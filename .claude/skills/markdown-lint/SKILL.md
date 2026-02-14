@@ -8,13 +8,16 @@ disable-model-invocation: false
 Check markdown files for formatting and style issues using markdownlint-cli2.
 
 **When to use this skill:**
+
 - Before committing changes to markdown files
 - After creating or updating lessons, READMEs, or documentation
 - When CI markdown linting checks fail
 - To ensure consistent markdown style across the project
 
 **AI auto-invocation:**
+
 The model should automatically invoke this skill:
+
 - **After creating/updating markdown files** — Run `npx markdownlint-cli2 "**/*.md"` to check
 - **Before git commits touching markdown** — Verify no linting errors
 - **If errors found** — Attempt auto-fix with `--fix` flag first, then fix remaining errors manually
@@ -42,25 +45,39 @@ If no arguments provided, runs in check-only mode.
 The project uses `.markdownlint-cli2.jsonc` for configuration:
 
 **Strict rules (must follow):**
+
 - **MD040**: Code blocks MUST have language tags (`` ```text ``, `` ```c ``, `` ```bash ``, etc.)
 - **MD060**: Tables must have consistent column alignment
 
 **Lenient rules:**
+
 - Line length (MD013): Disabled — lessons need flexibility
 - Blank lines (MD031/MD032): Lenient — formatting varies by context
 - Duplicate headings (MD024): Allowed at different levels
 - HTML (MD033): Allowed when needed for formatting
+
+**CRITICAL — Configuration is non-negotiable:**
+
+- **NEVER** disable or remove lint rules to make errors pass
+- **NEVER** relax existing rules (e.g., turning MD040 from error to warning)
+- **NEVER** modify `.markdownlint-cli2.jsonc` to bypass validation
+- **NEVER** remove or disable the CI workflow (`.github/workflows/markdown-lint.yml`)
+
+If linting fails, fix the markdown — do not weaken the linter. Quality checks
+protect learning quality for all users.
 
 ## Common errors and fixes
 
 ### MD040: Missing language tag on code block
 
 **Error:**
+
 ```text
 README.md:45 MD040/fenced-code-language Fenced code blocks should have a language specified
 ```
 
 **Problem:** Code block missing language identifier:
+
 ````text
 ```
 some code here
@@ -68,6 +85,7 @@ some code here
 ````
 
 **Fix:** Add appropriate language tag:
+
 ````text
 ```c
 some code here
@@ -75,6 +93,7 @@ some code here
 ````
 
 **Common tags:**
+
 - `bash` — Shell commands, scripts
 - `c` — C code
 - `text` — Plain text, output, diagrams, directory trees
@@ -96,6 +115,7 @@ code here
 ### MD060: Table columns should have consistent alignment
 
 **Error:**
+
 ```text
 README.md:80 MD060/table-column-count Table row column count
 ```
@@ -103,6 +123,7 @@ README.md:80 MD060/table-column-count Table row column count
 **Problem:** Table rows have different numbers of columns, or alignment is inconsistent.
 
 **Fix:** Ensure all rows have the same number of columns:
+
 ```markdown
 | Header 1 | Header 2 | Header 3 |
 |----------|----------|----------|
@@ -119,6 +140,7 @@ README.md:80 MD060/table-column-count Table row column count
 ```
 
 Or manually:
+
 ```bash
 npx markdownlint-cli2 "**/*.md"
 ```
@@ -130,6 +152,7 @@ npx markdownlint-cli2 "**/*.md"
 ```
 
 Or manually:
+
 ```bash
 npx markdownlint-cli2 --fix "**/*.md"
 ```
@@ -145,6 +168,7 @@ npx markdownlint-cli2 "**/*.md"
 ```
 
 If errors are found:
+
 1. Try auto-fix: `npx markdownlint-cli2 --fix "**/*.md"`
 2. Review remaining errors and fix manually
 3. Re-run to verify: `npx markdownlint-cli2 "**/*.md"`
@@ -152,6 +176,7 @@ If errors are found:
 ### In CI
 
 The `.github/workflows/markdown-lint.yml` workflow runs automatically on:
+
 - Pull requests touching markdown files
 - Pushes to main with markdown changes
 
@@ -166,6 +191,7 @@ When this skill is invoked:
    - Default to check-only mode
 
 2. **Run markdownlint-cli2:**
+
    ```bash
    npx markdownlint-cli2 [--fix] "**/*.md"
    ```
@@ -196,6 +222,7 @@ When this skill is invoked:
 ## Example output
 
 **All files pass:**
+
 ```text
 markdownlint-cli2 v0.20.0 (markdownlint v0.40.0)
 Finding: **/*.md
@@ -204,6 +231,7 @@ Summary: 0 error(s)
 ```
 
 **Errors found:**
+
 ```text
 markdownlint-cli2 v0.20.0 (markdownlint v0.40.0)
 Finding: **/*.md

@@ -54,6 +54,7 @@ All math operations are implemented in the **forge-gpu math library** at
 `common/math/forge_math.h`. It's header-only, well-documented, and reusable.
 
 **Quick reference:**
+
 - `vec2`, `vec3`, `vec4` — Vectors (map to HLSL `float2/3/4`)
 - `mat4` — 4×4 matrices (column-major, matches HLSL `float4x4`)
 - Operations: `add`, `sub`, `scale`, `dot`, `cross`, `normalize`, `lerp`, etc.
@@ -74,6 +75,7 @@ When you understand both the math AND the GPU API, you can build confidently.
 1. **Copy the header**: `common/math/forge_math.h`
 2. **Include it**: `#include "math/forge_math.h"`
 3. **Use it**:
+
    ```c
    vec3 position = vec3_create(0.0f, 1.0f, 0.0f);
    vec3 velocity = vec3_create(1.0f, 0.0f, 0.0f);
@@ -85,16 +87,19 @@ The math library is **standalone** — no SDL or GPU dependencies. Use it anywhe
 ## Learning Path
 
 **If you're new to graphics math:**
+
 1. Start with [01-vectors](01-vectors/) — Foundation of everything
 2. Move to matrices (coming soon) — Transformations and camera
 3. Then dive into GPU lessons to see it in action
 
 **If you're building a project:**
+
 1. Copy `.claude/skills/` into your project (AI skills for building)
 2. Use the math library for all math operations
 3. When you hit a concept you don't understand, read the corresponding lesson
 
 **If you're stuck on a GPU lesson:**
+
 - Check if there's a math lesson explaining the concept
 - Run the demo to see it in isolation
 - Then return to the GPU lesson with better understanding
@@ -104,11 +109,13 @@ The math library is **standalone** — no SDL or GPU dependencies. Use it anywhe
 Need a math operation that doesn't exist yet?
 
 Use the `/math-lesson` skill (or ask Claude to use it):
+
 ```bash
 /math-lesson 02 quaternions "Quaternion rotations and slerp"
 ```
 
 This creates:
+
 - A new math lesson with demo program
 - Implementation in `forge_math.h`
 - Documentation and cross-references
@@ -118,6 +125,7 @@ See [.claude/skills/math-lesson/](../../.claude/skills/math-lesson/) for details
 ## Exercises
 
 Each math lesson includes exercises. Work through them to:
+
 - Reinforce concepts
 - Practice using the math library
 - Build intuition for how math connects to graphics

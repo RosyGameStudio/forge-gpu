@@ -17,6 +17,7 @@ Learn the fundamentals of vector math for graphics and game programming.
 A console program demonstrating vector operations with clear output showing the geometric meaning of each operation. The demo covers all fundamental vector operations used in graphics programming.
 
 **Example output:**
+
 ```text
 === Vector Math Demo ===
 --- Creating Vectors ---
@@ -62,6 +63,7 @@ lerp(start, end, 1.0) = (10.000, 10.000, 0.000)
 ### What is a vector?
 
 A **vector** is a quantity with both magnitude (length) and direction. In graphics:
+
 - **Position**: Where something is (vec3 position = (5, 10, 2))
 - **Direction**: Which way it's facing (vec3 forward = (0, 0, 1))
 - **Displacement**: How far it moved (vec3 velocity = (1, 0, 0))
@@ -69,6 +71,7 @@ A **vector** is a quantity with both magnitude (length) and direction. In graphi
 Vectors are written as (x, y) in 2D or (x, y, z) in 3D.
 
 **forge-gpu types:**
+
 - `vec2` — 2D vectors (x, y) — maps to HLSL `float2`
 - `vec3` — 3D vectors (x, y, z) — maps to HLSL `float3`
 - `vec4` — 4D vectors (x, y, z, w) — maps to HLSL `float4`
@@ -121,6 +124,7 @@ vec3 fast = vec3_scale(velocity, 5.0f);  // (5, 0, 0) — 5× faster
 **Result:** A single number (scalar), not a vector.
 
 **Geometric meaning:** Measures how much two vectors point in the same direction.
+
 - Result = `|a| * |b| * cos(θ)` where θ is the angle between them
 - **Positive**: vectors point in similar directions
 - **Zero**: vectors are perpendicular (90° angle)
@@ -133,6 +137,7 @@ float d = vec3_dot(forward, right);  // 0.0 — perpendicular
 ```
 
 **Use cases:**
+
 - Checking if two vectors are perpendicular
 - Finding the angle between vectors: `angle = acos(dot(a, b) / (length(a) * length(b)))`
 - Lighting calculations: `brightness = dot(surface_normal, light_direction)`
@@ -170,6 +175,7 @@ vec3 dir = vec3_normalize(v);  // (0.6, 0.8, 0.0) — Length = 1.0
 ```
 
 **Use cases:**
+
 - Direction vectors (camera forward, object facing, etc.)
 - Unit normals for lighting
 - Consistent movement speed regardless of input magnitude
@@ -177,6 +183,7 @@ vec3 dir = vec3_normalize(v);  // (0.6, 0.8, 0.0) — Length = 1.0
 ### Cross Product (3D only)
 
 **Formula:**
+
 ```text
 (a.y * b.z - a.z * b.y,
  a.z * b.x - a.x * b.z,
@@ -184,6 +191,7 @@ vec3 dir = vec3_normalize(v);  // (0.6, 0.8, 0.0) — Length = 1.0
 ```
 
 **Geometric meaning:** Produces a vector **perpendicular** to both `a` and `b`, following the right-hand rule:
+
 - Point fingers along `a`
 - Curl them toward `b`
 - Thumb points along the result
@@ -197,6 +205,7 @@ vec3 z_axis = vec3_cross(x_axis, y_axis);  // (0, 0, 1)
 ```
 
 **Use cases:**
+
 - Computing surface normals: `normal = normalize(cross(edge1, edge2))`
 - Building coordinate frames: `right = cross(up, forward)`
 - Determining if a point is left/right of a line
@@ -206,6 +215,7 @@ vec3 z_axis = vec3_cross(x_axis, y_axis);  // (0, 0, 1)
 **Formula:** `a + t * (b - a)`
 
 **Geometric meaning:** Blend smoothly from `a` to `b`:
+
 - `t = 0.0` → returns `a`
 - `t = 0.5` → returns midpoint
 - `t = 1.0` → returns `b`
@@ -217,6 +227,7 @@ vec3 halfway = vec3_lerp(start, end, 0.5f);  // (5, 0, 0)
 ```
 
 **Use cases:**
+
 - Smooth camera movement
 - Animation (position over time)
 - Color blending
@@ -224,6 +235,7 @@ vec3 halfway = vec3_lerp(start, end, 0.5f);  // (5, 0, 0)
 ## Where it's used
 
 Graphics and game programming uses vectors for:
+
 - **Positions** — where objects are in 3D space
 - **Directions** — which way cameras, lights, and objects face
 - **Velocities** — how fast and in what direction things move
@@ -231,10 +243,12 @@ Graphics and game programming uses vectors for:
 - **Colors** — RGB values are vec3 (red, green, blue)
 
 **In forge-gpu lessons:**
+
 - [Lesson 02 — First Triangle](../../gpu/02-first-triangle/) uses `vec2` for vertex positions and `vec3` for RGB colors
 - [Lesson 03 — Uniforms & Motion](../../gpu/03-uniforms-and-motion/) uses vectors for animated triangle vertices
 
 **In the forge-gpu math library:**
+
 - See `common/math/forge_math.h` for all vector operations
 - See `common/math/README.md` for usage guide
 

@@ -10,6 +10,7 @@ Claude), implement or respond to feedback, and merge the PR when all feedback is
 resolved.
 
 The user provides:
+
 - **PR number**: the pull request number to review (optional - infers from current branch)
 
 ## Workflow
@@ -24,17 +25,20 @@ outputs them to stderr. Handle both stdout and stderr to capture all check statu
 Output format: `check-name  status  duration  url`
 
 **If any checks are still running (pending):**
+
 - Report which checks are pending
 - Exit with message: "GitHub Actions still running. Run this skill again when checks complete."
 - DO NOT sleep or wait — let the user run the skill again later
 
 **If checks failed:**
+
 - Report which checks failed
 - Show the failure URL from the output
 - **If markdown linting failed**, offer to run it locally and fix issues (see step 1.5)
 - Otherwise exit and ask user to investigate
 
 **If all checks passed:**
+
 - Proceed to step 2 (fetch review comments)
 
 ### 1.5. Fix markdown linting failures (if needed)
@@ -42,11 +46,13 @@ Output format: `check-name  status  duration  url`
 If the "Markdown Lint" check failed:
 
 1. **Run locally to see errors:**
+
    ```bash
    npx markdownlint-cli2 "**/*.md"
    ```
 
 2. **Attempt auto-fix:**
+
    ```bash
    npx markdownlint-cli2 --fix "**/*.md"
    ```
@@ -54,11 +60,13 @@ If the "Markdown Lint" check failed:
 3. **Manually fix remaining errors** (especially MD040 - missing language tags)
 
 4. **Verify all errors resolved:**
+
    ```bash
    npx markdownlint-cli2 "**/*.md"
    ```
 
 5. **Commit and push fixes:**
+
    ```bash
    git add <fixed-files>
    git commit -m "Fix markdown linting errors
@@ -79,6 +87,7 @@ gh api repos/{owner}/{repo}/pulls/{pr-number}/comments
 ```
 
 This returns an array of review comment objects with:
+
 - `path` — file path
 - `line` / `start_line` — line numbers
 - `body` — comment body (markdown, may include severity, suggestions)
@@ -86,12 +95,14 @@ This returns an array of review comment objects with:
 - `user.login` — reviewer (e.g., "coderabbitai[bot]", "claude-code[bot]")
 
 **CodeRabbit comment format:**
+
 - Body starts with severity: `_⚠️ Potential issue_ | _🟠 Major_`, `_🟡 Minor_`, or other markers
 - Includes suggested fixes in `<details><summary>Suggested fix</summary>` blocks
 - May include committable suggestions between `<!-- suggestion_start -->` markers
 - **Important:** CodeRabbit may leave nitpick/style comments alongside major issues—fetch ALL comments, not just the first few
 
 Parse and categorize feedback by:
+
 - Severity (🟠 Major, 🟡 Minor, nitpick/style)
 - File and line number
 - Reviewer (CodeRabbit, Claude, human)
@@ -103,6 +114,7 @@ Parse and categorize feedback by:
 **Sort comments by severity:** Major → Minor → Nitpick/Style, so critical issues (especially security) are addressed first.
 
 Show the user:
+
 ```text
 ## PR Review Feedback Summary
 
@@ -143,6 +155,7 @@ How should I handle this?
 ```
 
 Use AskUserQuestion with options:
+
 - "Implement" - Make the code changes, commit, push
 - "Respond and resolve" - Ask user for response text, post comment, resolve conversation
 - "Skip" - Move to next feedback
@@ -150,6 +163,7 @@ Use AskUserQuestion with options:
 ### 5. After implementing changes
 
 If any code changes were made:
+
 - Stage changes
 - Create commit: "Address PR feedback: [summary]"
 - Push to the PR branch
@@ -157,6 +171,7 @@ If any code changes were made:
 - Exit with: "Changes pushed. Run this skill again after checks complete."
 
 **On next run after CodeRabbit re-reviews:**
+
 - Check if comments are auto-resolved (CodeRabbit detects implemented fixes)
 - If still unresolved after implementing the suggested fix:
   - Mention CodeRabbit in a comment: "@coderabbitai I've implemented your suggestion in commit ABC123. Can you verify and resolve this conversation?"
@@ -166,20 +181,24 @@ If any code changes were made:
 ### 6. Check if ready to merge
 
 Use `gh pr view <pr-number> --json reviewDecision,statusCheckRollup` to verify:
+
 - All conversations are resolved
 - All status checks pass
 - PR has approval (reviewDecision = "APPROVED")
 
 **If not ready:**
+
 - Report what's blocking (conversations, checks, approval)
 - Exit with instructions
 
 **If ready:**
+
 - Proceed to step 7
 
 ### 7. Merge the PR
 
 Ask user for confirmation:
+
 ```text
 ✅ All feedback resolved, all checks passing, PR approved.
 
@@ -193,6 +212,7 @@ Merge method:
 ```
 
 After user confirmation:
+
 ```bash
 gh pr merge <pr-number> --squash --delete-branch
 ```

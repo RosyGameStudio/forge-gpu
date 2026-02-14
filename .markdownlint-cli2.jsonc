@@ -8,9 +8,6 @@
     // MD013/line-length - Disable line length limits (lessons need flexibility)
     "MD013": false,
 
-    // MD022/blanks-around-headings - Be lenient about heading spacing
-    "MD022": false,
-
     // MD024/no-duplicate-heading - Allow duplicate headings (lessons reuse "Example", "Usage")
     "MD024": {
       "siblings_only": true  // Only flag duplicates at the same level
@@ -21,12 +18,6 @@
 
     // MD036/no-emphasis-as-heading - Allow bold text that looks like headings
     "MD036": false,
-
-    // MD031/blanks-around-fences - Be lenient about code block spacing in examples
-    "MD031": false,
-
-    // MD032/blanks-around-lists - Be lenient about list spacing
-    "MD032": false,
 
     // MD033/no-inline-html - Allow inline HTML (sometimes needed for formatting)
     "MD033": false,

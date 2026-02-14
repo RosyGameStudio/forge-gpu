@@ -15,6 +15,7 @@ Understanding the transformation pipeline from your 3D model to pixels on screen
 A console program that traces a single point through all six coordinate spaces, printing its coordinates at each transformation stage. The output shows the complete pipeline from model space to screen pixels.
 
 **Example output:**
+
 ```text
 ====================================================================
   Coordinate Spaces - The Transformation Pipeline
@@ -53,6 +54,7 @@ A console program that traces a single point through all six coordinate spaces, 
 ## Why coordinate spaces matter
 
 When you're building a 3D game or renderer, you work with many different coordinate systems:
+
 - Your character model is defined in its own "local" coordinates
 - That character exists at a position in the game "world"
 - The player views the world through a "camera"
@@ -71,6 +73,7 @@ When you're building a 3D game or renderer, you work with many different coordin
 **Purpose:** Makes modeling easier — a cube centered at (0,0,0) is simpler to work with than one offset at (57, 103, -42).
 
 **Example:**
+
 ```c
 /* A simple triangle in local space */
 vec3 vertices[] = {
@@ -95,6 +98,7 @@ Each mesh/model has its own local space. You define it once, then reuse it every
 **Transformation:** `Model Matrix` (combines translation, rotation, scale)
 
 **Example:**
+
 ```c
 /* Place a tree at (5, 0, 10) in the world */
 vec3 position = vec3_create(5.0f, 0.0f, 10.0f);
@@ -117,6 +121,7 @@ The **model matrix** encodes "where is this object in the world?"
 **Origin:** The camera position
 
 **Axes:**
+
 - +X points to the camera's right
 - +Y points up
 - **-Z points forward** (where the camera is looking)
@@ -127,6 +132,7 @@ The **model matrix** encodes "where is this object in the world?"
 **Transformation:** `View Matrix` (inverse of the camera's model matrix)
 
 **Example:**
+
 ```c
 /* Create a camera at (0, 2, 10), looking at the origin */
 vec3 eye = vec3_create(0.0f, 2.0f, 10.0f);
@@ -139,6 +145,7 @@ mat4 view_matrix = mat4_look_at(eye, target, up);
 The **view matrix** encodes "where is the camera, and what is it looking at?"
 
 **How `mat4_look_at` works:**
+
 1. Compute the camera's orientation (forward, right, up vectors)
 2. Build a rotation matrix using those vectors
 3. Apply a translation to move the world opposite to the camera
@@ -159,6 +166,7 @@ In view space, objects in front of the camera have **negative Z** values.
 **Key property:** The **w component is no longer 1** — it encodes depth for perspective division.
 
 **Example:**
+
 ```c
 float fov = 60.0f * FORGE_DEG2RAD;           /* Field of view */
 float aspect = 1920.0f / 1080.0f;            /* Screen aspect ratio */
@@ -179,6 +187,7 @@ After applying the projection matrix, vertices are in **homogeneous coordinates*
 **What it is:** Coordinates after **perspective division** (dividing x, y, z by w).
 
 **Range:**
+
 - X ∈ [-1, 1] — left to right
 - Y ∈ [-1, 1] — bottom to top
 - Z ∈ [0, 1] — near to far (Vulkan/Metal/D3D12)
@@ -189,6 +198,7 @@ After applying the projection matrix, vertices are in **homogeneous coordinates*
 **Transformation:** Automatic perspective divide (GPU does this)
 
 **Example:**
+
 ```c
 vec4 clip_point = vec4_create(2.0f, 1.0f, 0.5f, 2.0f);
 
@@ -212,6 +222,7 @@ vec3 ndc_point = vec3_create(
 **Origin:** Top-left (0, 0) or bottom-left (API-dependent)
 
 **Range:**
+
 - X ∈ [0, screen_width]
 - Y ∈ [0, screen_height]
 
@@ -220,6 +231,7 @@ vec3 ndc_point = vec3_create(
 **Transformation:** `Viewport Transform` (GPU does this automatically)
 
 **Example:**
+
 ```c
 int screen_width = 1920;
 int screen_height = 1080;
@@ -295,6 +307,7 @@ Here's how a vertex flows through the entire pipeline:
 ```
 
 **In shader code (vertex shader):**
+
 ```hlsl
 float4 position_local = float4(input.position, 1.0);
 float4 position_world = mul(model_matrix, position_local);
@@ -306,6 +319,7 @@ return position_clip;
 ```
 
 **Combined transform (common optimization):**
+
 ```c
 /* Precompute on CPU once per frame */
 mat4 model_view_projection = mat4_multiply(
@@ -341,19 +355,23 @@ You could theoretically skip some of these (e.g., go straight from world to clip
 ### In GPU Lessons
 
 **Lesson 01 — Hello Window**
+
 - No coordinate transforms yet — just opening a window
 
 **Lesson 02 — First Triangle**
+
 - Vertices are in **clip space** directly (we skip the earlier spaces)
 - Range: [-1, 1] for visible vertices
 - See: [lessons/gpu/02-first-triangle](../../gpu/02-first-triangle/)
 
 **Lesson 03 — Uniforms & Motion**
+
 - Introduces **model matrix** via push constants
 - Still outputs to clip space, but now we can rotate geometry
 - See: [lessons/gpu/03-uniforms-and-motion](../../gpu/03-uniforms-and-motion/)
 
 **Future lessons (coming soon):**
+
 - **Camera lesson** — `mat4_look_at` for view matrix (world → view space)
 - **3D rendering** — `mat4_perspective` for projection (view → clip space)
 - **Multiple objects** — Separate model matrices for each object
@@ -363,18 +381,22 @@ You could theoretically skip some of these (e.g., go straight from world to clip
 All the transformation functions are in `common/math/forge_math.h`:
 
 **For model space → world space:**
+
 - `mat4_translate(vec3)` — position in world
 - `mat4_rotate_x/y/z(float)` — orientation
 - `mat4_scale(vec3)` — size
 - `mat4_multiply(a, b)` — combine transforms
 
 **For world space → view space:**
+
 - `mat4_look_at(eye, target, up)` — create view matrix
 
 **For view space → clip space:**
+
 - `mat4_perspective(fov, aspect, near, far)` — create projection matrix
 
 **For transforming vertices:**
+
 - `mat4_multiply_vec4(matrix, vector)` — apply a transformation
 
 See [common/math/README.md](../../../common/math/README.md) for full API.
