@@ -184,7 +184,9 @@ gh run view <run-id>
 
 # Reply to a specific review comment thread (CORRECT - creates nested reply)
 # Use this to respond to CodeRabbit/Claude feedback on specific lines
-gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment-id}/replies \
+# IMPORTANT: Must include PR number in path - repos/{owner}/{repo}/pulls/{pr-number}/comments/{comment-id}/replies
+# Example: gh api repos/RosyGameStudio/forge-gpu/pulls/1/comments/2807683534/replies
+gh api repos/{owner}/{repo}/pulls/{pr-number}/comments/{comment-id}/replies \
   -f body="response text"
 
 # Post a general PR comment (AVOID - doesn't thread properly with review feedback)
@@ -192,7 +194,8 @@ gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment-id}/replies \
 gh pr comment <pr-number> --body "response text"
 
 # Ask CodeRabbit to verify/resolve after implementing a fix (reply to the comment thread)
-gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment-id}/replies \
+# IMPORTANT: Must include PR number in the path (not just comment ID)
+gh api repos/{owner}/{repo}/pulls/{pr-number}/comments/{comment-id}/replies \
   -f body="@coderabbitai I've implemented your suggestion in commit ABC123. Can you verify and resolve this conversation?"
 
 # Resolve a review thread manually
@@ -211,9 +214,10 @@ gh pr merge <pr-number> --squash --delete-branch
 - If Code Rabbit or Claude give conflicting advice, prioritize project conventions from CLAUDE.md
 - Always show the user what will be changed before making code modifications
 - Use the same commit message format as publish-lesson (with Co-Authored-By line)
-- **The "X out of Y pending tasks"** shown in GitHub UI are the unresolved review comment threads—fetch them via `gh api repos/.../pulls/{pr}/comments`
+- **The "X out of Y pending tasks"** shown in GitHub UI are the unresolved review comment threads—fetch them via `gh api repos/{owner}/{repo}/pulls/{pr-number}/comments`
 - **CodeRabbit auto-resolution:** CodeRabbit automatically resolves conversations when it detects the suggested fix was implemented in a new commit. Let it auto-resolve; only ask it to resolve manually if it doesn't detect your fix after re-review.
-- **Reply to comment threads:** Always use `gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment-id}/replies` to reply to specific review comments. This keeps conversations threaded. Do NOT use `gh pr comment` for replies—it creates unthreaded general comments.
+- **Reply to comment threads:** Always use `gh api repos/{owner}/{repo}/pulls/{pr-number}/comments/{comment-id}/replies` to reply to specific review comments. This keeps conversations threaded. Do NOT use `gh pr comment` for replies—it creates unthreaded general comments.
+  - **Common mistake:** Forgetting to include the PR number in the path (e.g., `repos/{owner}/{repo}/pulls/comments/{id}/replies` won't work—must be `pulls/{pr-number}/comments/{id}/replies`)
 
 ## Error handling
 
