@@ -31,10 +31,43 @@ Output format: `check-name  status  duration  url`
 **If checks failed:**
 - Report which checks failed
 - Show the failure URL from the output
-- Exit and ask user to investigate
+- **If markdown linting failed**, offer to run it locally and fix issues (see step 1.5)
+- Otherwise exit and ask user to investigate
 
 **If all checks passed:**
 - Proceed to step 2 (fetch review comments)
+
+### 1.5. Fix markdown linting failures (if needed)
+
+If the "Markdown Lint" check failed:
+
+1. **Run locally to see errors:**
+   ```bash
+   npx markdownlint-cli2 "**/*.md"
+   ```
+
+2. **Attempt auto-fix:**
+   ```bash
+   npx markdownlint-cli2 --fix "**/*.md"
+   ```
+
+3. **Manually fix remaining errors** (especially MD040 - missing language tags)
+
+4. **Verify all errors resolved:**
+   ```bash
+   npx markdownlint-cli2 "**/*.md"
+   ```
+
+5. **Commit and push fixes:**
+   ```bash
+   git add <fixed-files>
+   git commit -m "Fix markdown linting errors
+
+   Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+   git push
+   ```
+
+6. **Exit and wait for checks to re-run** — user should invoke `/review-pr` again after checks pass
 
 ### 2. Fetch review comments
 

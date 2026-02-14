@@ -78,6 +78,12 @@ If any of these are missing, ask the user before proceeding.
 10. **Create a matching skill**: add `.claude/skills/<topic>/SKILL.md` that
     distills the lesson into a reusable pattern with YAML frontmatter
 
+11. **Run markdown linting**: Use the `/markdown-lint` skill to verify all markdown files pass linting:
+    ```bash
+    npx markdownlint-cli2 "**/*.md"
+    ```
+    If errors found, auto-fix first then manually fix remaining issues (especially MD040 language tags)
+
 ## Using the Math Library
 
 **CRITICAL:** GPU lessons must use the math library (`common/math/forge_math.h`) for all math operations. Never write bespoke math in GPU lessons.

@@ -53,6 +53,11 @@ Before committing, verify the lesson has all required pieces from the
 - [ ] Includes code template or step-by-step instructions
 - [ ] Documents common mistakes or gotchas
 
+### Markdown linting
+- [ ] All markdown files pass linting (`npx markdownlint-cli2 "**/*.md"`)
+- [ ] Code blocks have language tags (MD040)
+- [ ] Tables have consistent column counts (MD060)
+
 If any checks fail, report them to the user and ask if they want to fix them
 before proceeding.
 
@@ -81,7 +86,26 @@ git add .claude/skills/<topic>/
 git add CMakeLists.txt PLAN.md README.md
 ```
 
-### 3. Write a descriptive commit message
+### 3. Run markdown linting
+
+Before committing, verify all markdown files pass linting:
+
+```bash
+npx markdownlint-cli2 "**/*.md"
+```
+
+If errors are found:
+1. Try auto-fix: `npx markdownlint-cli2 --fix "**/*.md"`
+2. Manually fix remaining errors (especially MD040 - missing language tags on code blocks)
+3. Re-run to verify: `npx markdownlint-cli2 "**/*.md"`
+4. Stage any fixed files: `git add <fixed-files>`
+
+Common fixes:
+- Add language tags: `` ```text ``, `` ```c ``, `` ```bash ``, `` ```markdown ``
+- For nested code blocks, use 4 backticks for outer fence
+- Ensure tables have consistent column counts
+
+### 4. Write a descriptive commit message
 
 Format:
 ```text
@@ -107,16 +131,16 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 
 Present the commit message to the user for approval before committing.
 
-### 4. Commit and push
+### 5. Commit and push
 ```bash
 git commit -m "$(cat <<'EOF'
-[commit message from step 3]
+[commit message from step 4]
 EOF
 )"
 git push -u origin lesson-NN-name
 ```
 
-### 5. Create a pull request
+### 6. Create a pull request
 
 Use `gh pr create` with a structured description:
 

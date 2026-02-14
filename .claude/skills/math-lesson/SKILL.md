@@ -240,6 +240,23 @@ cmake --build build --config Debug
 
 Verify the demo runs and produces expected output.
 
+### 10. Run markdown linting
+
+Use the `/markdown-lint` skill to check all markdown files:
+
+```bash
+npx markdownlint-cli2 "**/*.md"
+```
+
+If errors are found:
+1. Try auto-fix: `npx markdownlint-cli2 --fix "**/*.md"`
+2. Manually fix remaining errors (especially MD040 - missing language tags)
+3. Verify: `npx markdownlint-cli2 "**/*.md"`
+
+Common fixes needed:
+- Add language tags to code blocks (`` ```text ``, `` ```c ``, `` ```bash ``)
+- Use 4 backticks for nested code blocks (when showing markdown in markdown)
+
 ## Math Library Conventions
 
 ### Coordinate System
