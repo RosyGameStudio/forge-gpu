@@ -12,7 +12,7 @@
 A dark blue-grey window — not exciting to look at, but the entire GPU frame
 pipeline is running under the hood.
 
-<!-- TODO: add screenshot -->
+![Lesson 01 result](assets/screenshot.png)
 
 ## Key concepts
 
