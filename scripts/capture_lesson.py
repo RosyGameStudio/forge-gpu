@@ -45,11 +45,22 @@ def find_executable(target_name):
     return None
 
 
+def resolve_cmake():
+    """Locate the cmake executable on PATH, or exit with a clear error."""
+    cmake_path = shutil.which("cmake")
+    if not cmake_path:
+        print("Error: cmake not found on PATH.")
+        sys.exit(1)
+    return cmake_path
+
+
 def build_lesson(target_name):
     """Build the lesson with FORGE_CAPTURE enabled."""
-    print(f"Configuring with FORGE_CAPTURE=ON...")
+    cmake_path = resolve_cmake()
+
+    print("Configuring with FORGE_CAPTURE=ON...")
     result = subprocess.run(
-        ["cmake", "-B", "build", "-DFORGE_CAPTURE=ON"],
+        [cmake_path, "-B", "build", "-DFORGE_CAPTURE=ON"],
         capture_output=True, text=True
     )
     if result.returncode != 0:
@@ -58,7 +69,7 @@ def build_lesson(target_name):
 
     print(f"Building {target_name}...")
     result = subprocess.run(
-        ["cmake", "--build", "build", "--config", "Debug", "--target", target_name],
+        [cmake_path, "--build", "build", "--config", "Debug", "--target", target_name],
         capture_output=True, text=True
     )
     if result.returncode != 0:
@@ -70,6 +81,7 @@ def build_lesson(target_name):
 
 def capture_screenshot(exe_path, output_bmp, capture_frame):
     """Run the lesson and capture a single frame."""
+    exe_path = os.path.abspath(exe_path)
     print(f"Capturing screenshot (frame {capture_frame})...")
     result = subprocess.run(
         [exe_path, "--screenshot", output_bmp, "--capture-frame", str(capture_frame)],
@@ -85,6 +97,7 @@ def capture_screenshot(exe_path, output_bmp, capture_frame):
 
 def capture_sequence(exe_path, output_dir, frames, capture_frame):
     """Run the lesson and capture a sequence of frames."""
+    exe_path = os.path.abspath(exe_path)
     print(f"Capturing {frames} frames (starting at frame {capture_frame})...")
     os.makedirs(output_dir, exist_ok=True)
     result = subprocess.run(

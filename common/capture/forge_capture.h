@@ -247,6 +247,11 @@ static inline bool forge_capture_finish_frame(
 
     /* ── Download swapchain → transfer buffer ─────────────────────────── */
     SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+    if (!copy) {
+        SDL_Log("Capture: failed to begin copy pass (%ux%u): %s",
+                cap->width, cap->height, SDL_GetError());
+        return false;  /* caller should still submit the command buffer */
+    }
 
     SDL_GPUTextureRegion src_region;
     SDL_zero(src_region);
