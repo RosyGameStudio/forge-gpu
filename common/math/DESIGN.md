@@ -360,7 +360,7 @@ Each math lesson includes a program that:
 - Demonstrates the concept visually or numerically
 - Provides examples for users to understand usage
 
-Additionally, there is now an automated test suite located in `tests/math/` with 32 tests covering all vector and matrix operations. These tests verify correctness and are integrated with CTest for CI/CD. Run tests with:
+Additionally, there is an automated test suite in `tests/math/` covering all vector and matrix operations. These tests verify correctness and are integrated with CTest for CI/CD. Run tests with:
 
 ```bash
 ctest -C Debug --output-on-failure

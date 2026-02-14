@@ -8,7 +8,7 @@ Infrastructure that supports all lessons:
 - [x] **zlib LICENSE**
 - [x] **Math library** — `common/math/forge_math.h` (vectors, matrices, documented, tested)
 - [x] **Math lessons** — `lessons/math/` with standalone programs teaching concepts
-- [x] **Test suite** — Automated tests for math library (26 tests, CTest integration)
+- [x] **Test suite** — Automated tests for math library (CTest integration)
 - [x] **Skills** — `/math-lesson`, `/new-lesson`, etc. for AI-assisted development
 
 ## GPU Lessons — Completed
