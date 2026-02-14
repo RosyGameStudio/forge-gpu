@@ -20,6 +20,32 @@ Lessons include `capture/forge_capture.h` which adds `--screenshot` and
 `--capture-dir` command-line flags. The Python orchestration script runs
 the lesson, converts the BMP output to PNG or GIF, and updates the README.
 
+## Key API calls
+
+- **Configure build:** `cmake -B build -DFORGE_CAPTURE=ON`
+- **Build target:** `cmake --build build --config Debug --target <target-name>`
+- **Screenshot:** `python scripts/capture_lesson.py lessons/gpu/<lesson-dir> --screenshot`
+- **GIF:** `python scripts/capture_lesson.py lessons/gpu/<lesson-dir> --gif --frames N`
+- **Start frame:** `--capture-frame N` (default: 5, increase if output is black)
+- **Skip README update:** `--no-update-readme`
+- **Force rebuild:** `--build`
+
+## Code template
+
+```bash
+# 1. Configure with capture support
+cmake -B build -DFORGE_CAPTURE=ON
+
+# 2. Build the lesson
+cmake --build build --config Debug --target <target-name>
+
+# 3a. Capture a static screenshot (most lessons)
+python scripts/capture_lesson.py lessons/gpu/<lesson-dir> --screenshot
+
+# 3b. OR capture an animated GIF (for lessons with motion)
+python scripts/capture_lesson.py lessons/gpu/<lesson-dir> --gif --frames 60
+```
+
 ## Steps
 
 ### 1. Identify the lesson

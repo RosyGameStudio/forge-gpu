@@ -34,6 +34,12 @@
  * and any first-frame artifacts are gone. */
 #define FORGE_CAPTURE_DEFAULT_START_FRAME  5
 
+/* Default number of frames to capture in sequence mode. */
+#define FORGE_CAPTURE_DEFAULT_DURATION  60
+
+/* Bytes per pixel for RGBA/BGRA formats (used for transfer buffer sizing). */
+#define FORGE_CAPTURE_BYTES_PER_PIXEL  4
+
 /* Maximum path length for output filenames. */
 #define FORGE_CAPTURE_MAX_PATH  512
 
@@ -93,7 +99,7 @@ static inline bool forge_capture_parse_args(
 {
     SDL_memset(cap, 0, sizeof(*cap));
     cap->start_frame = FORGE_CAPTURE_DEFAULT_START_FRAME;
-    cap->frame_count = 60;
+    cap->frame_count = FORGE_CAPTURE_DEFAULT_DURATION;
 
     for (int i = 1; i < argc; i++) {
         if (SDL_strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
@@ -143,7 +149,7 @@ static inline bool forge_capture_init(
     SDL_GPUTransferBufferCreateInfo buf_info;
     SDL_zero(buf_info);
     buf_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
-    buf_info.size  = cap->width * cap->height * 4;
+    buf_info.size  = cap->width * cap->height * FORGE_CAPTURE_BYTES_PER_PIXEL;
 
     cap->buffer = SDL_CreateGPUTransferBuffer(device, &buf_info);
     if (!cap->buffer) {
@@ -185,7 +191,7 @@ static inline bool forge_capture__save_bmp(
     ForgeCapture *cap, const void *pixels, const char *path)
 {
     SDL_PixelFormat fmt = forge_capture__pixel_format(cap->format);
-    int pitch = (int)(cap->width * 4);
+    int pitch = (int)(cap->width * FORGE_CAPTURE_BYTES_PER_PIXEL);
 
     SDL_Surface *surface = SDL_CreateSurfaceFrom(
         (int)cap->width, (int)cap->height, fmt, (void *)pixels, pitch);
@@ -278,14 +284,15 @@ static inline bool forge_capture_finish_frame(
                          cap->output_path, cap->frames_saved);
         }
 
-        forge_capture__save_bmp(cap, pixels, filepath);
+        if (forge_capture__save_bmp(cap, pixels, filepath)) {
+            cap->frames_saved++;
+        }
         SDL_UnmapGPUTransferBuffer(cap->device, cap->buffer);
     } else {
         SDL_Log("Capture: failed to map transfer buffer: %s", SDL_GetError());
     }
 
     SDL_ReleaseGPUFence(cap->device, fence);
-    cap->frames_saved++;
 
     return true;  /* command buffer was submitted — caller must not submit */
 }

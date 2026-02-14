@@ -31,7 +31,7 @@ import subprocess
 import sys
 
 
-def find_executable(lesson_dir, target_name):
+def find_executable(target_name):
     """Find the lesson executable in the build directory."""
     # Common build output locations for CMake + MSVC
     candidates = [
@@ -199,11 +199,11 @@ def main():
     lesson_name = f"Lesson {match.group(1)}" if match else target_name
 
     # Find or build the executable
-    exe_path = find_executable(lesson_dir, target_name)
+    exe_path = find_executable(target_name)
     if not exe_path or args.build:
         if not build_lesson(target_name):
             sys.exit(1)
-        exe_path = find_executable(lesson_dir, target_name)
+        exe_path = find_executable(target_name)
 
     if not exe_path:
         print(f"Could not find executable for {target_name}.")

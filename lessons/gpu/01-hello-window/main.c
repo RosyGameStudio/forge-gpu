@@ -245,14 +245,18 @@ SDL_AppResult SDL_AppIterate(void *appstate)
      * The GPU executes all recorded work and presents the
      * swapchain texture to the window. */
 #ifdef FORGE_CAPTURE
-    if (!forge_capture_finish_frame(&state->capture, cmd, swapchain))
+    if (state->capture.mode != FORGE_CAPTURE_NONE) {
+        if (!forge_capture_finish_frame(&state->capture, cmd, swapchain)) {
+            SDL_SubmitGPUCommandBuffer(cmd);
+        }
+        if (forge_capture_should_quit(&state->capture)) {
+            return SDL_APP_SUCCESS;
+        }
+    } else
 #endif
+    {
         SDL_SubmitGPUCommandBuffer(cmd);
-
-#ifdef FORGE_CAPTURE
-    if (forge_capture_should_quit(&state->capture))
-        return SDL_APP_SUCCESS;
-#endif
+    }
 
     return SDL_APP_CONTINUE;
 }
