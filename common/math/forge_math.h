@@ -712,4 +712,62 @@ static inline mat4 mat4_perspective(float fov_y_radians, float aspect_ratio,
     return m;
 }
 
+/* Create an orthographic projection matrix.
+ *
+ * This transforms view space into clip space WITHOUT perspective foreshortening
+ * (distant objects appear the same size as near objects).
+ *
+ * The projection maps an axis-aligned box in view space to the NDC cube.
+ * Everything inside the box is visible; everything outside is clipped.
+ *
+ * Unlike perspective projection, there is no perspective divide (w stays 1),
+ * so parallel lines in the scene remain parallel on screen.
+ *
+ * Parameters:
+ *   left   — X coordinate of the left clipping plane
+ *   right  — X coordinate of the right clipping plane
+ *   bottom — Y coordinate of the bottom clipping plane
+ *   top    — Y coordinate of the top clipping plane
+ *   near_plane — Distance to the near clipping plane (positive)
+ *   far_plane  — Distance to the far clipping plane (positive, > near)
+ *
+ * Coordinate ranges after projection:
+ *   X in [-1, 1] — left to right
+ *   Y in [-1, 1] — bottom to top
+ *   Z in [0, 1]  — near to far (Vulkan/Metal/D3D convention)
+ *
+ * Usage:
+ *   mat4 proj = mat4_orthographic(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 100.0f);
+ *
+ * Common use cases:
+ *   - 2D rendering / UI: mat4_orthographic(0, width, 0, height, -1, 1)
+ *   - Shadow maps: orthographic from the light's point of view
+ *   - CAD / architectural visualization: no perspective distortion
+ *
+ * See: lessons/math/03-orthographic-projection
+ */
+static inline mat4 mat4_orthographic(float left, float right,
+                                      float bottom, float top,
+                                      float near_plane, float far_plane)
+{
+    mat4 m = { 0 };  /* Zero-initialize */
+
+    /* X: map [left, right] to [-1, 1] */
+    m.m[0]  = 2.0f / (right - left);
+    m.m[12] = -(right + left) / (right - left);
+
+    /* Y: map [bottom, top] to [-1, 1] */
+    m.m[5]  = 2.0f / (top - bottom);
+    m.m[13] = -(top + bottom) / (top - bottom);
+
+    /* Z: map [-near, -far] to [0, 1] (0-to-1 depth, right-handed) */
+    m.m[10] = 1.0f / (near_plane - far_plane);
+    m.m[14] = near_plane / (near_plane - far_plane);
+
+    /* w stays 1 (no perspective divide) */
+    m.m[15] = 1.0f;
+
+    return m;
+}
+
 #endif /* FORGE_MATH_H */

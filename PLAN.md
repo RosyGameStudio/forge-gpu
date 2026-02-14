@@ -20,6 +20,7 @@ Infrastructure that supports all lessons:
 ## Math Lessons — Completed
 
 - [x] **Math Lesson 01 — Vectors** — vec2/vec3/vec4, dot product, cross product, normalization, lerp
+- [x] **Math Lesson 03 — Orthographic Projection** — mat4_orthographic, 2D rendering, perspective comparison
 
 ## GPU Lessons — Up Next
 
