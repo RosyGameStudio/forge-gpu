@@ -357,29 +357,29 @@ build\lessons\math\02-coordinate-spaces\Debug\02-coordinate-spaces.exe
 The demo program takes a single point and prints its coordinates at each stage of the pipeline. Watch how the values change!
 
 **Example output:**
-```
-════════════════════════════════════════════════════════════════════
-  Coordinate Spaces — The Transformation Pipeline
-════════════════════════════════════════════════════════════════════
+```text
+====================================================================
+  Coordinate Spaces - The Transformation Pipeline
+====================================================================
 
 1. LOCAL / MODEL SPACE
   Local point:         (1.00, 0.50, 0.00, 1.00)
 
 2. WORLD SPACE
-  World point:         (5.71, 2.71, 0.00, 1.00)
+  World point:         (5.35, 3.06, 0.00, 1.00)
 
 3. VIEW / CAMERA SPACE
-  View point:          (2.12, 0.42, -8.03, 1.00)
+  View point:          (5.13, 2.52, -8.54, 1.00)
 
 4. CLIP SPACE
-  Clip point:          (2.55, 0.65, 4.01, 8.03)
+  Clip point:          (5.00, 4.36, 8.45, 8.54)
 
 5. NDC (Normalized Device Coordinates)
-  NDC point:           (0.32, 0.08, 0.50, 1.00)
-  ✓ Point is INSIDE the visible range — would be rendered!
+  NDC point:           (0.59, 0.51, 0.99, 1.00)
+  [OK] Point is INSIDE the visible range - would be rendered!
 
 6. SCREEN SPACE
-  Screen pixel:        (1267.2, 496.8)
+  Screen pixel:        (1521.7, 264.3)
 ```
 
 ---
