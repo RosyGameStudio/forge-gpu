@@ -67,7 +67,7 @@ shader source, you'll need:
 After installing, make sure the Vulkan SDK `dxc` is on your PATH, or use
 the full path. On Windows the default location is:
 
-```
+```text
 C:\VulkanSDK\<version>\Bin\dxc.exe
 ```
 

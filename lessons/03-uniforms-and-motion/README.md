@@ -45,7 +45,7 @@ choice.
 
 ### The uniform data flow
 
-```
+```text
 CPU (each frame)                    GPU (vertex shader)
 ─────────────────                   ───────────────────
 Uniforms uniforms;                  cbuffer Uniforms : register(b0, space1)
