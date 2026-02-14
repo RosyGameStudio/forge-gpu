@@ -10,7 +10,47 @@ Understanding the transformation pipeline from your 3D model to pixels on screen
 - The complete pipeline: Model → World → View → Clip → NDC → Screen
 - How to use `mat4_look_at()` and `mat4_perspective()` for camera and projection
 
-## The Problem
+## Result
+
+A console program that traces a single point through all six coordinate spaces, printing its coordinates at each transformation stage. The output shows the complete pipeline from model space to screen pixels.
+
+**Example output:**
+```text
+====================================================================
+  Coordinate Spaces - The Transformation Pipeline
+====================================================================
+
+1. LOCAL / MODEL SPACE
+  Local point:         (1.00, 0.50, 0.00, 1.00)
+
+2. WORLD SPACE
+  World point:         (5.35, 3.06, 0.00, 1.00)
+
+3. VIEW / CAMERA SPACE
+  View point:          (5.13, 2.52, -8.54, 1.00)
+
+4. CLIP SPACE
+  Clip point:          (5.00, 4.36, 8.45, 8.54)
+
+5. NDC (Normalized Device Coordinates)
+  NDC point:           (0.59, 0.51, 0.99, 1.00)
+  [OK] Point is INSIDE the visible range - would be rendered!
+
+6. SCREEN SPACE
+  Screen pixel:        (1521.7, 264.3)
+```
+
+## Key concepts
+
+- **Coordinate spaces** — Different reference frames for representing geometry at each pipeline stage
+- **Homogeneous coordinates** — The w component enables perspective division and distinguishes positions (w=1) from directions (w=0)
+- **Model matrix** — Transforms from local object space to world scene space
+- **View matrix** — Transforms from world space to camera-relative space (created with `mat4_look_at`)
+- **Projection matrix** — Transforms from view space to clip space with perspective (created with `mat4_perspective`)
+- **Perspective divide** — Dividing x, y, z by w converts clip space to NDC
+- **Transformation pipeline** — The sequence: Model → World → View → Clip → NDC → Screen
+
+## Why coordinate spaces matter
 
 When you're building a 3D game or renderer, you work with many different coordinate systems:
 - Your character model is defined in its own "local" coordinates
@@ -202,7 +242,7 @@ You don't usually compute this manually — the GPU handles it. But understandin
 
 Here's how a vertex flows through the entire pipeline:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │  1. LOCAL SPACE                                             │
 │     - Vertex defined in model's own coordinates            │
@@ -341,7 +381,7 @@ See [common/math/README.md](../../../common/math/README.md) for full API.
 
 ---
 
-## Running the Demo
+## Building
 
 ```bash
 cmake -B build
@@ -355,32 +395,6 @@ build\lessons\math\02-coordinate-spaces\Debug\02-coordinate-spaces.exe
 ```
 
 The demo program takes a single point and prints its coordinates at each stage of the pipeline. Watch how the values change!
-
-**Example output:**
-```text
-====================================================================
-  Coordinate Spaces - The Transformation Pipeline
-====================================================================
-
-1. LOCAL / MODEL SPACE
-  Local point:         (1.00, 0.50, 0.00, 1.00)
-
-2. WORLD SPACE
-  World point:         (5.35, 3.06, 0.00, 1.00)
-
-3. VIEW / CAMERA SPACE
-  View point:          (5.13, 2.52, -8.54, 1.00)
-
-4. CLIP SPACE
-  Clip point:          (5.00, 4.36, 8.45, 8.54)
-
-5. NDC (Normalized Device Coordinates)
-  NDC point:           (0.59, 0.51, 0.99, 1.00)
-  [OK] Point is INSIDE the visible range - would be rendered!
-
-6. SCREEN SPACE
-  Screen pixel:        (1521.7, 264.3)
-```
 
 ---
 
