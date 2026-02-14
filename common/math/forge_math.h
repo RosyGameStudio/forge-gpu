@@ -423,7 +423,7 @@ static inline float vec4_dot(vec4 a, vec4 b)
  * Usage:
  *   mat4 m = mat4_identity();
  *
- * See: lessons/math/02-matrices
+ * See: lessons/math/02-coordinate-spaces
  */
 static inline mat4 mat4_identity(void)
 {
@@ -446,7 +446,7 @@ static inline mat4 mat4_identity(void)
  *   mat4 combined  = mat4_multiply(translate, rotate);
  *   // Rotates first, then translates
  *
- * See: lessons/math/02-matrices
+ * See: lessons/math/02-coordinate-spaces
  */
 static inline mat4 mat4_multiply(mat4 a, mat4 b)
 {
@@ -477,7 +477,7 @@ static inline mat4 mat4_multiply(mat4 a, mat4 b)
  *   vec4 v = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
  *   vec4 rotated = mat4_multiply_vec4(rotation, v);  // (0, 1, 0, 1)
  *
- * See: lessons/math/02-matrices
+ * See: lessons/math/02-coordinate-spaces
  */
 static inline vec4 mat4_multiply_vec4(mat4 m, vec4 v)
 {
@@ -500,7 +500,7 @@ static inline vec4 mat4_multiply_vec4(mat4 m, vec4 v)
  *   vec4 point = vec4_create(0.0f, 0.0f, 0.0f, 1.0f);
  *   vec4 moved = mat4_multiply_vec4(m, point);  // (10, 5, 0, 1)
  *
- * See: lessons/math/02-matrices
+ * See: lessons/math/02-coordinate-spaces
  */
 static inline mat4 mat4_translate(vec3 translation)
 {
@@ -535,7 +535,7 @@ static inline mat4 mat4_scale_uniform(float s)
  *   vec3 scale = vec3_create(2.0f, 1.0f, 0.5f);
  *   mat4 m = mat4_scale(scale);
  *
- * See: lessons/math/02-matrices
+ * See: lessons/math/02-coordinate-spaces
  */
 static inline mat4 mat4_scale(vec3 scale)
 {
@@ -559,7 +559,7 @@ static inline mat4 mat4_scale(vec3 scale)
  *   vec4 v = vec4_create(1.0f, 0.0f, 0.0f, 0.0f);
  *   vec4 rotated = mat4_multiply_vec4(m, v);  // (0, 1, 0, 0)
  *
- * See: lessons/math/02-matrices
+ * See: lessons/math/02-coordinate-spaces
  */
 static inline mat4 mat4_rotate_z(float angle_radians)
 {
@@ -577,7 +577,7 @@ static inline mat4 mat4_rotate_z(float angle_radians)
  * Rotates in the YZ plane.
  * Positive angle rotates counter-clockwise when looking down the +X axis.
  *
- * See: lessons/math/02-matrices
+ * See: lessons/math/02-coordinate-spaces
  */
 static inline mat4 mat4_rotate_x(float angle_radians)
 {
@@ -595,7 +595,7 @@ static inline mat4 mat4_rotate_x(float angle_radians)
  * Rotates in the XZ plane.
  * Positive angle rotates counter-clockwise when looking down the +Y axis.
  *
- * See: lessons/math/02-matrices
+ * See: lessons/math/02-coordinate-spaces
  */
 static inline mat4 mat4_rotate_y(float angle_radians)
 {

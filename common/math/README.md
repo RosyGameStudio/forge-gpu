@@ -98,7 +98,7 @@ Every function in `forge_math.h` includes:
 Standalone programs teaching each concept in depth:
 
 - `lessons/math/01-vectors/` — Vectors, dot product, cross product, normalization
-- `lessons/math/02-matrices/` — Matrices, transformations, rotations
+- `lessons/math/02-coordinate-spaces/` — Coordinate spaces, view and projection matrices
 
 Each lesson includes a demo program and README explaining the math.
 

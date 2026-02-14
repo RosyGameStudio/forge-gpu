@@ -336,6 +336,25 @@ static void test_vec4_add(void)
     END_TEST();
 }
 
+static void test_vec4_sub(void)
+{
+    TEST("vec4_sub");
+    vec4 a = TEST_V4_B;
+    vec4 b = TEST_V4_A;
+    vec4 result = vec4_sub(a, b);
+    ASSERT_VEC4_EQ(result, vec4_create(TEST_FOUR, TEST_FOUR, TEST_FOUR, TEST_FOUR));
+    END_TEST();
+}
+
+static void test_vec4_scale(void)
+{
+    TEST("vec4_scale");
+    vec4 v = TEST_V4_A;
+    vec4 result = vec4_scale(v, TEST_SCALE_2);
+    ASSERT_VEC4_EQ(result, vec4_create(TEST_TWO, TEST_FOUR, 6.0f, 8.0f));
+    END_TEST();
+}
+
 static void test_vec4_dot(void)
 {
     TEST("vec4_dot");
@@ -426,6 +445,100 @@ static void test_mat4_multiply(void)
     END_TEST();
 }
 
+static void test_mat4_rotate_x(void)
+{
+    TEST("mat4_rotate_x");
+    /* 90-degree rotation around X should turn Y-axis into Z-axis */
+    mat4 m = mat4_rotate_x(FORGE_PI / TEST_SCALE_2);
+    vec4 y_axis = TEST_V4_Y_AXIS;
+    vec4 result = mat4_multiply_vec4(m, y_axis);
+
+    /* Should be approximately (0, 0, 1, 0) */
+    ASSERT_FLOAT_EQ(result.x, TEST_ZERO);
+    ASSERT_FLOAT_EQ(result.y, TEST_ZERO);
+    ASSERT_FLOAT_EQ(result.z, TEST_ONE);
+    END_TEST();
+}
+
+static void test_mat4_rotate_y(void)
+{
+    TEST("mat4_rotate_y");
+    /* 90-degree rotation around Y should turn X-axis into -Z */
+    mat4 m = mat4_rotate_y(FORGE_PI / TEST_SCALE_2);
+    vec4 x_axis = TEST_V4_X_AXIS;
+    vec4 result = mat4_multiply_vec4(m, x_axis);
+
+    /* Should be approximately (0, 0, -1, 0) */
+    ASSERT_FLOAT_EQ(result.x, TEST_ZERO);
+    ASSERT_FLOAT_EQ(result.y, TEST_ZERO);
+    ASSERT_FLOAT_EQ(result.z, -TEST_ONE);
+    END_TEST();
+}
+
+static void test_mat4_look_at(void)
+{
+    TEST("mat4_look_at");
+    /* Camera at (0, 0, 5) looking at origin — standard setup */
+    vec3 eye = vec3_create(TEST_ZERO, TEST_ZERO, TEST_FIVE);
+    vec3 target = vec3_create(TEST_ZERO, TEST_ZERO, TEST_ZERO);
+    vec3 up = TEST_V3_Y_AXIS;
+    mat4 view = mat4_look_at(eye, target, up);
+
+    /* Origin should map to (0, 0, -5) in view space (5 units in front) */
+    vec4 origin = vec4_create(TEST_ZERO, TEST_ZERO, TEST_ZERO, TEST_ONE);
+    vec4 result = mat4_multiply_vec4(view, origin);
+    ASSERT_FLOAT_EQ(result.x, TEST_ZERO);
+    ASSERT_FLOAT_EQ(result.y, TEST_ZERO);
+    ASSERT_FLOAT_EQ(result.z, -TEST_FIVE);
+
+    /* Camera position should map to origin in view space */
+    vec4 eye_point = vec4_create(TEST_ZERO, TEST_ZERO, TEST_FIVE, TEST_ONE);
+    vec4 eye_result = mat4_multiply_vec4(view, eye_point);
+    ASSERT_FLOAT_EQ(eye_result.x, TEST_ZERO);
+    ASSERT_FLOAT_EQ(eye_result.y, TEST_ZERO);
+    ASSERT_FLOAT_EQ(eye_result.z, TEST_ZERO);
+
+    /* Point to the right in world (+X) should be +X in view space */
+    vec4 right_point = vec4_create(TEST_ONE, TEST_ZERO, TEST_ZERO, TEST_ONE);
+    vec4 right_result = mat4_multiply_vec4(view, right_point);
+    ASSERT_FLOAT_EQ(right_result.x, TEST_ONE);
+    ASSERT_FLOAT_EQ(right_result.y, TEST_ZERO);
+    END_TEST();
+}
+
+static void test_mat4_perspective(void)
+{
+    TEST("mat4_perspective");
+    float fov = FORGE_PI / TEST_THREE;  /* 60 degrees */
+    float aspect = 16.0f / 9.0f;
+    float near = 0.1f;
+    float far = 100.0f;
+    mat4 proj = mat4_perspective(fov, aspect, near, far);
+
+    /* Point on the near plane (z = -near) should map to NDC z = 0 */
+    vec4 near_point = vec4_create(TEST_ZERO, TEST_ZERO, -near, TEST_ONE);
+    vec4 near_clip = mat4_multiply_vec4(proj, near_point);
+    float near_ndc_z = near_clip.z / near_clip.w;
+    ASSERT_FLOAT_EQ(near_ndc_z, TEST_ZERO);
+
+    /* Point on the far plane (z = -far) should map to NDC z = 1 */
+    vec4 far_point = vec4_create(TEST_ZERO, TEST_ZERO, -far, TEST_ONE);
+    vec4 far_clip = mat4_multiply_vec4(proj, far_point);
+    float far_ndc_z = far_clip.z / far_clip.w;
+    ASSERT_FLOAT_EQ(far_ndc_z, TEST_ONE);
+
+    /* w should equal -z (positive depth) */
+    ASSERT_FLOAT_EQ(near_clip.w, near);
+    ASSERT_FLOAT_EQ(far_clip.w, far);
+
+    /* Center point should stay centered after perspective divide */
+    float near_ndc_x = near_clip.x / near_clip.w;
+    float near_ndc_y = near_clip.y / near_clip.w;
+    ASSERT_FLOAT_EQ(near_ndc_x, TEST_ZERO);
+    ASSERT_FLOAT_EQ(near_ndc_y, TEST_ZERO);
+    END_TEST();
+}
+
 static void test_mat4_multiply_identity(void)
 {
     TEST("mat4_multiply with identity");
@@ -483,6 +596,8 @@ int main(int argc, char *argv[])
     SDL_Log("\nvec4 tests:");
     test_vec4_create();
     test_vec4_add();
+    test_vec4_sub();
+    test_vec4_scale();
     test_vec4_dot();
 
     /* mat4 tests */
@@ -490,7 +605,11 @@ int main(int argc, char *argv[])
     test_mat4_identity();
     test_mat4_translate();
     test_mat4_scale();
+    test_mat4_rotate_x();
+    test_mat4_rotate_y();
     test_mat4_rotate_z();
+    test_mat4_look_at();
+    test_mat4_perspective();
     test_mat4_multiply();
     test_mat4_multiply_identity();
 
