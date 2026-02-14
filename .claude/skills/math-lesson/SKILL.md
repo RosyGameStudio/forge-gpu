@@ -82,6 +82,12 @@ int main(int argc, char *argv[])
 }
 ```
 
+**Console output formatting:**
+- **Use ASCII-only characters** for console output (cross-platform compatibility)
+- Avoid Unicode box-drawing, symbols, or special characters that may not render on Windows Terminal
+- Good: `-`, `=`, `*`, `|`, `->`, `[OK]`, `[!]`, "degrees", "in", "+/-"
+- Bad: `─`, `═`, `•`, `↓`, `→`, `✓`, `⚠`, `°`, `∈`, `±` (may render as garbled text on Windows)
+
 ### 4. Create `CMakeLists.txt`
 
 ```cmake
@@ -262,6 +268,7 @@ Every function needs:
 - **Visual when possible**: Showing rotations/transformations visually is more intuitive than printing numbers
 - **Cross-reference extensively**: Help users connect math theory to GPU practice
 - **Readable code**: This is teaching code, not production — clarity over performance
+- **ASCII-only output**: Use only ASCII characters in printf output for cross-platform compatibility (Windows Terminal may not render Unicode correctly)
 
 ## When NOT to Create a Lesson
 

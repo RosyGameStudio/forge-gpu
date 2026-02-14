@@ -22,8 +22,9 @@ implementations for your projects.
 | # | Topic | What you'll learn |
 |---|-------|-------------------|
 | 01 | [Vectors](01-vectors/) | Addition, dot/cross products, normalization, lerp |
+| 02 | [Coordinate Spaces](02-coordinate-spaces/) | Model, world, view, clip, NDC, screen spaces and transformations |
 
-*More lessons coming soon:* Matrices, quaternions, coordinate transformations, projections, and more.
+*More lessons coming soon:* Matrices (deep dive), quaternions, and more.
 
 ## How Math Lessons Work
 
