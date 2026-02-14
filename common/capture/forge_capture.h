@@ -277,7 +277,11 @@ static inline bool forge_capture_finish_frame(
         return true;  /* cmd was consumed even on failure */
     }
 
-    SDL_WaitForGPUFences(cap->device, true, &fence, 1);
+    if (!SDL_WaitForGPUFences(cap->device, true, &fence, 1)) {
+        SDL_Log("Capture: failed to wait for fence: %s", SDL_GetError());
+        SDL_ReleaseGPUFence(cap->device, fence);
+        return true;  /* cmd was consumed — caller must not submit */
+    }
 
     /* ── Map and save ─────────────────────────────────────────────────── */
     void *pixels = SDL_MapGPUTransferBuffer(cap->device, cap->buffer, false);
