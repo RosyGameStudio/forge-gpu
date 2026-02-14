@@ -12,6 +12,51 @@ Learn the fundamentals of vector math for graphics and game programming.
 - Normalization (creating unit vectors)
 - Linear interpolation (smooth blending)
 
+## Result
+
+A console program demonstrating vector operations with clear output showing the geometric meaning of each operation. The demo covers all fundamental vector operations used in graphics programming.
+
+**Example output:**
+```text
+=== Vector Math Demo ===
+--- Creating Vectors ---
+a (X-axis) = (1.000, 0.000, 0.000)
+b (Y-axis) = (0.000, 1.000, 0.000)
+c = (3.000, 4.000, 0.000)
+
+--- Addition ---
+a + b = (1.000, 1.000, 0.000)
+Geometric meaning: diagonal direction (northeast)
+
+--- Dot Product ---
+a · b = 0.000 (perpendicular → 0)
+a · (2,0,0) = 2.000 (parallel → positive)
+a · (-1,0,0) = -1.000 (opposite → negative)
+
+--- Length and Normalization ---
+Length of c = 5.000
+Normalized c = (0.600, 0.800, 0.000)
+Length of normalized c = 1.000 (should be 1.0)
+
+--- Cross Product ---
+a × b = (0.000, 0.000, 1.000)
+Result is perpendicular to both a and b
+
+--- Linear Interpolation ---
+lerp(start, end, 0.0) = (0.000, 0.000, 0.000)
+lerp(start, end, 0.5) = (5.000, 5.000, 0.000)
+lerp(start, end, 1.0) = (10.000, 10.000, 0.000)
+```
+
+## Key concepts
+
+- **Vector types** — `vec2`, `vec3`, `vec4` map to HLSL `float2/3/4`
+- **Addition/subtraction** — Combine displacements or find direction between points
+- **Dot product** — Measures alignment: positive (same direction), zero (perpendicular), negative (opposite)
+- **Cross product** — Finds perpendicular vector, useful for normals and coordinate frames
+- **Normalization** — Creates unit-length direction vectors
+- **Linear interpolation (lerp)** — Smoothly blends between two vectors
+
 ## The Math
 
 ### What is a vector?
@@ -193,7 +238,7 @@ Graphics and game programming uses vectors for:
 - See `common/math/forge_math.h` for all vector operations
 - See `common/math/README.md` for usage guide
 
-## Running the demo
+## Building
 
 ```bash
 cmake -B build
@@ -206,7 +251,7 @@ build\lessons\math\01-vectors\Debug\01-vectors.exe
 ./build/lessons/math/01-vectors/01-vectors
 ```
 
-You'll see examples of each vector operation with explanations.
+The demo shows examples of each vector operation with geometric explanations.
 
 ## Exercises
 
