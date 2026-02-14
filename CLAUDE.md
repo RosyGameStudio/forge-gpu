@@ -142,6 +142,28 @@ Skills are Claude Code commands that teach AI agents patterns from lessons.
 skill. When creating GPU lessons, ensure they use the math library and reference
 math lessons for theory.
 
+## Markdown linting
+
+All markdown files are linted with markdownlint-cli2 in CI. Configuration is in
+`.markdownlint-cli2.jsonc`.
+
+**Key rules:**
+- **MD040** — All code blocks MUST have language tags (` ```c`, ` ```bash`, ` ```text`)
+- **MD060** — Tables must have consistent column alignment
+- Line length limits are disabled (lessons need flexibility)
+- Blank lines around lists/code blocks are lenient
+
+**Testing locally:**
+```bash
+npx markdownlint-cli2 "**/*.md"
+```
+
+**Common fixes:**
+- Missing language tag: ` ``` ` → ` ```c` or ` ```text` or ` ```bash`
+- Use `text` for plain output, diagrams, or examples without syntax
+
+The linter runs automatically on PRs and will fail if issues are found.
+
 ## Dependencies
 - SDL3 (with GPU API)
 - CMake 3.24+
