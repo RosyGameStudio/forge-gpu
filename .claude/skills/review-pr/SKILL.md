@@ -183,10 +183,12 @@ gh pr view <pr-number> --json reviewDecision,statusCheckRollup
 gh run view <run-id>
 
 # Reply to a specific review comment thread (CORRECT - creates nested reply)
+# Use this to respond to CodeRabbit/Claude feedback on specific lines
 gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment-id}/replies \
   -f body="response text"
 
-# Post a general PR comment (AVOID - doesn't thread properly)
+# Post a general PR comment (AVOID - doesn't thread properly with review feedback)
+# This creates a standalone comment, not a reply to a review thread
 gh pr comment <pr-number> --body "response text"
 
 # Ask CodeRabbit to verify/resolve after implementing a fix (reply to the comment thread)

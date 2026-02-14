@@ -31,7 +31,7 @@ jobs:
       (
         github.event_name == 'issues' &&
         (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) &&
-        contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.user.association)
+        contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
       )
     runs-on: ubuntu-latest
     permissions:
