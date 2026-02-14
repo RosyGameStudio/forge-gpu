@@ -20,7 +20,7 @@ If any of these are missing, ask the user before proceeding.
    - Check if the math library (`common/math/forge_math.h`) has what you need
    - If new math operations are needed, use `/math-lesson` to add them first
 
-2. **Create the lesson directory**: `lessons/$ARGUMENTS[0]-$ARGUMENTS[1]/`
+2. **Create the lesson directory**: `lessons/gpu/$ARGUMENTS[0]-$ARGUMENTS[1]/`
 
 3. **Create main.c** using the SDL callback architecture:
    - `#define SDL_MAIN_USE_CALLBACKS 1` before includes

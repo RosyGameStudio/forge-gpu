@@ -56,7 +56,7 @@ provides reusable skills and libraries so humans and AI can build together.
 
 ## Project Structure
 
-```
+```text
 forge-gpu/
 ├── lessons/
 │   ├── math/              # Math fundamentals (vectors, matrices, etc.)

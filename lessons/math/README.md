@@ -63,8 +63,8 @@ See [common/math/README.md](../../common/math/README.md) for complete API docs.
 
 Math lessons teach the theory. GPU lessons show it in practice:
 
-- **[Lesson 02 — First Triangle](../02-first-triangle/)** uses `vec2` for positions, `vec3` for colors
-- **[Lesson 03 — Uniforms & Motion](../03-uniforms-and-motion/)** uses `mat4_rotate_z` for animation
+- **[Lesson 02 — First Triangle](../gpu/02-first-triangle/)** uses `vec2` for positions, `vec3` for colors
+- **[Lesson 03 — Uniforms & Motion](../gpu/03-uniforms-and-motion/)** uses `mat4_rotate_z` for animation
 
 When you understand both the math AND the GPU API, you can build confidently.
 

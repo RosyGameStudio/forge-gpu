@@ -21,6 +21,45 @@ static int fail_count = 0;
 /* Epsilon for floating-point comparisons (account for rounding errors) */
 #define EPSILON 0.0001f
 
+/* ── Test Constants ──────────────────────────────────────────────────────── */
+
+/* Common scalars */
+#define TEST_ZERO       0.0f
+#define TEST_ONE        1.0f
+#define TEST_TWO        2.0f
+#define TEST_THREE      3.0f
+#define TEST_FOUR       4.0f
+#define TEST_FIVE       5.0f
+#define TEST_TEN        10.0f
+#define TEST_HALF       0.5f
+#define TEST_SCALE_2    2.0f
+
+/* Common vec2 test vectors */
+#define TEST_V2_A       vec2_create(1.0f, 2.0f)
+#define TEST_V2_B       vec2_create(3.0f, 4.0f)
+#define TEST_V2_ZERO    vec2_create(0.0f, 0.0f)
+#define TEST_V2_X_AXIS  vec2_create(1.0f, 0.0f)
+#define TEST_V2_Y_AXIS  vec2_create(0.0f, 1.0f)
+#define TEST_V2_TEN     vec2_create(10.0f, 10.0f)
+#define TEST_V2_345     vec2_create(3.0f, 4.0f)  /* 3-4-5 triangle */
+
+/* Common vec3 test vectors */
+#define TEST_V3_A       vec3_create(1.0f, 2.0f, 3.0f)
+#define TEST_V3_B       vec3_create(4.0f, 5.0f, 6.0f)
+#define TEST_V3_ZERO    vec3_create(0.0f, 0.0f, 0.0f)
+#define TEST_V3_X_AXIS  vec3_create(1.0f, 0.0f, 0.0f)
+#define TEST_V3_Y_AXIS  vec3_create(0.0f, 1.0f, 0.0f)
+#define TEST_V3_Z_AXIS  vec3_create(0.0f, 0.0f, 1.0f)
+#define TEST_V3_TEN     vec3_create(10.0f, 10.0f, 10.0f)
+#define TEST_V3_345     vec3_create(3.0f, 4.0f, 0.0f)  /* 3-4-5 triangle */
+
+/* Common vec4 test vectors */
+#define TEST_V4_A       vec4_create(1.0f, 2.0f, 3.0f, 4.0f)
+#define TEST_V4_B       vec4_create(5.0f, 6.0f, 7.0f, 8.0f)
+#define TEST_V4_X_AXIS  vec4_create(1.0f, 0.0f, 0.0f, 0.0f)
+#define TEST_V4_Y_AXIS  vec4_create(0.0f, 1.0f, 0.0f, 0.0f)
+#define TEST_V4_POINT   vec4_create(0.0f, 0.0f, 0.0f, 1.0f)
+
 /* Check if two floats are approximately equal */
 static bool float_eq(float a, float b)
 {
@@ -99,70 +138,70 @@ static bool vec4_eq(vec4 a, vec4 b)
 static void test_vec2_create(void)
 {
     TEST("vec2_create");
-    vec2 v = vec2_create(1.0f, 2.0f);
-    ASSERT_FLOAT_EQ(v.x, 1.0f);
-    ASSERT_FLOAT_EQ(v.y, 2.0f);
+    vec2 v = TEST_V2_A;
+    ASSERT_FLOAT_EQ(v.x, TEST_ONE);
+    ASSERT_FLOAT_EQ(v.y, TEST_TWO);
     END_TEST();
 }
 
 static void test_vec2_add(void)
 {
     TEST("vec2_add");
-    vec2 a = vec2_create(1.0f, 2.0f);
-    vec2 b = vec2_create(3.0f, 4.0f);
+    vec2 a = TEST_V2_A;
+    vec2 b = TEST_V2_B;
     vec2 result = vec2_add(a, b);
-    ASSERT_VEC2_EQ(result, vec2_create(4.0f, 6.0f));
+    ASSERT_VEC2_EQ(result, vec2_create(TEST_FOUR, 6.0f));
     END_TEST();
 }
 
 static void test_vec2_sub(void)
 {
     TEST("vec2_sub");
-    vec2 a = vec2_create(5.0f, 3.0f);
-    vec2 b = vec2_create(2.0f, 1.0f);
+    vec2 a = vec2_create(TEST_FIVE, TEST_THREE);
+    vec2 b = vec2_create(TEST_TWO, TEST_ONE);
     vec2 result = vec2_sub(a, b);
-    ASSERT_VEC2_EQ(result, vec2_create(3.0f, 2.0f));
+    ASSERT_VEC2_EQ(result, vec2_create(TEST_THREE, TEST_TWO));
     END_TEST();
 }
 
 static void test_vec2_scale(void)
 {
     TEST("vec2_scale");
-    vec2 v = vec2_create(2.0f, 3.0f);
-    vec2 result = vec2_scale(v, 2.0f);
-    ASSERT_VEC2_EQ(result, vec2_create(4.0f, 6.0f));
+    vec2 v = vec2_create(TEST_TWO, TEST_THREE);
+    vec2 result = vec2_scale(v, TEST_SCALE_2);
+    ASSERT_VEC2_EQ(result, vec2_create(TEST_FOUR, 6.0f));
     END_TEST();
 }
 
 static void test_vec2_dot(void)
 {
     TEST("vec2_dot");
-    vec2 a = vec2_create(1.0f, 0.0f);
-    vec2 b = vec2_create(0.0f, 1.0f);
+    vec2 a = TEST_V2_X_AXIS;
+    vec2 b = TEST_V2_Y_AXIS;
     float dot = vec2_dot(a, b);
-    ASSERT_FLOAT_EQ(dot, 0.0f);  /* Perpendicular */
+    ASSERT_FLOAT_EQ(dot, TEST_ZERO);  /* Perpendicular */
 
-    vec2 c = vec2_create(2.0f, 0.0f);
+    vec2 c = vec2_create(TEST_TWO, TEST_ZERO);
     float dot2 = vec2_dot(a, c);
-    ASSERT_FLOAT_EQ(dot2, 2.0f);  /* Parallel */
+    ASSERT_FLOAT_EQ(dot2, TEST_TWO);  /* Parallel */
     END_TEST();
 }
 
 static void test_vec2_length(void)
 {
     TEST("vec2_length");
-    vec2 v = vec2_create(3.0f, 4.0f);
+    vec2 v = TEST_V2_345;
     float len = vec2_length(v);
-    ASSERT_FLOAT_EQ(len, 5.0f);  /* 3-4-5 triangle */
+    ASSERT_FLOAT_EQ(len, TEST_FIVE);  /* 3-4-5 triangle */
     END_TEST();
 }
 
 static void test_vec2_normalize(void)
 {
     TEST("vec2_normalize");
-    vec2 v = vec2_create(3.0f, 4.0f);
+    vec2 v = TEST_V2_345;
     vec2 normalized = vec2_normalize(v);
-    ASSERT_FLOAT_EQ(vec2_length(normalized), 1.0f);  /* Unit length */
+    ASSERT_FLOAT_EQ(vec2_length(normalized), TEST_ONE);  /* Unit length */
     ASSERT_VEC2_EQ(normalized, vec2_create(0.6f, 0.8f));
     END_TEST();
 }
@@ -170,10 +209,10 @@ static void test_vec2_normalize(void)
 static void test_vec2_lerp(void)
 {
     TEST("vec2_lerp");
-    vec2 a = vec2_create(0.0f, 0.0f);
-    vec2 b = vec2_create(10.0f, 10.0f);
-    vec2 mid = vec2_lerp(a, b, 0.5f);
-    ASSERT_VEC2_EQ(mid, vec2_create(5.0f, 5.0f));
+    vec2 a = TEST_V2_ZERO;
+    vec2 b = TEST_V2_TEN;
+    vec2 mid = vec2_lerp(a, b, TEST_HALF);
+    ASSERT_VEC2_EQ(mid, vec2_create(TEST_FIVE, TEST_FIVE));
     END_TEST();
 }
 
@@ -184,91 +223,91 @@ static void test_vec2_lerp(void)
 static void test_vec3_create(void)
 {
     TEST("vec3_create");
-    vec3 v = vec3_create(1.0f, 2.0f, 3.0f);
-    ASSERT_FLOAT_EQ(v.x, 1.0f);
-    ASSERT_FLOAT_EQ(v.y, 2.0f);
-    ASSERT_FLOAT_EQ(v.z, 3.0f);
+    vec3 v = TEST_V3_A;
+    ASSERT_FLOAT_EQ(v.x, TEST_ONE);
+    ASSERT_FLOAT_EQ(v.y, TEST_TWO);
+    ASSERT_FLOAT_EQ(v.z, TEST_THREE);
     END_TEST();
 }
 
 static void test_vec3_add(void)
 {
     TEST("vec3_add");
-    vec3 a = vec3_create(1.0f, 2.0f, 3.0f);
-    vec3 b = vec3_create(4.0f, 5.0f, 6.0f);
+    vec3 a = TEST_V3_A;
+    vec3 b = TEST_V3_B;
     vec3 result = vec3_add(a, b);
-    ASSERT_VEC3_EQ(result, vec3_create(5.0f, 7.0f, 9.0f));
+    ASSERT_VEC3_EQ(result, vec3_create(TEST_FIVE, 7.0f, 9.0f));
     END_TEST();
 }
 
 static void test_vec3_sub(void)
 {
     TEST("vec3_sub");
-    vec3 a = vec3_create(5.0f, 3.0f, 2.0f);
-    vec3 b = vec3_create(2.0f, 1.0f, 1.0f);
+    vec3 a = vec3_create(TEST_FIVE, TEST_THREE, TEST_TWO);
+    vec3 b = vec3_create(TEST_TWO, TEST_ONE, TEST_ONE);
     vec3 result = vec3_sub(a, b);
-    ASSERT_VEC3_EQ(result, vec3_create(3.0f, 2.0f, 1.0f));
+    ASSERT_VEC3_EQ(result, vec3_create(TEST_THREE, TEST_TWO, TEST_ONE));
     END_TEST();
 }
 
 static void test_vec3_scale(void)
 {
     TEST("vec3_scale");
-    vec3 v = vec3_create(1.0f, 2.0f, 3.0f);
-    vec3 result = vec3_scale(v, 2.0f);
-    ASSERT_VEC3_EQ(result, vec3_create(2.0f, 4.0f, 6.0f));
+    vec3 v = TEST_V3_A;
+    vec3 result = vec3_scale(v, TEST_SCALE_2);
+    ASSERT_VEC3_EQ(result, vec3_create(TEST_TWO, TEST_FOUR, 6.0f));
     END_TEST();
 }
 
 static void test_vec3_dot(void)
 {
     TEST("vec3_dot");
-    vec3 a = vec3_create(1.0f, 0.0f, 0.0f);
-    vec3 b = vec3_create(0.0f, 1.0f, 0.0f);
+    vec3 a = TEST_V3_X_AXIS;
+    vec3 b = TEST_V3_Y_AXIS;
     float dot = vec3_dot(a, b);
-    ASSERT_FLOAT_EQ(dot, 0.0f);  /* Perpendicular */
+    ASSERT_FLOAT_EQ(dot, TEST_ZERO);  /* Perpendicular */
     END_TEST();
 }
 
 static void test_vec3_cross(void)
 {
     TEST("vec3_cross");
-    vec3 x = vec3_create(1.0f, 0.0f, 0.0f);
-    vec3 y = vec3_create(0.0f, 1.0f, 0.0f);
+    vec3 x = TEST_V3_X_AXIS;
+    vec3 y = TEST_V3_Y_AXIS;
     vec3 z = vec3_cross(x, y);
-    ASSERT_VEC3_EQ(z, vec3_create(0.0f, 0.0f, 1.0f));  /* X × Y = Z */
+    ASSERT_VEC3_EQ(z, TEST_V3_Z_AXIS);  /* X × Y = Z */
 
     /* Verify perpendicularity */
-    ASSERT_FLOAT_EQ(vec3_dot(z, x), 0.0f);
-    ASSERT_FLOAT_EQ(vec3_dot(z, y), 0.0f);
+    ASSERT_FLOAT_EQ(vec3_dot(z, x), TEST_ZERO);
+    ASSERT_FLOAT_EQ(vec3_dot(z, y), TEST_ZERO);
     END_TEST();
 }
 
 static void test_vec3_length(void)
 {
     TEST("vec3_length");
-    vec3 v = vec3_create(3.0f, 4.0f, 0.0f);
+    vec3 v = TEST_V3_345;
     float len = vec3_length(v);
-    ASSERT_FLOAT_EQ(len, 5.0f);
+    ASSERT_FLOAT_EQ(len, TEST_FIVE);
     END_TEST();
 }
 
 static void test_vec3_normalize(void)
 {
     TEST("vec3_normalize");
-    vec3 v = vec3_create(3.0f, 4.0f, 0.0f);
+    vec3 v = TEST_V3_345;
     vec3 normalized = vec3_normalize(v);
-    ASSERT_FLOAT_EQ(vec3_length(normalized), 1.0f);
+    ASSERT_FLOAT_EQ(vec3_length(normalized), TEST_ONE);
     END_TEST();
 }
 
 static void test_vec3_lerp(void)
 {
     TEST("vec3_lerp");
-    vec3 a = vec3_create(0.0f, 0.0f, 0.0f);
-    vec3 b = vec3_create(10.0f, 10.0f, 10.0f);
-    vec3 mid = vec3_lerp(a, b, 0.5f);
-    ASSERT_VEC3_EQ(mid, vec3_create(5.0f, 5.0f, 5.0f));
+    vec3 a = TEST_V3_ZERO;
+    vec3 b = TEST_V3_TEN;
+    vec3 mid = vec3_lerp(a, b, TEST_HALF);
+    ASSERT_VEC3_EQ(mid, vec3_create(TEST_FIVE, TEST_FIVE, TEST_FIVE));
     END_TEST();
 }
 
@@ -279,31 +318,31 @@ static void test_vec3_lerp(void)
 static void test_vec4_create(void)
 {
     TEST("vec4_create");
-    vec4 v = vec4_create(1.0f, 2.0f, 3.0f, 4.0f);
-    ASSERT_FLOAT_EQ(v.x, 1.0f);
-    ASSERT_FLOAT_EQ(v.y, 2.0f);
-    ASSERT_FLOAT_EQ(v.z, 3.0f);
-    ASSERT_FLOAT_EQ(v.w, 4.0f);
+    vec4 v = TEST_V4_A;
+    ASSERT_FLOAT_EQ(v.x, TEST_ONE);
+    ASSERT_FLOAT_EQ(v.y, TEST_TWO);
+    ASSERT_FLOAT_EQ(v.z, TEST_THREE);
+    ASSERT_FLOAT_EQ(v.w, TEST_FOUR);
     END_TEST();
 }
 
 static void test_vec4_add(void)
 {
     TEST("vec4_add");
-    vec4 a = vec4_create(1.0f, 2.0f, 3.0f, 4.0f);
-    vec4 b = vec4_create(5.0f, 6.0f, 7.0f, 8.0f);
+    vec4 a = TEST_V4_A;
+    vec4 b = TEST_V4_B;
     vec4 result = vec4_add(a, b);
-    ASSERT_VEC4_EQ(result, vec4_create(6.0f, 8.0f, 10.0f, 12.0f));
+    ASSERT_VEC4_EQ(result, vec4_create(6.0f, 8.0f, TEST_TEN, 12.0f));
     END_TEST();
 }
 
 static void test_vec4_dot(void)
 {
     TEST("vec4_dot");
-    vec4 a = vec4_create(1.0f, 0.0f, 0.0f, 0.0f);
-    vec4 b = vec4_create(0.0f, 1.0f, 0.0f, 0.0f);
+    vec4 a = TEST_V4_X_AXIS;
+    vec4 b = TEST_V4_Y_AXIS;
     float dot = vec4_dot(a, b);
-    ASSERT_FLOAT_EQ(dot, 0.0f);
+    ASSERT_FLOAT_EQ(dot, TEST_ZERO);
     END_TEST();
 }
 
@@ -317,42 +356,42 @@ static void test_mat4_identity(void)
     mat4 m = mat4_identity();
 
     /* Diagonal should be 1.0 */
-    ASSERT_FLOAT_EQ(m.m[0], 1.0f);
-    ASSERT_FLOAT_EQ(m.m[5], 1.0f);
-    ASSERT_FLOAT_EQ(m.m[10], 1.0f);
-    ASSERT_FLOAT_EQ(m.m[15], 1.0f);
+    ASSERT_FLOAT_EQ(m.m[0], TEST_ONE);
+    ASSERT_FLOAT_EQ(m.m[5], TEST_ONE);
+    ASSERT_FLOAT_EQ(m.m[10], TEST_ONE);
+    ASSERT_FLOAT_EQ(m.m[15], TEST_ONE);
 
     /* Off-diagonal should be 0.0 */
-    ASSERT_FLOAT_EQ(m.m[1], 0.0f);
-    ASSERT_FLOAT_EQ(m.m[4], 0.0f);
+    ASSERT_FLOAT_EQ(m.m[1], TEST_ZERO);
+    ASSERT_FLOAT_EQ(m.m[4], TEST_ZERO);
     END_TEST();
 }
 
 static void test_mat4_translate(void)
 {
     TEST("mat4_translate");
-    mat4 m = mat4_translate(vec3_create(5.0f, 3.0f, 2.0f));
+    mat4 m = mat4_translate(vec3_create(TEST_FIVE, TEST_THREE, TEST_TWO));
 
     /* Translation is in column 3 (indices 12, 13, 14) */
-    ASSERT_FLOAT_EQ(m.m[12], 5.0f);
-    ASSERT_FLOAT_EQ(m.m[13], 3.0f);
-    ASSERT_FLOAT_EQ(m.m[14], 2.0f);
+    ASSERT_FLOAT_EQ(m.m[12], TEST_FIVE);
+    ASSERT_FLOAT_EQ(m.m[13], TEST_THREE);
+    ASSERT_FLOAT_EQ(m.m[14], TEST_TWO);
 
     /* Transform a point */
-    vec4 point = vec4_create(0.0f, 0.0f, 0.0f, 1.0f);
+    vec4 point = TEST_V4_POINT;
     vec4 result = mat4_multiply_vec4(m, point);
-    ASSERT_VEC4_EQ(result, vec4_create(5.0f, 3.0f, 2.0f, 1.0f));
+    ASSERT_VEC4_EQ(result, vec4_create(TEST_FIVE, TEST_THREE, TEST_TWO, TEST_ONE));
     END_TEST();
 }
 
 static void test_mat4_scale(void)
 {
     TEST("mat4_scale");
-    mat4 m = mat4_scale(vec3_create(2.0f, 3.0f, 4.0f));
+    mat4 m = mat4_scale(vec3_create(TEST_TWO, TEST_THREE, TEST_FOUR));
 
-    vec4 v = vec4_create(1.0f, 1.0f, 1.0f, 1.0f);
+    vec4 v = vec4_create(TEST_ONE, TEST_ONE, TEST_ONE, TEST_ONE);
     vec4 result = mat4_multiply_vec4(m, v);
-    ASSERT_VEC4_EQ(result, vec4_create(2.0f, 3.0f, 4.0f, 1.0f));
+    ASSERT_VEC4_EQ(result, vec4_create(TEST_TWO, TEST_THREE, TEST_FOUR, TEST_ONE));
     END_TEST();
 }
 
@@ -360,14 +399,14 @@ static void test_mat4_rotate_z(void)
 {
     TEST("mat4_rotate_z");
     /* 90-degree rotation around Z should turn X-axis into Y-axis */
-    mat4 m = mat4_rotate_z(FORGE_PI / 2.0f);
-    vec4 x_axis = vec4_create(1.0f, 0.0f, 0.0f, 0.0f);
+    mat4 m = mat4_rotate_z(FORGE_PI / TEST_SCALE_2);
+    vec4 x_axis = TEST_V4_X_AXIS;
     vec4 result = mat4_multiply_vec4(m, x_axis);
 
     /* Should be approximately (0, 1, 0, 0) */
-    ASSERT_FLOAT_EQ(result.x, 0.0f);
-    ASSERT_FLOAT_EQ(result.y, 1.0f);
-    ASSERT_FLOAT_EQ(result.z, 0.0f);
+    ASSERT_FLOAT_EQ(result.x, TEST_ZERO);
+    ASSERT_FLOAT_EQ(result.y, TEST_ONE);
+    ASSERT_FLOAT_EQ(result.z, TEST_ZERO);
     END_TEST();
 }
 
@@ -375,11 +414,11 @@ static void test_mat4_multiply(void)
 {
     TEST("mat4_multiply");
     /* Translate then scale should scale first, then translate */
-    mat4 translate = mat4_translate(vec3_create(10.0f, 0.0f, 0.0f));
-    mat4 scale = mat4_scale_uniform(2.0f);
+    mat4 translate = mat4_translate(vec3_create(TEST_TEN, TEST_ZERO, TEST_ZERO));
+    mat4 scale = mat4_scale_uniform(TEST_SCALE_2);
     mat4 combined = mat4_multiply(translate, scale);
 
-    vec4 point = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
+    vec4 point = vec4_create(TEST_ONE, TEST_ZERO, TEST_ZERO, TEST_ONE);
     vec4 result = mat4_multiply_vec4(combined, point);
 
     /* Scale first (1 * 2 = 2), then translate (2 + 10 = 12) */
@@ -390,7 +429,7 @@ static void test_mat4_multiply(void)
 static void test_mat4_multiply_identity(void)
 {
     TEST("mat4_multiply with identity");
-    mat4 m = mat4_translate(vec3_create(5.0f, 3.0f, 2.0f));
+    mat4 m = mat4_translate(vec3_create(TEST_FIVE, TEST_THREE, TEST_TWO));
     mat4 identity = mat4_identity();
     mat4 result = mat4_multiply(m, identity);
 
@@ -410,7 +449,7 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    if (!SDL_Init(0)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return 1;
     }

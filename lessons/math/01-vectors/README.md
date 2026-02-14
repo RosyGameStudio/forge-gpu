@@ -186,8 +186,8 @@ Graphics and game programming uses vectors for:
 - **Colors** — RGB values are vec3 (red, green, blue)
 
 **In forge-gpu lessons:**
-- [Lesson 02 — First Triangle](../../02-first-triangle/) uses `vec2` for vertex positions and `vec3` for RGB colors
-- [Lesson 03 — Uniforms & Motion](../../03-uniforms-and-motion/) uses vectors for animated triangle vertices
+- [Lesson 02 — First Triangle](../../gpu/02-first-triangle/) uses `vec2` for vertex positions and `vec3` for RGB colors
+- [Lesson 03 — Uniforms & Motion](../../gpu/03-uniforms-and-motion/) uses vectors for animated triangle vertices
 
 **In the forge-gpu math library:**
 - See `common/math/forge_math.h` for all vector operations

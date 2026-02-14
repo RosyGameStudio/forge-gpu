@@ -33,9 +33,9 @@ Learn the SDL GPU API and modern rendering techniques:
 
 | # | Name | What you'll learn |
 |---|------|-------------------|
-| 01 | [Hello Window](lessons/01-hello-window/) | GPU device, swapchain, command buffers, render passes |
-| 02 | [First Triangle](lessons/02-first-triangle/) | Vertex buffers, shaders, graphics pipeline |
-| 03 | [Uniforms & Motion](lessons/03-uniforms-and-motion/) | Uniform buffers, push uniforms, animating with time |
+| 01 | [Hello Window](lessons/gpu/01-hello-window/) | GPU device, swapchain, command buffers, render passes |
+| 02 | [First Triangle](lessons/gpu/02-first-triangle/) | Vertex buffers, shaders, graphics pipeline |
+| 03 | [Uniforms & Motion](lessons/gpu/03-uniforms-and-motion/) | Uniform buffers, push uniforms, animating with time |
 
 ### Math Lessons (lessons/math/)
 

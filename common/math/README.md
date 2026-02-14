@@ -104,8 +104,8 @@ Each lesson includes a demo program and README explaining the math.
 
 See how these functions are used in real code:
 
-- `lessons/02-first-triangle/` — Uses `vec2` and `vec3` for vertices and colors
-- `lessons/03-uniforms-and-motion/` — Uses `mat4_rotate_z` for animation
+- `lessons/gpu/02-first-triangle/` — Uses `vec2` and `vec3` for vertices and colors
+- `lessons/gpu/03-uniforms-and-motion/` — Uses `mat4_rotate_z` for animation
 
 ## Design Philosophy
 

@@ -346,10 +346,16 @@ Add features when lessons need them, not speculatively.
 
 Each math lesson includes a program that:
 - Demonstrates the concept visually or numerically
-- Serves as a test that the implementation works
 - Provides examples for users to understand usage
 
-No separate test suite initially — the lessons ARE the tests.
+Additionally, there is now an automated test suite located in `tests/math/` with 26 tests covering all vector and matrix operations. These tests verify correctness and are integrated with CTest for CI/CD. Run tests with:
+
+```bash
+ctest -C Debug --output-on-failure
+# Or directly: build/tests/math/Debug/test_math.exe
+```
+
+Math lessons serve as examples and demos, while the automated unit and integration tests ensure the library works correctly.
 
 ## Evolution Path
 
