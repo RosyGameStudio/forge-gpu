@@ -142,6 +142,15 @@ cmake --build build --config Debug
 ./build/lessons/math/NN-concept-name/NN-concept-name
 ```
 
+**Example output:**
+```text
+[Copy actual program output here]
+```
+
+**Important:** If including example output, copy it directly from running the program.
+Don't manually type or stylize it—learners will compare their output to this example.
+Always add a language specifier (e.g., ` ```text`) to code blocks.
+
 ## Exercises
 
 1. [Exercise extending the concept]
@@ -269,6 +278,7 @@ Every function needs:
 - **Cross-reference extensively**: Help users connect math theory to GPU practice
 - **Readable code**: This is teaching code, not production — clarity over performance
 - **ASCII-only output**: Use only ASCII characters in printf output for cross-platform compatibility (Windows Terminal may not render Unicode correctly)
+- **Example output accuracy**: If including example output in README, copy it directly from the actual program—don't manually type it. Learners will compare their output to yours.
 
 ## When NOT to Create a Lesson
 
