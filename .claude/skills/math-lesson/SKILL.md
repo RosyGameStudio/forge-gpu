@@ -108,9 +108,29 @@ Structure:
 ```markdown
 # Math Lesson NN — Concept Name
 
+[Brief subtitle explaining what this teaches]
+
 ## What you'll learn
 
 [Bullet list of math concepts covered]
+
+## Result
+
+[Brief description of expected demo output or what the program demonstrates]
+
+**Example output:**
+```text
+[Copy actual program output here]
+```
+
+**Important:** Copy output directly from running the program—don't manually type it.
+
+## Key concepts
+
+[Bullet list of core takeaways:]
+- **Concept 1** — Brief explanation
+- **Concept 2** — Brief explanation
+- **Formula/operation** — What it does and when to use it
 
 ## The Math
 
@@ -134,22 +154,20 @@ Graphics and game programming uses this for:
 - [Link to GPU lesson] uses `function_name()` for [purpose]
 - [Link to GPU lesson] uses `function_name()` for [purpose]
 
-## Running the demo
+## Building
 
 ```bash
 cmake -B build
 cmake --build build --config Debug
+
+# Windows
+build\lessons\math\NN-concept-name\Debug\NN-concept-name.exe
+
+# Linux / macOS
 ./build/lessons/math/NN-concept-name/NN-concept-name
 ```
 
-**Example output:**
-```text
-[Copy actual program output here]
-```
-
-**Important:** If including example output, copy it directly from running the program.
-Don't manually type or stylize it—learners will compare their output to this example.
-Always add a language specifier (e.g., ` ```text`) to code blocks.
+[Brief note on what the demo shows]
 
 ## Exercises
 
