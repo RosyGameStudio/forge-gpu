@@ -84,7 +84,7 @@ git add CMakeLists.txt PLAN.md README.md
 ### 3. Write a descriptive commit message
 
 Format:
-```
+```text
 Add Lesson NN — Title
 
 Introduces [key concept] with a [description of what the lesson builds].

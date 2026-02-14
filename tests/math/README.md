@@ -36,7 +36,7 @@ Each test prints:
 - ❌ `FAIL` with expected vs actual values if it fails
 
 Example output:
-```
+```text
 === forge-gpu Math Library Tests ===
 vec2 tests:
   Testing: vec2_create

@@ -105,7 +105,7 @@ add_custom_command(TARGET NN-concept-name POST_BUILD
 ### 5. Create `README.md`
 
 Structure:
-```markdown
+````markdown
 # Math Lesson NN — Concept Name
 
 [Brief subtitle explaining what this teaches]
@@ -179,7 +179,7 @@ build\lessons\math\NN-concept-name\Debug\NN-concept-name.exe
 
 - [Relevant math lesson that builds on this]
 - [External resource if helpful]
-```
+````
 
 ### 6. Update `common/math/forge_math.h`
 

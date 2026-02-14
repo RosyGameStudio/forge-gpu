@@ -148,7 +148,7 @@ If the math library doesn't have an operation you need:
 1. Check `common/math/forge_math.h` — might already exist
 2. Check `lessons/math/` — might have a lesson teaching it
 3. Use `/math-lesson` to add it:
-   ```
+   ```bash
    /math-lesson 02 quaternions "Quaternion rotations"
    ```
 4. This creates: math lesson + library update + documentation

@@ -70,7 +70,7 @@ Parse and categorize feedback by:
 **Sort comments by severity:** Major → Minor → Nitpick/Style, so critical issues (especially security) are addressed first.
 
 Show the user:
-```
+```text
 ## PR Review Feedback Summary
 
 ### Pending conversations: X
@@ -99,7 +99,7 @@ If no pending conversations, skip to step 6.
 
 For each pending conversation, ask the user:
 
-```
+```text
 Feedback from [Reviewer] on file.c:123:
 > [feedback text]
 
@@ -147,7 +147,7 @@ Use `gh pr view <pr-number> --json reviewDecision,statusCheckRollup` to verify:
 ### 7. Merge the PR
 
 Ask user for confirmation:
-```
+```text
 ✅ All feedback resolved, all checks passing, PR approved.
 
 Ready to merge PR #X: "Title"
@@ -228,7 +228,7 @@ gh pr merge <pr-number> --squash --delete-branch
 
 ## Example interaction
 
-```
+```text
 Running review-pr for PR #1...
 
 ✓ All GitHub Actions checks passed

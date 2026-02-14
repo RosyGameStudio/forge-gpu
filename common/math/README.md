@@ -67,7 +67,7 @@ Each vector type supports:
 
 **Right-handed, Y-up:**
 
-```
+```text
      +Y (up)
       |
       |

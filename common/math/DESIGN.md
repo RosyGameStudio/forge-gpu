@@ -37,7 +37,7 @@ with it via skills.
 
 ## Directory Structure
 
-```
+```text
 common/math/
 ├── DESIGN.md         # This file — design decisions and conventions
 ├── README.md         # User-facing: how to use the library
@@ -48,7 +48,7 @@ common/math/
 
 **Right-handed, Y-up** — Standard for most 3D graphics and game engines.
 
-```
+```text
      +Y (up)
       |
       |
@@ -82,7 +82,7 @@ Our world space is Y-up, but NDC has its own conventions (this is normal in grap
 
 A `mat4` stores 16 floats in **column-major** order in memory:
 
-```
+```c
 float m[16] = {
     m0,  m1,  m2,  m3,   // column 0 (index 0–3)
     m4,  m5,  m6,  m7,   // column 1 (index 4–7)
@@ -93,7 +93,7 @@ float m[16] = {
 
 As a matrix (mathematical notation):
 
-```
+```text
 | m0  m4  m8   m12 |   // row 0
 | m1  m5  m9   m13 |   // row 1
 | m2  m6  m10  m14 |   // row 2
@@ -149,7 +149,7 @@ are row-major). We accept this trade-off for shader compatibility.
 **Counter-clockwise (CCW) front faces** — When viewed from the camera, triangles
 with vertices in counter-clockwise order are facing toward you.
 
-```
+```text
 Looking at a triangle from the front:
     v0
     /\

@@ -168,7 +168,7 @@ The flags: `-T vs_6_0` = vertex shader model 6.0, `-T ps_6_0` = pixel
 
 ## Project Structure
 
-```
+```text
 forge-gpu/
 ├── lessons/
 │   ├── math/              Math lessons — standalone programs + theory

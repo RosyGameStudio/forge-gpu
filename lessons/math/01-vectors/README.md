@@ -177,7 +177,7 @@ vec3 dir = vec3_normalize(v);  // (0.6, 0.8, 0.0) — Length = 1.0
 ### Cross Product (3D only)
 
 **Formula:**
-```
+```text
 (a.y * b.z - a.z * b.y,
  a.z * b.x - a.x * b.z,
  a.x * b.y - a.y * b.x)
