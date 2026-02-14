@@ -141,7 +141,10 @@ static inline bool forge_capture_init(
     cap->device = device;
 
     int w = 0, h = 0;
-    SDL_GetWindowSizeInPixels(window, &w, &h);
+    if (!SDL_GetWindowSizeInPixels(window, &w, &h)) {
+        SDL_Log("Capture: failed to get window size: %s", SDL_GetError());
+        return false;
+    }
     cap->width  = (Uint32)w;
     cap->height = (Uint32)h;
     cap->format = SDL_GetGPUSwapchainTextureFormat(device, window);
