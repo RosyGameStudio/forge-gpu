@@ -53,16 +53,21 @@ This returns an array of review comment objects with:
 - `user.login` — reviewer (e.g., "coderabbitai[bot]", "claude-code[bot]")
 
 **CodeRabbit comment format:**
-- Body starts with severity: `_⚠️ Potential issue_ | _🟠 Major_` or `_🟡 Minor_`
+- Body starts with severity: `_⚠️ Potential issue_ | _🟠 Major_`, `_🟡 Minor_`, or other markers
 - Includes suggested fixes in `<details><summary>Suggested fix</summary>` blocks
 - May include committable suggestions between `<!-- suggestion_start -->` markers
+- **Important:** CodeRabbit may leave nitpick/style comments alongside major issues—fetch ALL comments, not just the first few
 
 Parse and categorize feedback by:
-- Severity (Major, Minor, Info)
+- Severity (🟠 Major, 🟡 Minor, nitpick/style)
 - File and line number
 - Reviewer (CodeRabbit, Claude, human)
 
+**Present ALL comments to the user** sorted by severity (Major → Minor → Nitpick) so security/critical issues are addressed first.
+
 ### 3. Present feedback summary
+
+**Sort comments by severity:** Major → Minor → Nitpick/Style, so critical issues (especially security) are addressed first.
 
 Show the user:
 ```
@@ -70,13 +75,20 @@ Show the user:
 
 ### Pending conversations: X
 
-1. **[Code Rabbit]** file.c:123
-   > Suggestion: Use SDL_calloc instead of malloc
-   [View conversation](https://github.com/...)
+**Major issues (🟠):**
+1. **[CodeRabbit]** file.c:123
+   > Security: Anyone can trigger this workflow
+   [View](https://github.com/...)
 
-2. **[Claude]** README.md:45
-   > Question: Should this mention the aspect ratio?
-   [View conversation](https://github.com/...)
+**Minor issues (🟡):**
+2. **[CodeRabbit]** README.md:45
+   > Style: Add language tag to code block
+   [View](https://github.com/...)
+
+**Nitpicks/Style:**
+3. **[Claude]** main.c:100
+   > Consider adding a comment here
+   [View](https://github.com/...)
 
 ### Resolved conversations: Y
 ```
@@ -170,11 +182,16 @@ gh pr view <pr-number> --json reviewDecision,statusCheckRollup
 # View specific workflow run
 gh run view <run-id>
 
-# Post a comment on a review thread
+# Reply to a specific review comment thread (CORRECT - creates nested reply)
+gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment-id}/replies \
+  -f body="response text"
+
+# Post a general PR comment (AVOID - doesn't thread properly)
 gh pr comment <pr-number> --body "response text"
 
-# Ask CodeRabbit to verify/resolve after implementing a fix
-gh pr comment <pr-number> --body "@coderabbitai I've implemented your suggestion in commit ABC123. Can you verify and resolve this conversation?"
+# Ask CodeRabbit to verify/resolve after implementing a fix (reply to the comment thread)
+gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment-id}/replies \
+  -f body="@coderabbitai I've implemented your suggestion in commit ABC123. Can you verify and resolve this conversation?"
 
 # Resolve a review thread manually
 # Note: GitHub CLI doesn't directly support this - may need gh api or manual UI resolution
@@ -194,6 +211,7 @@ gh pr merge <pr-number> --squash --delete-branch
 - Use the same commit message format as publish-lesson (with Co-Authored-By line)
 - **The "X out of Y pending tasks"** shown in GitHub UI are the unresolved review comment threads—fetch them via `gh api repos/.../pulls/{pr}/comments`
 - **CodeRabbit auto-resolution:** CodeRabbit automatically resolves conversations when it detects the suggested fix was implemented in a new commit. Let it auto-resolve; only ask it to resolve manually if it doesn't detect your fix after re-review.
+- **Reply to comment threads:** Always use `gh api repos/{owner}/{repo}/pulls/{pr}/comments/{comment-id}/replies` to reply to specific review comments. This keeps conversations threaded. Do NOT use `gh pr comment` for replies—it creates unthreaded general comments.
 
 ## Error handling
 
