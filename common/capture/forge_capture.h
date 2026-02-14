@@ -227,6 +227,10 @@ static inline bool forge_capture__save_bmp(
 static inline bool forge_capture_finish_frame(
     ForgeCapture *cap, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *swapchain)
 {
+    if (!cap || cap->mode == FORGE_CAPTURE_NONE) {
+        return false;
+    }
+
     cap->current_frame++;
 
     /* Not yet at the frame where we start capturing. */
