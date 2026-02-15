@@ -26,7 +26,7 @@ Before committing, verify the lesson has all required pieces from the
 - [ ] `lessons/NN-name/CMakeLists.txt` exists
 - [ ] `lessons/NN-name/README.md` exists
 - [ ] `lessons/NN-name/shaders/` directory exists with shader source files
-- [ ] `lessons/NN-name/assets/screenshot.png` or `assets/preview.gif` exists
+- [ ] `lessons/NN-name/assets/screenshot.png` or `lessons/NN-name/assets/preview.gif` exists
 - [ ] `.claude/skills/<topic>/SKILL.md` exists (the matching skill)
 
 ### main.c structure
