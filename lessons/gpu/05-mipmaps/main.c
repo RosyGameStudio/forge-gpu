@@ -175,8 +175,15 @@ static SDL_GPUShader *create_shader(
     int                  num_storage_buffers,
     int                  num_uniform_buffers)
 {
+    /* Query which shader bytecode formats the current GPU backend supports.
+     * Vulkan uses SPIR-V, D3D12 uses DXIL — we ship both and pick at runtime
+     * so the same binary runs on either backend. */
     SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device);
 
+    /* Fill SDL_GPUShaderCreateInfo with the shader's resource binding counts.
+     * These tell the GPU driver how many samplers, storage textures/buffers,
+     * and uniform buffers the shader expects — they must match the HLSL
+     * register declarations exactly or binding will silently break. */
     SDL_GPUShaderCreateInfo info;
     SDL_zero(info);
     info.stage                = stage;
@@ -186,6 +193,8 @@ static SDL_GPUShader *create_shader(
     info.num_storage_buffers  = num_storage_buffers;
     info.num_uniform_buffers  = num_uniform_buffers;
 
+    /* Prefer SPIR-V (Vulkan, portable) with DXIL as the Windows/D3D12
+     * fallback.  This order maximises cross-platform coverage. */
     if (formats & SDL_GPU_SHADERFORMAT_SPIRV) {
         info.format    = SDL_GPU_SHADERFORMAT_SPIRV;
         info.code      = spirv_code;
@@ -199,6 +208,8 @@ static SDL_GPUShader *create_shader(
         return NULL;
     }
 
+    /* Pass the completed SDL_GPUShaderCreateInfo to create a runtime shader
+     * object that can be attached to a graphics pipeline. */
     SDL_GPUShader *shader = SDL_CreateGPUShader(device, &info);
     if (!shader) {
         SDL_Log("Failed to create %s shader: %s",
@@ -348,7 +359,13 @@ static SDL_GPUTexture *create_checker_texture(SDL_GPUDevice *device)
      * This call must be outside any pass. */
     SDL_GenerateMipmapsForGPUTexture(cmd, texture);
 
-    SDL_SubmitGPUCommandBuffer(cmd);
+    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+        SDL_Log("Failed to submit texture upload command buffer: %s",
+                SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return NULL;
+    }
     SDL_ReleaseGPUTransferBuffer(device, transfer);
 
     SDL_Log("Checkerboard texture created with %d mip levels", num_levels);
@@ -399,10 +416,16 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* ── 4. Request sRGB swapchain ──────────────────────────────────── */
     if (SDL_WindowSupportsGPUSwapchainComposition(
             device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR_LINEAR)) {
-        SDL_SetGPUSwapchainParameters(
-            device, window,
-            SDL_GPU_SWAPCHAINCOMPOSITION_SDR_LINEAR,
-            SDL_GPU_PRESENTMODE_VSYNC);
+        if (!SDL_SetGPUSwapchainParameters(
+                device, window,
+                SDL_GPU_SWAPCHAINCOMPOSITION_SDR_LINEAR,
+                SDL_GPU_PRESENTMODE_VSYNC)) {
+            SDL_Log("SDL_SetGPUSwapchainParameters failed: %s", SDL_GetError());
+            SDL_ReleaseWindowFromGPUDevice(device, window);
+            SDL_DestroyWindow(window);
+            SDL_DestroyGPUDevice(device);
+            return SDL_APP_FAILURE;
+        }
     }
 
     /* ── 5. Create procedural checkerboard texture with mipmaps ──────── */
@@ -722,7 +745,21 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_UploadToGPUBuffer(copy_pass, &idx_src, &idx_dst, false);
 
     SDL_EndGPUCopyPass(copy_pass);
-    SDL_SubmitGPUCommandBuffer(upload_cmd);
+    if (!SDL_SubmitGPUCommandBuffer(upload_cmd)) {
+        SDL_Log("Failed to submit buffer upload command buffer: %s",
+                SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUBuffer(device, index_buffer);
+        SDL_ReleaseGPUBuffer(device, vertex_buffer);
+        SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
+        for (int i = 0; i < NUM_SAMPLER_MODES; i++)
+            SDL_ReleaseGPUSampler(device, samplers[i]);
+        SDL_ReleaseGPUTexture(device, texture);
+        SDL_ReleaseWindowFromGPUDevice(device, window);
+        SDL_DestroyWindow(window);
+        SDL_DestroyGPUDevice(device);
+        return SDL_APP_FAILURE;
+    }
     SDL_ReleaseGPUTransferBuffer(device, transfer);
 
     /* ── 10. Store state ─────────────────────────────────────────────── */
@@ -903,7 +940,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 #ifdef FORGE_CAPTURE
     if (state->capture.mode != FORGE_CAPTURE_NONE) {
         if (!forge_capture_finish_frame(&state->capture, cmd, swapchain)) {
-            SDL_SubmitGPUCommandBuffer(cmd);
+            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                SDL_Log("Failed to submit render command buffer: %s",
+                        SDL_GetError());
+                return SDL_APP_FAILURE;
+            }
         }
         if (forge_capture_should_quit(&state->capture)) {
             return SDL_APP_SUCCESS;
@@ -911,7 +952,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     } else
 #endif
     {
-        SDL_SubmitGPUCommandBuffer(cmd);
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("Failed to submit render command buffer: %s",
+                    SDL_GetError());
+            return SDL_APP_FAILURE;
+        }
     }
 
     return SDL_APP_CONTINUE;
