@@ -99,6 +99,13 @@
 /* Number of sampler modes we cycle through */
 #define NUM_SAMPLER_MODES 3
 
+/* Sentinel value for sampler max_lod — effectively unlimited mip levels.
+ * Any value above the actual mip count works; 1000 is a GPU convention. */
+#define MAX_LOD_UNLIMITED 1000.0f
+
+/* Buffer length for the window title string (mode name + prefix) */
+#define TITLE_BUF_LEN 256
+
 /* ── Sampler mode names (shown in window title) ──────────────────────────── */
 
 static const char *sampler_mode_names[NUM_SAMPLER_MODES] = {
@@ -426,7 +433,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
         info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
         info.min_lod        = 0.0f;
-        info.max_lod        = 1000.0f;  /* Allow all mip levels */
+        info.max_lod        = MAX_LOD_UNLIMITED;
         samplers[0] = SDL_CreateGPUSampler(device, &info);
     }
 
@@ -442,7 +449,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
         info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
         info.min_lod        = 0.0f;
-        info.max_lod        = 1000.0f;
+        info.max_lod        = MAX_LOD_UNLIMITED;
         samplers[1] = SDL_CreateGPUSampler(device, &info);
     }
 
@@ -790,7 +797,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         state->current_sampler = (state->current_sampler + 1) % NUM_SAMPLER_MODES;
 
         /* Update window title to show current mode */
-        char title[256];
+        char title[TITLE_BUF_LEN];
         SDL_snprintf(title, sizeof(title), "%s — %s",
                      WINDOW_TITLE, sampler_mode_names[state->current_sampler]);
         SDL_SetWindowTitle(state->window, title);
@@ -856,14 +863,21 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             return SDL_APP_FAILURE;
         }
 
+        /* Select the GPU program and fixed-function pipeline state
+         * (shaders, vertex layout, rasterizer, blend modes). */
         SDL_BindGPUGraphicsPipeline(pass, state->pipeline);
 
+        /* Bind the vertex buffer — provides position and UV attributes
+         * to the vertex shader for each vertex in the quad. */
         SDL_GPUBufferBinding vertex_binding;
         SDL_zero(vertex_binding);
         vertex_binding.buffer = state->vertex_buffer;
         vertex_binding.offset = 0;
         SDL_BindGPUVertexBuffers(pass, 0, &vertex_binding, 1);
 
+        /* Bind the index buffer — supplies triangle indices so we can
+         * draw the quad with 4 vertices instead of 6.  16-bit indices
+         * are sufficient for small meshes. */
         SDL_GPUBufferBinding index_binding;
         SDL_zero(index_binding);
         index_binding.buffer = state->index_buffer;
@@ -871,13 +885,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_BindGPUIndexBuffer(pass, &index_binding,
                                SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
-        /* Bind texture + current sampler */
+        /* Bind the texture and the currently selected sampler so the
+         * fragment shader can perform texture lookups (sampling). */
         SDL_GPUTextureSamplerBinding tex_sampler_binding;
         SDL_zero(tex_sampler_binding);
         tex_sampler_binding.texture = state->texture;
         tex_sampler_binding.sampler = state->samplers[state->current_sampler];
         SDL_BindGPUFragmentSamplers(pass, 0, &tex_sampler_binding, 1);
 
+        /* Issue the indexed draw call — renders the quad using the
+         * pipeline, vertex/index buffers, and texture+sampler bound above. */
         SDL_DrawGPUIndexedPrimitives(pass, INDEX_COUNT, 1, 0, 0, 0);
 
         SDL_EndGPURenderPass(pass);

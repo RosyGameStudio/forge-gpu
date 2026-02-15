@@ -8,6 +8,28 @@
 - LOD selection (how the GPU picks the right mip level)
 - How `forge_log2f`, `forge_clampf`, and `forge_trilerpf` connect to the GPU
 
+## Result
+
+After running this lesson you will understand how mip chains are computed (level
+count, memory cost), how the GPU selects a mip level via LOD, and how trilinear
+interpolation blends between two mip levels for smooth transitions. The console
+output walks through each concept with concrete numbers.
+
+## Key concepts
+
+- **Mip chain** — a series of progressively halved textures, from full size down to 1×1
+- **LOD (Level of Detail)** — `log2(footprint)`, how the GPU picks which mip level to sample
+- **Trilinear interpolation** — bilinear sample from two adjacent mip levels, then lerp between them
+- **Screen-space derivatives** — `ddx`/`ddy` measure how fast UVs change across pixels, driving LOD selection
+
+## Building
+
+```bash
+python scripts/run.py math/05
+```
+
+Requires SDL3 and a C99 compiler (see project root README for full setup).
+
 ## The problem: aliasing
 
 When a texture is viewed at a distance, many texels map to a single screen

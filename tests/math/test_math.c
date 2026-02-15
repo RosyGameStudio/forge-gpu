@@ -24,13 +24,17 @@ static int fail_count = 0;
 /* ── Test Constants ──────────────────────────────────────────────────────── */
 
 /* Common scalars */
+#define TEST_NEG_ONE    (-1.0f)
 #define TEST_ZERO       0.0f
 #define TEST_ONE        1.0f
 #define TEST_TWO        2.0f
 #define TEST_THREE      3.0f
 #define TEST_FOUR       4.0f
 #define TEST_FIVE       5.0f
+#define TEST_EIGHT      8.0f
 #define TEST_TEN        10.0f
+#define TEST_FIFTEEN    15.0f
+#define TEST_256        256.0f
 #define TEST_HALF       0.5f
 #define TEST_SCALE_2    2.0f
 
@@ -138,11 +142,11 @@ static bool vec4_eq(vec4 a, vec4 b)
 static void test_forge_log2f(void)
 {
     TEST("forge_log2f");
-    ASSERT_FLOAT_EQ(forge_log2f(1.0f), TEST_ZERO);     /* 2^0 = 1 */
-    ASSERT_FLOAT_EQ(forge_log2f(2.0f), TEST_ONE);       /* 2^1 = 2 */
-    ASSERT_FLOAT_EQ(forge_log2f(4.0f), TEST_TWO);       /* 2^2 = 4 */
-    ASSERT_FLOAT_EQ(forge_log2f(8.0f), TEST_THREE);     /* 2^3 = 8 */
-    ASSERT_FLOAT_EQ(forge_log2f(256.0f), 8.0f);         /* 2^8 = 256 */
+    ASSERT_FLOAT_EQ(forge_log2f(TEST_ONE), TEST_ZERO);     /* 2^0 = 1 */
+    ASSERT_FLOAT_EQ(forge_log2f(TEST_TWO), TEST_ONE);      /* 2^1 = 2 */
+    ASSERT_FLOAT_EQ(forge_log2f(TEST_FOUR), TEST_TWO);     /* 2^2 = 4 */
+    ASSERT_FLOAT_EQ(forge_log2f(TEST_EIGHT), TEST_THREE);  /* 2^3 = 8 */
+    ASSERT_FLOAT_EQ(forge_log2f(TEST_256), TEST_EIGHT);    /* 2^8 = 256 */
     END_TEST();
 }
 
@@ -152,9 +156,9 @@ static void test_forge_clampf(void)
     /* Value within range — returns unchanged */
     ASSERT_FLOAT_EQ(forge_clampf(TEST_FIVE, TEST_ZERO, TEST_TEN), TEST_FIVE);
     /* Value below range — returns lo */
-    ASSERT_FLOAT_EQ(forge_clampf(-1.0f, TEST_ZERO, TEST_TEN), TEST_ZERO);
+    ASSERT_FLOAT_EQ(forge_clampf(TEST_NEG_ONE, TEST_ZERO, TEST_TEN), TEST_ZERO);
     /* Value above range — returns hi */
-    ASSERT_FLOAT_EQ(forge_clampf(15.0f, TEST_ZERO, TEST_TEN), TEST_TEN);
+    ASSERT_FLOAT_EQ(forge_clampf(TEST_FIFTEEN, TEST_ZERO, TEST_TEN), TEST_TEN);
     /* Value at boundaries — returns boundary */
     ASSERT_FLOAT_EQ(forge_clampf(TEST_ZERO, TEST_ZERO, TEST_TEN), TEST_ZERO);
     ASSERT_FLOAT_EQ(forge_clampf(TEST_TEN, TEST_ZERO, TEST_TEN), TEST_TEN);
@@ -173,12 +177,12 @@ static void test_forge_trilerpf(void)
                                     0.0f, 0.0f, 0.0f), TEST_ONE);
     /* At corner (1,1,1) — returns c111 */
     ASSERT_FLOAT_EQ(forge_trilerpf(1, 2, 3, 4, 5, 6, 7, 8,
-                                    1.0f, 1.0f, 1.0f), 8.0f);
+                                    TEST_ONE, TEST_ONE, TEST_ONE), TEST_EIGHT);
 
     /* Center: average of all 8 values */
     /* (1+2+3+4+5+6+7+8)/8 = 4.5 */
     ASSERT_FLOAT_EQ(forge_trilerpf(1, 2, 3, 4, 5, 6, 7, 8,
-                                    TEST_HALF, TEST_HALF, TEST_HALF), 4.5f);
+                                    TEST_HALF, TEST_HALF, TEST_HALF), TEST_FOUR + TEST_HALF);
 
     /* tz=0 should equal bilerp of front face */
     float front = forge_bilerpf(1, 2, 3, 4, 0.3f, 0.7f);

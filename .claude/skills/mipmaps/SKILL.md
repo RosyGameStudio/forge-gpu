@@ -18,6 +18,100 @@ modes for different quality/performance trade-offs. It builds on the
 - Controlling LOD behavior with `min_lod`, `max_lod`, and `mip_lod_bias`
 - Comparing sampler mipmap modes (trilinear vs bilinear+nearest vs none)
 
+## Key API calls (ordered)
+
+1. `SDL_CreateGPUTexture` — create texture with `num_levels > 1` and `SAMPLER | COLOR_TARGET` usage
+2. `SDL_CreateGPUTransferBuffer` — staging buffer for CPU → GPU upload
+3. `SDL_MapGPUTransferBuffer` / `SDL_UnmapGPUTransferBuffer` — write pixel data
+4. `SDL_BeginGPUCopyPass` / `SDL_UploadToGPUTexture` / `SDL_EndGPUCopyPass` — upload base mip level
+5. `SDL_GenerateMipmapsForGPUTexture` — auto-generate all smaller mip levels (outside any pass)
+6. `SDL_SubmitGPUCommandBuffer` — submit the upload + mipgen work
+7. `SDL_CreateGPUSampler` — configure mipmap filtering mode (trilinear, bilinear+nearest, none)
+8. `SDL_BindGPUFragmentSamplers` — bind texture + sampler for drawing
+
+## Code template
+
+Minimal end-to-end sequence: create a mipmapped texture, generate mips, set up a
+trilinear sampler, and bind for rendering.
+
+```c
+#include "math/forge_math.h"
+
+#define TEX_SIZE      256
+#define BYTES_PER_PX  4
+#define MAX_LOD       1000.0f  /* allow all mip levels */
+
+/* ── 1. Create texture with mip levels ──────────────────────────────── */
+int num_levels = (int)forge_log2f((float)TEX_SIZE) + 1;
+
+SDL_GPUTextureCreateInfo tex_info = { 0 };
+tex_info.type                 = SDL_GPU_TEXTURETYPE_2D;
+tex_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+tex_info.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER |
+                                SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+tex_info.width                = TEX_SIZE;
+tex_info.height               = TEX_SIZE;
+tex_info.layer_count_or_depth = 1;
+tex_info.num_levels           = num_levels;
+SDL_GPUTexture *texture = SDL_CreateGPUTexture(device, &tex_info);
+
+/* ── 2. Generate pixel data (procedural or loaded from file) ────────── */
+Uint32 total_bytes = TEX_SIZE * TEX_SIZE * BYTES_PER_PX;
+Uint8 *pixels = (Uint8 *)SDL_malloc(total_bytes);
+/* ... fill pixels ... */
+
+/* ── 3. Upload base level via transfer buffer ───────────────────────── */
+SDL_GPUTransferBufferCreateInfo xfer_info = { 0 };
+xfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+xfer_info.size  = total_bytes;
+SDL_GPUTransferBuffer *xfer = SDL_CreateGPUTransferBuffer(device, &xfer_info);
+void *mapped = SDL_MapGPUTransferBuffer(device, xfer, false);
+SDL_memcpy(mapped, pixels, total_bytes);
+SDL_UnmapGPUTransferBuffer(device, xfer);
+SDL_free(pixels);
+
+SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
+SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+
+SDL_GPUTextureTransferInfo src = { 0 };
+src.transfer_buffer = xfer;
+src.pixels_per_row  = TEX_SIZE;
+src.rows_per_layer  = TEX_SIZE;
+
+SDL_GPUTextureRegion dst = { 0 };
+dst.texture   = texture;
+dst.mip_level = 0;
+dst.w = TEX_SIZE;  dst.h = TEX_SIZE;  dst.d = 1;
+
+SDL_UploadToGPUTexture(copy, &src, &dst, false);
+SDL_EndGPUCopyPass(copy);
+
+/* ── 4. Generate mipmaps — MUST be outside any pass ─────────────────── */
+SDL_GenerateMipmapsForGPUTexture(cmd, texture);
+
+SDL_SubmitGPUCommandBuffer(cmd);
+SDL_ReleaseGPUTransferBuffer(device, xfer);
+
+/* ── 5. Create trilinear sampler ────────────────────────────────────── */
+SDL_GPUSamplerCreateInfo samp_info = { 0 };
+samp_info.min_filter     = SDL_GPU_FILTER_LINEAR;
+samp_info.mag_filter     = SDL_GPU_FILTER_LINEAR;
+samp_info.mipmap_mode    = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+samp_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+samp_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+samp_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+samp_info.min_lod        = 0.0f;
+samp_info.max_lod        = MAX_LOD;
+SDL_GPUSampler *sampler = SDL_CreateGPUSampler(device, &samp_info);
+
+/* ── 6. Bind for rendering (inside a render pass) ───────────────────── */
+SDL_GPUTextureSamplerBinding binding = { 0 };
+binding.texture = texture;
+binding.sampler = sampler;
+SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
+SDL_DrawGPUIndexedPrimitives(pass, index_count, 1, 0, 0, 0);
+```
+
 ## Creating a mipmapped texture
 
 ### Key differences from a non-mipmapped texture

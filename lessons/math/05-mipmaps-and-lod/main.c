@@ -20,6 +20,14 @@
 #include <stdio.h>
 #include "math/forge_math.h"
 
+/* ── Constants ────────────────────────────────────────────────────────── */
+
+/* Base texture dimensions for the mip chain example */
+#define BASE_TEX_SIZE  256
+
+/* Bytes per texel (RGBA8) */
+#define BYTES_PER_TEXEL 4
+
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 
 static void print_header(const char *name)
@@ -79,26 +87,25 @@ int main(int argc, char *argv[])
 
     print_header("2. MIP CHAIN -- HALVING AND LOG2");
 
-    int base_size = 256;
-    int num_levels = (int)forge_log2f((float)base_size) + 1;
+    int num_levels = (int)forge_log2f((float)BASE_TEX_SIZE) + 1;
 
-    printf("  A %dx%d texture has %d mip levels.\n\n", base_size, base_size,
-           num_levels);
+    printf("  A %dx%d texture has %d mip levels.\n\n", BASE_TEX_SIZE,
+           BASE_TEX_SIZE, num_levels);
     printf("  Each level halves the dimensions of the previous level:\n\n");
     printf("  %-8s  %-12s  %-12s  %-8s\n", "Level", "Size", "Texels", "Bytes");
     printf("  %-8s  %-12s  %-12s  %-8s\n", "-----", "--------", "--------", "------");
 
     int total_texels = 0;
-    int size = base_size;
+    int size = BASE_TEX_SIZE;
     for (int level = 0; level < num_levels; level++) {
         int texels = size * size;
         total_texels += texels;
         printf("  %-8d  %4dx%-7d  %-12d  %d\n",
-               level, size, size, texels, texels * 4);
+               level, size, size, texels, texels * BYTES_PER_TEXEL);
         if (size > 1) size /= 2;
     }
 
-    int base_texels = base_size * base_size;
+    int base_texels = BASE_TEX_SIZE * BASE_TEX_SIZE;
     printf("\n  Base level texels:  %d\n", base_texels);
     printf("  Total with mipmaps: %d\n", total_texels);
     printf("  Overhead: %.0f%% extra memory (always ~33%%)\n",
@@ -106,8 +113,8 @@ int main(int argc, char *argv[])
 
     printf("\n  The formula: num_levels = floor(log2(max_dimension)) + 1\n");
     printf("    log2(%d) = %.0f, so %d + 1 = %d levels\n",
-           base_size, forge_log2f((float)base_size),
-           (int)forge_log2f((float)base_size), num_levels);
+           BASE_TEX_SIZE, forge_log2f((float)BASE_TEX_SIZE),
+           (int)forge_log2f((float)BASE_TEX_SIZE), num_levels);
 
     printf("\n  Other examples:\n");
     int sizes[] = { 512, 1024, 2048, 4096 };
@@ -239,7 +246,7 @@ int main(int argc, char *argv[])
 
     float distances[] = { 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f, 128.0f };
     int num_distances = (int)(sizeof(distances) / sizeof(distances[0]));
-    int tex_size = 256;
+    int tex_size = BASE_TEX_SIZE;
 
     for (int i = 0; i < num_distances; i++) {
         float dist = distances[i];
