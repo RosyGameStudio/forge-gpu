@@ -37,9 +37,14 @@ def find_dxc():
     # Check VULKAN_SDK first (has -spirv support)
     vulkan_sdk = os.environ.get("VULKAN_SDK")
     if vulkan_sdk:
-        dxc_path = os.path.join(vulkan_sdk, "Bin", "dxc.exe")
-        if os.path.isfile(dxc_path):
-            return dxc_path
+        # Windows: Bin/dxc.exe, Linux/macOS: bin/dxc
+        candidates = [
+            os.path.join(vulkan_sdk, "Bin", "dxc.exe"),
+            os.path.join(vulkan_sdk, "bin", "dxc"),
+        ]
+        for dxc_path in candidates:
+            if os.path.isfile(dxc_path):
+                return dxc_path
 
     # Fall back to PATH
     dxc_path = shutil.which("dxc")

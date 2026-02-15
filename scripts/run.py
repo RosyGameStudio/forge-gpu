@@ -43,19 +43,18 @@ def find_executable(lesson_type, dirname):
     """Locate the built executable for a lesson."""
     base = os.path.join(BUILD_DIR, "lessons", lesson_type, dirname)
 
-    # Multi-config generators (MSVC): look in Debug/, Release/, etc.
+    # Multi-config generators (MSVC, Xcode): look in Debug/, Release/, etc.
     for config in BUILD_CONFIGS:
-        exe = os.path.join(base, config, dirname + ".exe")
-        if os.path.isfile(exe):
-            return exe
+        for ext in [".exe", ""]:
+            exe = os.path.join(base, config, dirname + ext)
+            if os.path.isfile(exe):
+                return exe
 
     # Single-config generators (Ninja, Make): exe is directly in the folder
-    exe = os.path.join(base, dirname + ".exe")
-    if os.path.isfile(exe):
-        return exe
-    exe = os.path.join(base, dirname)
-    if os.path.isfile(exe):
-        return exe
+    for ext in [".exe", ""]:
+        exe = os.path.join(base, dirname + ext)
+        if os.path.isfile(exe):
+            return exe
 
     return None
 
