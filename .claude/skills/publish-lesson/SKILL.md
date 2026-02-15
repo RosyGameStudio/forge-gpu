@@ -1,7 +1,7 @@
 ---
 name: publish-lesson
 description: Validate, commit, and create a PR for a new forge-gpu lesson
-argument-hint: [lesson-number] [lesson-name]
+argument-hint: "[lesson-number] [lesson-name]"
 disable-model-invocation: false
 ---
 

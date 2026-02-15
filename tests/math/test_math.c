@@ -132,6 +132,62 @@ static bool vec4_eq(vec4 a, vec4 b)
     } while (0)
 
 /* ══════════════════════════════════════════════════════════════════════════
+ * Scalar Helper Tests
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+static void test_forge_log2f(void)
+{
+    TEST("forge_log2f");
+    ASSERT_FLOAT_EQ(forge_log2f(1.0f), TEST_ZERO);     /* 2^0 = 1 */
+    ASSERT_FLOAT_EQ(forge_log2f(2.0f), TEST_ONE);       /* 2^1 = 2 */
+    ASSERT_FLOAT_EQ(forge_log2f(4.0f), TEST_TWO);       /* 2^2 = 4 */
+    ASSERT_FLOAT_EQ(forge_log2f(8.0f), TEST_THREE);     /* 2^3 = 8 */
+    ASSERT_FLOAT_EQ(forge_log2f(256.0f), 8.0f);         /* 2^8 = 256 */
+    END_TEST();
+}
+
+static void test_forge_clampf(void)
+{
+    TEST("forge_clampf");
+    /* Value within range — returns unchanged */
+    ASSERT_FLOAT_EQ(forge_clampf(TEST_FIVE, TEST_ZERO, TEST_TEN), TEST_FIVE);
+    /* Value below range — returns lo */
+    ASSERT_FLOAT_EQ(forge_clampf(-1.0f, TEST_ZERO, TEST_TEN), TEST_ZERO);
+    /* Value above range — returns hi */
+    ASSERT_FLOAT_EQ(forge_clampf(15.0f, TEST_ZERO, TEST_TEN), TEST_TEN);
+    /* Value at boundaries — returns boundary */
+    ASSERT_FLOAT_EQ(forge_clampf(TEST_ZERO, TEST_ZERO, TEST_TEN), TEST_ZERO);
+    ASSERT_FLOAT_EQ(forge_clampf(TEST_TEN, TEST_ZERO, TEST_TEN), TEST_TEN);
+    END_TEST();
+}
+
+static void test_forge_trilerpf(void)
+{
+    TEST("forge_trilerpf");
+    /* All corners same value — result equals that value */
+    ASSERT_FLOAT_EQ(forge_trilerpf(5, 5, 5, 5, 5, 5, 5, 5,
+                                    TEST_HALF, TEST_HALF, TEST_HALF), TEST_FIVE);
+
+    /* At corner (0,0,0) — returns c000 */
+    ASSERT_FLOAT_EQ(forge_trilerpf(1, 2, 3, 4, 5, 6, 7, 8,
+                                    0.0f, 0.0f, 0.0f), TEST_ONE);
+    /* At corner (1,1,1) — returns c111 */
+    ASSERT_FLOAT_EQ(forge_trilerpf(1, 2, 3, 4, 5, 6, 7, 8,
+                                    1.0f, 1.0f, 1.0f), 8.0f);
+
+    /* Center: average of all 8 values */
+    /* (1+2+3+4+5+6+7+8)/8 = 4.5 */
+    ASSERT_FLOAT_EQ(forge_trilerpf(1, 2, 3, 4, 5, 6, 7, 8,
+                                    TEST_HALF, TEST_HALF, TEST_HALF), 4.5f);
+
+    /* tz=0 should equal bilerp of front face */
+    float front = forge_bilerpf(1, 2, 3, 4, 0.3f, 0.7f);
+    ASSERT_FLOAT_EQ(forge_trilerpf(1, 2, 3, 4, 5, 6, 7, 8,
+                                    0.3f, 0.7f, 0.0f), front);
+    END_TEST();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
  * vec2 Tests
  * ══════════════════════════════════════════════════════════════════════════ */
 
@@ -311,6 +367,32 @@ static void test_vec3_lerp(void)
     END_TEST();
 }
 
+static void test_vec3_trilerp(void)
+{
+    TEST("vec3_trilerp");
+    /* All corners same — result equals that value */
+    vec3 same = vec3_create(TEST_ONE, TEST_TWO, TEST_THREE);
+    vec3 result = vec3_trilerp(same, same, same, same, same, same, same, same,
+                                TEST_HALF, TEST_HALF, TEST_HALF);
+    ASSERT_VEC3_EQ(result, same);
+
+    /* At corner (0,0,0) — returns c000 */
+    vec3 c000 = vec3_create(TEST_ONE, TEST_ZERO, TEST_ZERO);
+    vec3 c111 = vec3_create(TEST_ZERO, TEST_ZERO, TEST_ONE);
+    vec3 zero3 = TEST_V3_ZERO;
+    vec3 corner = vec3_trilerp(c000, zero3, zero3, zero3,
+                                zero3, zero3, zero3, c111,
+                                0.0f, 0.0f, 0.0f);
+    ASSERT_VEC3_EQ(corner, c000);
+
+    /* At corner (1,1,1) — returns c111 */
+    corner = vec3_trilerp(c000, zero3, zero3, zero3,
+                           zero3, zero3, zero3, c111,
+                           1.0f, 1.0f, 1.0f);
+    ASSERT_VEC3_EQ(corner, c111);
+    END_TEST();
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
  * vec4 Tests
  * ══════════════════════════════════════════════════════════════════════════ */
@@ -362,6 +444,26 @@ static void test_vec4_dot(void)
     vec4 b = TEST_V4_Y_AXIS;
     float dot = vec4_dot(a, b);
     ASSERT_FLOAT_EQ(dot, TEST_ZERO);
+    END_TEST();
+}
+
+static void test_vec4_trilerp(void)
+{
+    TEST("vec4_trilerp");
+    /* All corners same — result equals that value */
+    vec4 same = vec4_create(TEST_ONE, TEST_TWO, TEST_THREE, TEST_FOUR);
+    vec4 result = vec4_trilerp(same, same, same, same, same, same, same, same,
+                                TEST_HALF, TEST_HALF, TEST_HALF);
+    ASSERT_VEC4_EQ(result, same);
+
+    /* At corner (0,0,0) — returns c000 */
+    vec4 c000 = vec4_create(TEST_ONE, TEST_ZERO, TEST_ZERO, TEST_ONE);
+    vec4 c111 = vec4_create(TEST_ZERO, TEST_ZERO, TEST_ONE, TEST_ONE);
+    vec4 zero4 = vec4_create(TEST_ZERO, TEST_ZERO, TEST_ZERO, TEST_ZERO);
+    vec4 corner = vec4_trilerp(c000, zero4, zero4, zero4,
+                                zero4, zero4, zero4, c111,
+                                0.0f, 0.0f, 0.0f);
+    ASSERT_VEC4_EQ(corner, c000);
     END_TEST();
 }
 
@@ -646,8 +748,14 @@ int main(int argc, char *argv[])
 
     SDL_Log("\n=== forge-gpu Math Library Tests ===\n");
 
+    /* Scalar helper tests */
+    SDL_Log("Scalar helper tests:");
+    test_forge_log2f();
+    test_forge_clampf();
+    test_forge_trilerpf();
+
     /* vec2 tests */
-    SDL_Log("vec2 tests:");
+    SDL_Log("\nvec2 tests:");
     test_vec2_create();
     test_vec2_add();
     test_vec2_sub();
@@ -668,6 +776,7 @@ int main(int argc, char *argv[])
     test_vec3_length();
     test_vec3_normalize();
     test_vec3_lerp();
+    test_vec3_trilerp();
 
     /* vec4 tests */
     SDL_Log("\nvec4 tests:");
@@ -676,6 +785,7 @@ int main(int argc, char *argv[])
     test_vec4_sub();
     test_vec4_scale();
     test_vec4_dot();
+    test_vec4_trilerp();
 
     /* mat4 tests */
     SDL_Log("\nmat4 tests:");

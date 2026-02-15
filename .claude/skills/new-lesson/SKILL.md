@@ -1,7 +1,7 @@
 ---
 name: new-lesson
 description: Scaffold a new forge-gpu lesson with all required files
-argument-hint: [number] [name] [description]
+argument-hint: "[number] [name] [description]"
 disable-model-invocation: true
 ---
 
