@@ -57,6 +57,25 @@ static int fail_count = 0;
 #define TEST_V3_TEN     vec3_create(10.0f, 10.0f, 10.0f)
 #define TEST_V3_345     vec3_create(3.0f, 4.0f, 0.0f)  /* 3-4-5 triangle */
 
+/* Projection test constants */
+#define TEST_PROJ_FOV_DEG       60.0f
+#define TEST_PROJ_ASPECT_W      16.0f
+#define TEST_PROJ_ASPECT_H       9.0f
+#define TEST_PROJ_NEAR           0.1f
+#define TEST_PROJ_FAR          100.0f
+
+/* mat4_perspective_from_planes near-plane bounds */
+#define TEST_PLANES_L           -2.0f
+#define TEST_PLANES_R            2.0f
+#define TEST_PLANES_B           -1.5f
+#define TEST_PLANES_T            1.5f
+#define TEST_PLANES_NEAR         1.0f
+#define TEST_PLANES_FAR        100.0f
+
+/* mat4_perspective_from_planes depth test */
+#define TEST_PLANES_DEPTH_NEAR   0.5f
+#define TEST_PLANES_DEPTH_FAR   50.0f
+
 /* Common vec4 test vectors */
 #define TEST_V4_A       vec4_create(1.0f, 2.0f, 3.0f, 4.0f)
 #define TEST_V4_B       vec4_create(5.0f, 6.0f, 7.0f, 8.0f)
@@ -762,11 +781,11 @@ static void test_vec3_perspective_divide(void)
 {
     TEST("vec3_perspective_divide");
     /* A clip-space point with w=2 should have its x,y,z halved */
-    vec4 clip = vec4_create(4.0f, -6.0f, 1.0f, 2.0f);
+    vec4 clip = vec4_create(TEST_FOUR, -6.0f, TEST_ONE, TEST_TWO);
     vec3 ndc = vec3_perspective_divide(clip);
-    ASSERT_FLOAT_EQ(ndc.x, 2.0f);
-    ASSERT_FLOAT_EQ(ndc.y, -3.0f);
-    ASSERT_FLOAT_EQ(ndc.z, 0.5f);
+    ASSERT_FLOAT_EQ(ndc.x, TEST_TWO);
+    ASSERT_FLOAT_EQ(ndc.y, -TEST_THREE);
+    ASSERT_FLOAT_EQ(ndc.z, TEST_HALF);
     END_TEST();
 }
 
@@ -774,9 +793,9 @@ static void test_vec3_perspective_divide_w_one(void)
 {
     TEST("vec3_perspective_divide with w=1");
     /* When w=1 (orthographic), NDC = clip.xyz unchanged */
-    vec4 clip = vec4_create(0.5f, -0.3f, 0.8f, 1.0f);
+    vec4 clip = vec4_create(TEST_HALF, -0.3f, 0.8f, TEST_ONE);
     vec3 ndc = vec3_perspective_divide(clip);
-    ASSERT_FLOAT_EQ(ndc.x, 0.5f);
+    ASSERT_FLOAT_EQ(ndc.x, TEST_HALF);
     ASSERT_FLOAT_EQ(ndc.y, -0.3f);
     ASSERT_FLOAT_EQ(ndc.z, 0.8f);
     END_TEST();
@@ -786,23 +805,24 @@ static void test_mat4_perspective_from_planes(void)
 {
     TEST("mat4_perspective_from_planes near-plane corners");
     /* Near-plane corners should map to NDC corners (-1,-1,0) to (1,1,0) */
-    float l = -2.0f, r = 2.0f, b = -1.5f, t = 1.5f;
-    float n = 1.0f, f = 100.0f;
+    float l = TEST_PLANES_L, r = TEST_PLANES_R;
+    float b = TEST_PLANES_B, t = TEST_PLANES_T;
+    float n = TEST_PLANES_NEAR, f = TEST_PLANES_FAR;
     mat4 proj = mat4_perspective_from_planes(l, r, b, t, n, f);
 
     /* Bottom-left of near plane: (l, b, -n, 1) -> NDC (-1, -1, 0) */
-    vec4 bl_clip = mat4_multiply_vec4(proj, vec4_create(l, b, -n, 1.0f));
+    vec4 bl_clip = mat4_multiply_vec4(proj, vec4_create(l, b, -n, TEST_ONE));
     vec3 bl_ndc = vec3_perspective_divide(bl_clip);
-    ASSERT_FLOAT_EQ(bl_ndc.x, -1.0f);
-    ASSERT_FLOAT_EQ(bl_ndc.y, -1.0f);
-    ASSERT_FLOAT_EQ(bl_ndc.z, 0.0f);
+    ASSERT_FLOAT_EQ(bl_ndc.x, -TEST_ONE);
+    ASSERT_FLOAT_EQ(bl_ndc.y, -TEST_ONE);
+    ASSERT_FLOAT_EQ(bl_ndc.z, TEST_ZERO);
 
     /* Top-right of near plane: (r, t, -n, 1) -> NDC (1, 1, 0) */
-    vec4 tr_clip = mat4_multiply_vec4(proj, vec4_create(r, t, -n, 1.0f));
+    vec4 tr_clip = mat4_multiply_vec4(proj, vec4_create(r, t, -n, TEST_ONE));
     vec3 tr_ndc = vec3_perspective_divide(tr_clip);
-    ASSERT_FLOAT_EQ(tr_ndc.x, 1.0f);
-    ASSERT_FLOAT_EQ(tr_ndc.y, 1.0f);
-    ASSERT_FLOAT_EQ(tr_ndc.z, 0.0f);
+    ASSERT_FLOAT_EQ(tr_ndc.x, TEST_ONE);
+    ASSERT_FLOAT_EQ(tr_ndc.y, TEST_ONE);
+    ASSERT_FLOAT_EQ(tr_ndc.z, TEST_ZERO);
     END_TEST();
 }
 
@@ -810,9 +830,9 @@ static void test_mat4_perspective_from_planes_symmetric(void)
 {
     TEST("mat4_perspective_from_planes symmetric matches mat4_perspective");
     /* Symmetric case should match mat4_perspective */
-    float fov = 60.0f * FORGE_DEG2RAD;
-    float aspect = 16.0f / 9.0f;
-    float n = 0.1f, f = 100.0f;
+    float fov = TEST_PROJ_FOV_DEG * FORGE_DEG2RAD;
+    float aspect = TEST_PROJ_ASPECT_W / TEST_PROJ_ASPECT_H;
+    float n = TEST_PROJ_NEAR, f = TEST_PROJ_FAR;
 
     float half_h = n * tanf(fov * 0.5f);
     float half_w = half_h * aspect;
@@ -831,18 +851,21 @@ static void test_mat4_perspective_from_planes_depth(void)
 {
     TEST("mat4_perspective_from_planes depth mapping");
     /* Near plane center -> z=0, far plane center -> z=1 */
-    float n = 0.5f, f = 50.0f;
-    mat4 proj = mat4_perspective_from_planes(-1.0f, 1.0f, -1.0f, 1.0f, n, f);
+    float n = TEST_PLANES_DEPTH_NEAR, f = TEST_PLANES_DEPTH_FAR;
+    mat4 proj = mat4_perspective_from_planes(-TEST_ONE, TEST_ONE,
+                                              -TEST_ONE, TEST_ONE, n, f);
 
     /* Center of near plane: (0, 0, -n) */
-    vec4 near_clip = mat4_multiply_vec4(proj, vec4_create(0.0f, 0.0f, -n, 1.0f));
+    vec4 near_clip = mat4_multiply_vec4(proj,
+        vec4_create(TEST_ZERO, TEST_ZERO, -n, TEST_ONE));
     vec3 near_ndc = vec3_perspective_divide(near_clip);
-    ASSERT_FLOAT_EQ(near_ndc.z, 0.0f);
+    ASSERT_FLOAT_EQ(near_ndc.z, TEST_ZERO);
 
     /* Center of far plane: (0, 0, -f) */
-    vec4 far_clip = mat4_multiply_vec4(proj, vec4_create(0.0f, 0.0f, -f, 1.0f));
+    vec4 far_clip = mat4_multiply_vec4(proj,
+        vec4_create(TEST_ZERO, TEST_ZERO, -f, TEST_ONE));
     vec3 far_ndc = vec3_perspective_divide(far_clip);
-    ASSERT_FLOAT_EQ(far_ndc.z, 1.0f);
+    ASSERT_FLOAT_EQ(far_ndc.z, TEST_ONE);
     END_TEST();
 }
 

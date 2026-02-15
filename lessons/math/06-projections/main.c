@@ -27,6 +27,64 @@
 #include <SDL3/SDL_main.h>
 #include "math/forge_math.h"
 
+/* ── Constants ────────────────────────────────────────────────────────────── */
+
+/* Section 1: Perspective without a matrix */
+#define SEC1_NEAR              1.0f
+#define SEC1_POINT_X           2.0f
+#define SEC1_POINT_Y           1.0f
+#define SEC1_DEPTH_A          -2.0f
+#define SEC1_DEPTH_B          -4.0f
+#define SEC1_DEPTH_C          -8.0f
+
+/* Section 2: Perspective projection matrix */
+#define SEC2_FOV_DEG           90.0f
+#define SEC2_ASPECT_W          16.0f
+#define SEC2_ASPECT_H           9.0f
+#define SEC2_NEAR               0.1f
+#define SEC2_FAR              100.0f
+#define SEC2_TEST_X             3.0f
+#define SEC2_TEST_Y             2.0f
+#define SEC2_TEST_Z            -5.0f
+
+/* Section 3: Clip space to NDC */
+#define SEC3_FOV_DEG           60.0f
+#define SEC3_NEAR               0.1f
+#define SEC3_FAR              100.0f
+#define SEC3_MID_Z            -50.0f
+#define SEC3_OFF_X              5.0f
+#define SEC3_OFF_Y              3.0f
+#define SEC3_OFF_Z            -10.0f
+
+/* Section 4: Frustum dimensions */
+#define SEC4_FOV_DEG           60.0f
+
+/* Section 5: Perspective-correct interpolation */
+#define SEC5_Z_NEAR            -1.0f
+#define SEC5_Z_FAR             -4.0f
+#define SEC5_U_NEAR             0.0f
+#define SEC5_U_FAR              1.0f
+#define SEC5_SCREEN_MID         0.5f
+#define SEC5_NUM_SAMPLES       10
+
+/* Section 6: Orthographic projection */
+#define SEC6_EXTENT            10.0f
+#define SEC6_NEAR               0.1f
+#define SEC6_FAR              100.0f
+
+/* Section 7: Asymmetric perspective */
+#define SEC7_ASYM_LEFT         -0.06f
+#define SEC7_ASYM_RIGHT         0.04f
+#define SEC7_ASYM_BOTTOM       -0.05f
+#define SEC7_ASYM_TOP           0.05f
+
+/* Section 8: Comparing projections */
+#define SEC8_ASPECT             1.0f
+#define SEC8_NEAR               1.0f
+#define SEC8_FAR              100.0f
+#define SEC8_REF_DEPTH         10.0f
+#define SEC8_TEST_X             2.0f
+
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
 static void print_vec3(const char *label, vec3 v)
@@ -103,13 +161,13 @@ int main(int argc, char *argv[])
     printf("  y_screen = y * near / (-z)\n\n");
 
     {
-        float near = 1.0f;
+        float near = SEC1_NEAR;
 
         /* Test points at increasing depth (z is negative in view space) */
         vec3 points[] = {
-            vec3_create( 2.0f,  1.0f, -2.0f),
-            vec3_create( 2.0f,  1.0f, -4.0f),
-            vec3_create( 2.0f,  1.0f, -8.0f),
+            vec3_create(SEC1_POINT_X, SEC1_POINT_Y, SEC1_DEPTH_A),
+            vec3_create(SEC1_POINT_X, SEC1_POINT_Y, SEC1_DEPTH_B),
+            vec3_create(SEC1_POINT_X, SEC1_POINT_Y, SEC1_DEPTH_C),
         };
         int num_points = sizeof(points) / sizeof(points[0]);
 
@@ -144,17 +202,17 @@ int main(int argc, char *argv[])
     printf("── 2. The perspective projection matrix ───────────────────\n\n");
 
     {
-        float fov = 90.0f * FORGE_DEG2RAD;  /* 90° vertical FOV */
-        float aspect = 16.0f / 9.0f;
-        float near = 0.1f;
-        float far = 100.0f;
+        float fov = SEC2_FOV_DEG * FORGE_DEG2RAD;  /* 90° vertical FOV */
+        float aspect = SEC2_ASPECT_W / SEC2_ASPECT_H;
+        float near = SEC2_NEAR;
+        float far = SEC2_FAR;
         mat4 proj = mat4_perspective(fov, aspect, near, far);
 
         print_mat4("Perspective matrix (90° FOV, 16:9, near=0.1, far=100)", proj);
         printf("\n");
 
         /* Transform a point and show clip-space output */
-        vec4 view_point = vec4_create(3.0f, 2.0f, -5.0f, 1.0f);
+        vec4 view_point = vec4_create(SEC2_TEST_X, SEC2_TEST_Y, SEC2_TEST_Z, 1.0f);
         vec4 clip = mat4_multiply_vec4(proj, view_point);
 
         print_vec4("View-space point", view_point);
@@ -180,18 +238,18 @@ int main(int argc, char *argv[])
     printf("── 3. Clip space to NDC (perspective divide) ──────────────\n\n");
 
     {
-        float fov = 60.0f * FORGE_DEG2RAD;
-        float aspect = 16.0f / 9.0f;
-        float near = 0.1f;
-        float far = 100.0f;
+        float fov = SEC3_FOV_DEG * FORGE_DEG2RAD;
+        float aspect = SEC2_ASPECT_W / SEC2_ASPECT_H;
+        float near = SEC3_NEAR;
+        float far = SEC3_FAR;
         mat4 proj = mat4_perspective(fov, aspect, near, far);
 
         /* Test several points */
         vec4 test_points[] = {
-            vec4_create(0.0f, 0.0f, -0.1f, 1.0f),   /* on near plane */
-            vec4_create(0.0f, 0.0f, -100.0f, 1.0f),  /* on far plane */
-            vec4_create(0.0f, 0.0f, -50.0f, 1.0f),   /* halfway */
-            vec4_create(5.0f, 3.0f, -10.0f, 1.0f),   /* off-center */
+            vec4_create(0.0f, 0.0f, -near, 1.0f),       /* on near plane */
+            vec4_create(0.0f, 0.0f, -far, 1.0f),         /* on far plane */
+            vec4_create(0.0f, 0.0f, SEC3_MID_Z, 1.0f),   /* halfway */
+            vec4_create(SEC3_OFF_X, SEC3_OFF_Y, SEC3_OFF_Z, 1.0f), /* off-center */
         };
         const char *names[] = {
             "On near plane   ", "On far plane    ",
@@ -226,11 +284,11 @@ int main(int argc, char *argv[])
     printf("── 4. Frustum dimensions from FOV ─────────────────────────\n\n");
 
     {
-        float fov_deg = 60.0f;
+        float fov_deg = SEC4_FOV_DEG;
         float fov = fov_deg * FORGE_DEG2RAD;
-        float aspect = 16.0f / 9.0f;
-        float near = 0.1f;
-        float far = 100.0f;
+        float aspect = SEC2_ASPECT_W / SEC2_ASPECT_H;
+        float near = SEC3_NEAR;
+        float far = SEC3_FAR;
 
         float half_h = near * tanf(fov * 0.5f);
         float half_w = half_h * aspect;
@@ -296,10 +354,10 @@ int main(int argc, char *argv[])
 
     {
         /* Two triangle vertices at different depths */
-        float z_near = -1.0f;   /* near vertex */
-        float z_far  = -4.0f;   /* far vertex */
-        float u_near = 0.0f;    /* UV at near vertex */
-        float u_far  = 1.0f;    /* UV at far vertex */
+        float z_near = SEC5_Z_NEAR;   /* near vertex */
+        float z_far  = SEC5_Z_FAR;    /* far vertex */
+        float u_near = SEC5_U_NEAR;   /* UV at near vertex */
+        float u_far  = SEC5_U_FAR;    /* UV at far vertex */
 
         float w_near = -z_near;  /* w = -z in perspective */
         float w_far  = -z_far;
@@ -309,7 +367,7 @@ int main(int argc, char *argv[])
         printf("\n");
 
         /* Compare at screen-space midpoint (t = 0.5) */
-        float t = 0.5f;
+        float t = SEC5_SCREEN_MID;
 
         /* Wrong: naive screen-space lerp */
         float u_wrong = forge_lerpf(u_near, u_far, t);
@@ -339,8 +397,8 @@ int main(int argc, char *argv[])
         SDL_Log("  Full interpolation comparison:");
         SDL_Log("    screen_t | naive_u | correct_u | error");
         SDL_Log("    ---------|---------|-----------|------");
-        for (int i = 0; i <= 10; i++) {
-            float st = (float)i / 10.0f;
+        for (int i = 0; i <= SEC5_NUM_SAMPLES; i++) {
+            float st = (float)i / (float)SEC5_NUM_SAMPLES;
             float naive = forge_lerpf(u_near, u_far, st);
             float iw = forge_lerpf(inv_w_near, inv_w_far, st);
             float uw = forge_lerpf(u_over_w_near, u_over_w_far, st);
@@ -366,9 +424,9 @@ int main(int argc, char *argv[])
     printf("── 6. Orthographic projection ─────────────────────────────\n\n");
 
     {
-        float left = -10.0f, right = 10.0f;
-        float bottom = -10.0f, top = 10.0f;
-        float near = 0.1f, far = 100.0f;
+        float left = -SEC6_EXTENT, right = SEC6_EXTENT;
+        float bottom = -SEC6_EXTENT, top = SEC6_EXTENT;
+        float near = SEC6_NEAR, far = SEC6_FAR;
         mat4 ortho = mat4_orthographic(left, right, bottom, top, near, far);
 
         print_mat4("Orthographic matrix ([-10,10] x [-10,10], near=0.1, far=100)",
@@ -417,10 +475,10 @@ int main(int argc, char *argv[])
 
     {
         /* First: verify symmetric case matches mat4_perspective */
-        float fov = 60.0f * FORGE_DEG2RAD;
-        float aspect = 16.0f / 9.0f;
-        float near = 0.1f;
-        float far = 100.0f;
+        float fov = SEC3_FOV_DEG * FORGE_DEG2RAD;
+        float aspect = SEC2_ASPECT_W / SEC2_ASPECT_H;
+        float near = SEC3_NEAR;
+        float far = SEC3_FAR;
 
         float half_h = near * tanf(fov * 0.5f);
         float half_w = half_h * aspect;
@@ -443,10 +501,10 @@ int main(int argc, char *argv[])
         printf("\n");
 
         /* Now show an asymmetric frustum (like a VR left eye) */
-        float asym_left = -0.06f;
-        float asym_right = 0.04f;
-        float asym_bottom = -0.05f;
-        float asym_top = 0.05f;
+        float asym_left = SEC7_ASYM_LEFT;
+        float asym_right = SEC7_ASYM_RIGHT;
+        float asym_bottom = SEC7_ASYM_BOTTOM;
+        float asym_top = SEC7_ASYM_TOP;
 
         mat4 asym = mat4_perspective_from_planes(
             asym_left, asym_right, asym_bottom, asym_top, near, far);
@@ -484,25 +542,25 @@ int main(int argc, char *argv[])
     printf("── 8. Comparing projections ───────────────────────────────\n\n");
 
     {
-        float fov = 60.0f * FORGE_DEG2RAD;
-        float aspect = 1.0f;  /* Square for simple comparison */
-        float near = 1.0f;
-        float far = 100.0f;
+        float fov = SEC3_FOV_DEG * FORGE_DEG2RAD;
+        float aspect = SEC8_ASPECT;  /* Square for simple comparison */
+        float near = SEC8_NEAR;
+        float far = SEC8_FAR;
 
         mat4 persp = mat4_perspective(fov, aspect, near, far);
 
         /* For fair comparison, set ortho bounds to match the perspective
          * frustum at a reference depth */
-        float ref_depth = 10.0f;
+        float ref_depth = SEC8_REF_DEPTH;
         float half_h = ref_depth * tanf(fov * 0.5f);
         mat4 ortho = mat4_orthographic(-half_h, half_h, -half_h, half_h,
                                         near, far);
 
         vec4 test_pts[] = {
-            vec4_create(2.0f, 0.0f, -5.0f, 1.0f),
-            vec4_create(2.0f, 0.0f, -10.0f, 1.0f),
-            vec4_create(2.0f, 0.0f, -20.0f, 1.0f),
-            vec4_create(2.0f, 0.0f, -50.0f, 1.0f),
+            vec4_create(SEC8_TEST_X, 0.0f,  -5.0f, 1.0f),
+            vec4_create(SEC8_TEST_X, 0.0f, -10.0f, 1.0f),
+            vec4_create(SEC8_TEST_X, 0.0f, -20.0f, 1.0f),
+            vec4_create(SEC8_TEST_X, 0.0f, -50.0f, 1.0f),
         };
         int np = sizeof(test_pts) / sizeof(test_pts[0]);
 

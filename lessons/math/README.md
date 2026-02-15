@@ -28,7 +28,7 @@ implementations for your projects.
 | 05 | [Matrices](05-matrices/) | Matrix math, multiplication, basis vectors, transpose, determinant, inverse |
 | 06 | [Projections](06-projections/) | Perspective, orthographic, frustums, clip space, NDC |
 
-*More lessons coming soon:* Quaternions, projections, anisotropy, and more.
+*More lessons coming soon:* Quaternions, anisotropy, and more.
 
 ## How Math Lessons Work
 
