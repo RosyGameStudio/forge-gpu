@@ -30,6 +30,7 @@
 
 /* Section 1: Fixed-point */
 #define FIXED_SCALE        256     /* 8 fractional bits */
+#define INT16_MAX_VALUE  32767     /* max signed 16-bit integer */
 
 /* Section 3: Precision ranges and accumulation */
 #define PRECISION_NUM_RANGES  8
@@ -40,6 +41,9 @@
 #define DEPTH_NEAR           0.1f
 #define DEPTH_FAR          100.0f
 #define DEPTH_NUM_SAMPLES   10
+#define Z_FIGHT_SEPARATION   0.01f  /* distance between two surfaces */
+#define DEPTH_EPSILON        6e-8f  /* ~1/2^24, 24-bit depth buffer precision */
+#define ZFIGHT_OFFSET_COUNT  4      /* number of test distances */
 
 /* Section 6: float vs double comparison */
 #define ITERATION_COUNT  10000000
@@ -164,7 +168,7 @@ int main(int argc, char *argv[])
         SDL_Log("  Smallest representable value: 1/%d = %.6f",
                 FIXED_SCALE, 1.0f / FIXED_SCALE);
         SDL_Log("  Largest (16-bit signed):      %d / %d = %.1f",
-                32767, FIXED_SCALE, 32767.0f / FIXED_SCALE);
+                INT16_MAX_VALUE, FIXED_SCALE, (float)INT16_MAX_VALUE / FIXED_SCALE);
         printf("\n");
         printf("  Fixed-point has constant precision everywhere.\n");
         printf("  Floating-point lets precision FLOAT to where you need it.\n\n");
@@ -423,16 +427,16 @@ int main(int argc, char *argv[])
 
         /* Z-fighting demonstration */
         printf("  Z-fighting example:\n");
-        printf("  Two surfaces 0.01 units apart at different distances:\n\n");
+        printf("  Two surfaces %.2f units apart at different distances:\n\n",
+               Z_FIGHT_SEPARATION);
 
-        float offsets[] = { 1.0f, 10.0f, 50.0f, 90.0f };
-        int num_offsets = 4;
+        float offsets[ZFIGHT_OFFSET_COUNT] = { 1.0f, 10.0f, 50.0f, 90.0f };
 
         SDL_Log("    distance  | surface A ndc_z | surface B ndc_z | difference");
         SDL_Log("   -----------|----------------|----------------|----------");
-        for (int i = 0; i < num_offsets; i++) {
+        for (int i = 0; i < ZFIGHT_OFFSET_COUNT; i++) {
             float z_a = -offsets[i];
-            float z_b = -(offsets[i] + 0.01f);
+            float z_b = -(offsets[i] + Z_FIGHT_SEPARATION);
 
             vec4 clip_a = mat4_multiply_vec4(proj, vec4_create(0, 0, z_a, 1));
             vec4 clip_b = mat4_multiply_vec4(proj, vec4_create(0, 0, z_b, 1));
@@ -441,8 +445,8 @@ int main(int argc, char *argv[])
 
             float diff = ndc_b.z - ndc_a.z;
 
-            /* A 24-bit depth buffer has precision of about 1/16777216 ~= 6e-8 */
-            int resolvable = (diff > 6e-8f) ? 1 : 0;
+            /* A 24-bit depth buffer has precision of about 1/2^24 */
+            int resolvable = (diff > DEPTH_EPSILON) ? 1 : 0;
 
             SDL_Log("    z=%5.1f   |    %.8f    |    %.8f    |  %.2e  %s",
                     z_a, ndc_a.z, ndc_b.z, diff,
