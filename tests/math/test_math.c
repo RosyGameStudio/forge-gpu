@@ -754,6 +754,98 @@ static void test_mat4_orthographic_2d(void)
     END_TEST();
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+ * Projection Tests (Lesson 06)
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+static void test_vec3_perspective_divide(void)
+{
+    TEST("vec3_perspective_divide");
+    /* A clip-space point with w=2 should have its x,y,z halved */
+    vec4 clip = vec4_create(4.0f, -6.0f, 1.0f, 2.0f);
+    vec3 ndc = vec3_perspective_divide(clip);
+    ASSERT_FLOAT_EQ(ndc.x, 2.0f);
+    ASSERT_FLOAT_EQ(ndc.y, -3.0f);
+    ASSERT_FLOAT_EQ(ndc.z, 0.5f);
+    END_TEST();
+}
+
+static void test_vec3_perspective_divide_w_one(void)
+{
+    TEST("vec3_perspective_divide with w=1");
+    /* When w=1 (orthographic), NDC = clip.xyz unchanged */
+    vec4 clip = vec4_create(0.5f, -0.3f, 0.8f, 1.0f);
+    vec3 ndc = vec3_perspective_divide(clip);
+    ASSERT_FLOAT_EQ(ndc.x, 0.5f);
+    ASSERT_FLOAT_EQ(ndc.y, -0.3f);
+    ASSERT_FLOAT_EQ(ndc.z, 0.8f);
+    END_TEST();
+}
+
+static void test_mat4_perspective_from_planes(void)
+{
+    TEST("mat4_perspective_from_planes near-plane corners");
+    /* Near-plane corners should map to NDC corners (-1,-1,0) to (1,1,0) */
+    float l = -2.0f, r = 2.0f, b = -1.5f, t = 1.5f;
+    float n = 1.0f, f = 100.0f;
+    mat4 proj = mat4_perspective_from_planes(l, r, b, t, n, f);
+
+    /* Bottom-left of near plane: (l, b, -n, 1) -> NDC (-1, -1, 0) */
+    vec4 bl_clip = mat4_multiply_vec4(proj, vec4_create(l, b, -n, 1.0f));
+    vec3 bl_ndc = vec3_perspective_divide(bl_clip);
+    ASSERT_FLOAT_EQ(bl_ndc.x, -1.0f);
+    ASSERT_FLOAT_EQ(bl_ndc.y, -1.0f);
+    ASSERT_FLOAT_EQ(bl_ndc.z, 0.0f);
+
+    /* Top-right of near plane: (r, t, -n, 1) -> NDC (1, 1, 0) */
+    vec4 tr_clip = mat4_multiply_vec4(proj, vec4_create(r, t, -n, 1.0f));
+    vec3 tr_ndc = vec3_perspective_divide(tr_clip);
+    ASSERT_FLOAT_EQ(tr_ndc.x, 1.0f);
+    ASSERT_FLOAT_EQ(tr_ndc.y, 1.0f);
+    ASSERT_FLOAT_EQ(tr_ndc.z, 0.0f);
+    END_TEST();
+}
+
+static void test_mat4_perspective_from_planes_symmetric(void)
+{
+    TEST("mat4_perspective_from_planes symmetric matches mat4_perspective");
+    /* Symmetric case should match mat4_perspective */
+    float fov = 60.0f * FORGE_DEG2RAD;
+    float aspect = 16.0f / 9.0f;
+    float n = 0.1f, f = 100.0f;
+
+    float half_h = n * tanf(fov * 0.5f);
+    float half_w = half_h * aspect;
+
+    mat4 from_fov = mat4_perspective(fov, aspect, n, f);
+    mat4 from_planes = mat4_perspective_from_planes(-half_w, half_w,
+                                                      -half_h, half_h, n, f);
+
+    for (int i = 0; i < 16; i++) {
+        ASSERT_FLOAT_EQ(from_fov.m[i], from_planes.m[i]);
+    }
+    END_TEST();
+}
+
+static void test_mat4_perspective_from_planes_depth(void)
+{
+    TEST("mat4_perspective_from_planes depth mapping");
+    /* Near plane center -> z=0, far plane center -> z=1 */
+    float n = 0.5f, f = 50.0f;
+    mat4 proj = mat4_perspective_from_planes(-1.0f, 1.0f, -1.0f, 1.0f, n, f);
+
+    /* Center of near plane: (0, 0, -n) */
+    vec4 near_clip = mat4_multiply_vec4(proj, vec4_create(0.0f, 0.0f, -n, 1.0f));
+    vec3 near_ndc = vec3_perspective_divide(near_clip);
+    ASSERT_FLOAT_EQ(near_ndc.z, 0.0f);
+
+    /* Center of far plane: (0, 0, -f) */
+    vec4 far_clip = mat4_multiply_vec4(proj, vec4_create(0.0f, 0.0f, -f, 1.0f));
+    vec3 far_ndc = vec3_perspective_divide(far_clip);
+    ASSERT_FLOAT_EQ(far_ndc.z, 1.0f);
+    END_TEST();
+}
+
 static void test_mat4_multiply_identity(void)
 {
     TEST("mat4_multiply with identity");
@@ -1081,6 +1173,11 @@ int main(int argc, char *argv[])
     test_mat4_orthographic();
     test_mat4_orthographic_corners();
     test_mat4_orthographic_2d();
+    test_vec3_perspective_divide();
+    test_vec3_perspective_divide_w_one();
+    test_mat4_perspective_from_planes();
+    test_mat4_perspective_from_planes_symmetric();
+    test_mat4_perspective_from_planes_depth();
     test_mat4_multiply();
     test_mat4_multiply_identity();
     test_mat4_transpose();
