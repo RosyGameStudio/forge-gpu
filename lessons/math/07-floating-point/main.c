@@ -31,8 +31,10 @@
 /* Section 1: Fixed-point */
 #define FIXED_SCALE        256     /* 8 fractional bits */
 
-/* Section 3: Precision ranges */
+/* Section 3: Precision ranges and accumulation */
 #define PRECISION_NUM_RANGES  8
+#define ACCUM_ITERATION_COUNT 1000000
+#define ACCUM_STEP            0.1f
 
 /* Section 5: Depth buffer */
 #define DEPTH_NEAR           0.1f
@@ -273,13 +275,14 @@ int main(int argc, char *argv[])
 
         /* Demonstrate accumulation error */
         float sum = 0.0f;
-        for (int i = 0; i < 1000000; i++) {
-            sum += 0.1f;
+        float expected_sum = ACCUM_STEP * ACCUM_ITERATION_COUNT;
+        for (int i = 0; i < ACCUM_ITERATION_COUNT; i++) {
+            sum += ACCUM_STEP;
         }
-        SDL_Log("  Accumulation error: 0.1 added 1,000,000 times");
-        SDL_Log("    Expected: 100000.0");
+        SDL_Log("  Accumulation error: %.1f added %d times", ACCUM_STEP, ACCUM_ITERATION_COUNT);
+        SDL_Log("    Expected: %.1f", expected_sum);
         SDL_Log("    Got:      %.6f", sum);
-        SDL_Log("    Error:    %.6f", sum - 100000.0f);
+        SDL_Log("    Error:    %.6f", sum - expected_sum);
         printf("\n");
     }
 
@@ -501,13 +504,14 @@ int main(int argc, char *argv[])
         /* Accumulation comparison */
         float  f_sum = 0.0f;
         double d_sum = 0.0;
+        double expected = (double)ACCUM_STEP * ITERATION_COUNT;
         for (int i = 0; i < ITERATION_COUNT; i++) {
-            f_sum += 0.1f;
-            d_sum += 0.1;
+            f_sum += ACCUM_STEP;
+            d_sum += (double)ACCUM_STEP;
         }
-        SDL_Log("  Adding 0.1 ten million times:");
-        SDL_Log("    float  result: %15.6f  (error: %.6f)", f_sum, f_sum - 1000000.0f);
-        SDL_Log("    double result: %15.6f  (error: %.6f)", d_sum, d_sum - 1000000.0);
+        SDL_Log("  Adding %.1f %d times:", ACCUM_STEP, ITERATION_COUNT);
+        SDL_Log("    float  result: %15.6f  (error: %.6f)", f_sum, f_sum - (float)expected);
+        SDL_Log("    double result: %15.6f  (error: %.6f)", d_sum, d_sum - expected);
         printf("\n");
 
         /* Why GPUs use float */

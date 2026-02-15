@@ -274,12 +274,11 @@ static inline int forge_approx_equalf(float a, float b, float tolerance)
  */
 static inline int forge_rel_equalf(float a, float b, float tolerance)
 {
-    float diff = a - b;
-    if (diff < 0.0f) diff = -diff;
+    float diff = fabsf(a - b);
+    float larger = fmaxf(fabsf(a), fabsf(b));
 
-    float abs_a = a < 0.0f ? -a : a;
-    float abs_b = b < 0.0f ? -b : b;
-    float larger = abs_a > abs_b ? abs_a : abs_b;
+    /* When both values are zero, diff is also zero — they're equal. */
+    if (larger == 0.0f) return diff == 0.0f;
 
     return diff < tolerance * larger;
 }
