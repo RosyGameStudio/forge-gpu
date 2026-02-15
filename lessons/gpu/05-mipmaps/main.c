@@ -874,7 +874,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_FAILURE;
     }
 
-    /* ── 3. Push uniform data ─────────────────────────────────────── */
+    /* ── 3. Push per-frame uniforms ───────────────────────────────── */
+    /* The uniforms struct contains values that change every frame:
+     *   time     — drives sine-wave animation (quad pulsing)
+     *   aspect   — keeps the quad square regardless of window resize
+     *   uv_scale — controls how many times the texture tiles
+     * We must push these each frame so the vertex shader sees the
+     * latest values via its cbuffer. */
     SDL_PushGPUVertexUniformData(cmd, 0, &uniforms, sizeof(uniforms));
 
     /* ── 4. Acquire swapchain & render ────────────────────────────── */
