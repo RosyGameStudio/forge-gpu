@@ -14,6 +14,10 @@
  *   - Perspective projection — mat4_perspective for 3D foreshortening
  *   - Camera                 — mat4_look_at for view matrix
  *
+ * All math operations use the forge_math library (common/math/forge_math.h,
+ * see common/math/README.md).  The theory behind each transform is explained
+ * in Math Lesson 06 — Matrices (lessons/math/06-matrices/).
+ *
  * What we keep from earlier lessons:
  *   - SDL callbacks, GPU device, window, sRGB swapchain  (Lesson 01)
  *   - Vertex buffers, shaders, graphics pipeline          (Lesson 02)
@@ -332,6 +336,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
                 SDL_GPU_PRESENTMODE_VSYNC)) {
             SDL_Log("SDL_SetGPUSwapchainParameters failed: %s",
                     SDL_GetError());
+            SDL_ReleaseWindowFromGPUDevice(device, window);
+            SDL_DestroyWindow(window);
+            SDL_DestroyGPUDevice(device);
+            return SDL_APP_FAILURE;
         }
     }
 
@@ -339,6 +347,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     int win_w = 0, win_h = 0;
     if (!SDL_GetWindowSizeInPixels(window, &win_w, &win_h)) {
         SDL_Log("SDL_GetWindowSizeInPixels failed: %s", SDL_GetError());
+        SDL_ReleaseWindowFromGPUDevice(device, window);
+        SDL_DestroyWindow(window);
+        SDL_DestroyGPUDevice(device);
+        return SDL_APP_FAILURE;
     }
 
     SDL_GPUTexture *depth_texture = create_depth_texture(
@@ -610,6 +622,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_EndGPUCopyPass(copy_pass);
     if (!SDL_SubmitGPUCommandBuffer(upload_cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUBuffer(device, index_buffer);
+        SDL_ReleaseGPUBuffer(device, vertex_buffer);
+        SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
+        SDL_ReleaseGPUTexture(device, depth_texture);
+        SDL_ReleaseWindowFromGPUDevice(device, window);
+        SDL_DestroyWindow(window);
+        SDL_DestroyGPUDevice(device);
+        return SDL_APP_FAILURE;
     }
     SDL_ReleaseGPUTransferBuffer(device, transfer);
 
@@ -706,6 +727,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     int w = 0, h = 0;
     if (!SDL_GetWindowSizeInPixels(state->window, &w, &h)) {
         SDL_Log("SDL_GetWindowSizeInPixels failed: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
     }
     float aspect = (h > 0) ? (float)w / (float)h : 1.0f;
     float fov    = FOV_DEG * FORGE_DEG2RAD;
@@ -813,7 +835,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 #ifdef FORGE_CAPTURE
     if (state->capture.mode != FORGE_CAPTURE_NONE) {
         if (!forge_capture_finish_frame(&state->capture, cmd, swapchain)) {
-            SDL_SubmitGPUCommandBuffer(cmd);
+            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s",
+                        SDL_GetError());
+                return SDL_APP_FAILURE;
+            }
         }
         if (forge_capture_should_quit(&state->capture)) {
             return SDL_APP_SUCCESS;
@@ -823,6 +849,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     {
         if (!SDL_SubmitGPUCommandBuffer(cmd)) {
             SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+            return SDL_APP_FAILURE;
         }
     }
 

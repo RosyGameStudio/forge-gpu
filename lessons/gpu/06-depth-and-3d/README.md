@@ -190,6 +190,14 @@ This lesson has a matching Claude Code skill:
 It distils the depth buffer, MVP pipeline, and 3D rendering patterns from this
 lesson into a reusable reference.
 
+## See also
+
+- [Math Lesson 06 — Matrices](../../math/06-matrices/) — numerical walkthrough of each transform
+- [Math Lesson 02 — Coordinate Spaces](../../math/02-coordinate-spaces/) — transform theory
+- [Math Lesson 03 — Orthographic Projection](../../math/03-orthographic-projection/) — alternative projection
+- [Lesson 04 — Textures & Samplers](../04-textures-and-samplers/) — index buffers (used here too)
+- [Math library](../../../common/math/README.md) — `mat4_perspective`, `mat4_look_at`, etc.
+
 ## Exercises
 
 1. **Camera position**: Move the camera to `(3, 0, 0)` looking at the origin.
@@ -213,11 +221,3 @@ lesson into a reusable reference.
 6. **Orthographic projection**: Replace `mat4_perspective` with
    `mat4_orthographic`. The cube still renders correctly, but without
    perspective foreshortening — it looks "flat" like an isometric game.
-
-## See also
-
-- [Math Lesson 06 — Matrices](../../math/06-matrices/) — numerical walkthrough of each transform
-- [Math Lesson 02 — Coordinate Spaces](../../math/02-coordinate-spaces/) — transform theory
-- [Math Lesson 03 — Orthographic Projection](../../math/03-orthographic-projection/) — alternative projection
-- [Lesson 04 — Textures & Samplers](../04-textures-and-samplers/) — index buffers (used here too)
-- [Math library](../../../common/math/README.md) — `mat4_perspective`, `mat4_look_at`, etc.

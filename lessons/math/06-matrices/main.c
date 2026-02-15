@@ -23,6 +23,12 @@
 #include <stdio.h>
 #include "math/forge_math.h"
 
+/* ── Constants for the MVP pipeline demo (section 6) ──────────────────── */
+#define FOV_DEG      60.0f
+#define ASPECT_RATIO (16.0f / 9.0f)
+#define NEAR_PLANE   0.1f
+#define FAR_PLANE    100.0f
+
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 
 static void print_header(const char *name)
@@ -194,7 +200,7 @@ int main(int argc, char *argv[])
     printf("\n");
     print_vec4("Z axis (0, 0, 1):", z_axis);
     print_vec4("After 90-deg Y rotation:", rotated_z);
-    printf("  Z axis became -X axis (right-hand rule).\n");
+    printf("  Z axis became +X axis (right-hand rule).\n");
 
     /* ── 5. Composition ──────────────────────────────────────────────── */
 
@@ -205,28 +211,28 @@ int main(int argc, char *argv[])
     printf("  rotate-then-translate.\n\n");
 
     /* Set up: translate by (5, 0, 0), rotate 90 around Z */
-    mat4 T = mat4_translate(vec3_create(5.0f, 0.0f, 0.0f));
-    mat4 R = mat4_rotate_z(angle_90);
+    mat4 translate_x = mat4_translate(vec3_create(5.0f, 0.0f, 0.0f));
+    mat4 rotate_z = mat4_rotate_z(angle_90);
 
     /* Order 1: rotate first, then translate (T * R) */
-    mat4 TR = mat4_multiply(T, R);
-    vec4 test_p = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
-    vec4 result_TR = mat4_multiply_vec4(TR, test_p);
+    mat4 translate_rotate = mat4_multiply(translate_x, rotate_z);
+    vec4 test_point = vec4_create(1.0f, 0.0f, 0.0f, 1.0f);
+    vec4 result_translate_rotate = mat4_multiply_vec4(translate_rotate, test_point);
 
     printf("  Starting point: (1, 0, 0)\n\n");
 
     printf("  Order 1: Rotate 90 around Z, THEN translate by (5, 0, 0)\n");
     printf("    Combined = Translate * Rotate\n");
-    print_vec4("    Result:", result_TR);
+    print_vec4("    Result:", result_translate_rotate);
     printf("    (1,0,0) -> rotate -> (0,1,0) -> translate -> (5,1,0)\n\n");
 
     /* Order 2: translate first, then rotate (R * T) */
-    mat4 RT = mat4_multiply(R, T);
-    vec4 result_RT = mat4_multiply_vec4(RT, test_p);
+    mat4 rotate_translate = mat4_multiply(rotate_z, translate_x);
+    vec4 result_rotate_translate = mat4_multiply_vec4(rotate_translate, test_point);
 
     printf("  Order 2: Translate by (5, 0, 0), THEN rotate 90 around Z\n");
     printf("    Combined = Rotate * Translate\n");
-    print_vec4("    Result:", result_RT);
+    print_vec4("    Result:", result_rotate_translate);
     printf("    (1,0,0) -> translate -> (6,0,0) -> rotate -> (0,6,0)\n\n");
 
     printf("  DIFFERENT results!  Transform order is critical.\n");
@@ -269,10 +275,10 @@ int main(int argc, char *argv[])
     print_vec4("After View (camera space):", view_pos);
     printf("  Negative Z means the point is in front of the camera.\n");
 
-    /* Projection: 60-degree FOV, 16:9 aspect, near=0.1, far=100 */
-    float fov = 60.0f * FORGE_DEG2RAD;
-    float aspect = 16.0f / 9.0f;
-    mat4 projection = mat4_perspective(fov, aspect, 0.1f, 100.0f);
+    /* Projection: 60-degree FOV, 16:9 aspect */
+    float fov = FOV_DEG * FORGE_DEG2RAD;
+    float aspect = ASPECT_RATIO;
+    mat4 projection = mat4_perspective(fov, aspect, NEAR_PLANE, FAR_PLANE);
 
     vec4 clip_pos = mat4_multiply_vec4(projection, view_pos);
     printf("\n  Projection: 60-degree FOV, 16:9 aspect\n");
