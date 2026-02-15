@@ -40,7 +40,9 @@ Before committing, verify the lesson has all required pieces from the
   the function name + `SDL_GetError()` and clean up or early-return. This is
   the most common PR review finding — verify every call site before publishing.
 - [ ] No magic numbers — all literals are `#define` or `enum` constants
-- [ ] Has comprehensive comments explaining *why*, not just *what*
+- [ ] Has comprehensive comments explaining *why* and *purpose*, not just *what* —
+  every pipeline setting, resource binding, and API call states the reason for
+  the choice (e.g. why CULLMODE_NONE, why we push uniforms each frame)
 
 ### Integration with project
 

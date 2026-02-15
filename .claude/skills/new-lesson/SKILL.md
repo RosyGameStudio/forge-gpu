@@ -57,7 +57,11 @@ If any of these are missing, ask the user before proceeding.
      return `false` on failure. Log a descriptive error (include the function name)
      and clean up or early-return. Never ignore a bool return value.
    - No magic numbers — `#define` or `enum` everything
-   - Extensive comments explaining *why*, not just *what*
+   - Extensive comments explaining *why* and *purpose*, not just *what* —
+     every pipeline setting, resource binding, and API call should have a brief
+     comment stating why that choice was made (e.g. why CULLMODE_NONE, why
+     TRIANGLELIST, why we push uniforms each frame). This is a recurring PR
+     review requirement.
    - Use C99, matching SDL's own style
    - **Use math library types for all math operations** (see "Using the Math Library" below)
 

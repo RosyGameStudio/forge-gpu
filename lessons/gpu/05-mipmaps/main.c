@@ -542,21 +542,29 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     /* ── 8. Create graphics pipeline ────────────────────────────────── */
+    /* Describe the vertex buffer layout — the GPU needs to know the byte
+     * stride (pitch) between consecutive vertices so it can step through
+     * the interleaved Vertex structs in memory. */
     SDL_GPUVertexBufferDescription vertex_buffer_desc;
     SDL_zero(vertex_buffer_desc);
     vertex_buffer_desc.slot       = 0;
     vertex_buffer_desc.pitch      = sizeof(Vertex);
     vertex_buffer_desc.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 
+    /* Map each Vertex struct field to a shader input location.
+     * FLOAT2 matches vec2 (two 32-bit floats) — position and UV are both
+     * 2-component vectors.  offsetof() gives the byte offset of each
+     * field within the interleaved Vertex struct so the GPU knows where
+     * to read each attribute.  Location N maps to HLSL TEXCOORD{N}. */
     SDL_GPUVertexAttribute vertex_attributes[NUM_VERTEX_ATTRIBUTES];
     SDL_zero(vertex_attributes);
 
-    vertex_attributes[0].location    = 0;
+    vertex_attributes[0].location    = 0;   /* TEXCOORD0 = position */
     vertex_attributes[0].buffer_slot = 0;
     vertex_attributes[0].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
     vertex_attributes[0].offset      = offsetof(Vertex, position);
 
-    vertex_attributes[1].location    = 1;
+    vertex_attributes[1].location    = 1;   /* TEXCOORD1 = uv */
     vertex_attributes[1].buffer_slot = 0;
     vertex_attributes[1].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
     vertex_attributes[1].offset      = offsetof(Vertex, uv);
@@ -572,12 +580,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     pipeline_info.vertex_input_state.vertex_attributes               = vertex_attributes;
     pipeline_info.vertex_input_state.num_vertex_attributes           = NUM_VERTEX_ATTRIBUTES;
 
+    /* Triangle list: every 3 indices form one triangle.  Simple and
+     * universal — good for a quad (2 triangles, 6 indices). */
     pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
 
+    /* Solid fill (not wireframe), no backface culling (the quad is flat
+     * and may face either way), CCW winding matches our vertex order. */
     pipeline_info.rasterizer_state.fill_mode  = SDL_GPU_FILLMODE_FILL;
     pipeline_info.rasterizer_state.cull_mode  = SDL_GPU_CULLMODE_NONE;
     pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
 
+    /* The pipeline's color target format must match the swapchain format
+     * exactly — query it at runtime because it varies by backend and
+     * swapchain composition (e.g. SDR_LINEAR gives an _SRGB format). */
     SDL_GPUColorTargetDescription color_target_desc;
     SDL_zero(color_target_desc);
     color_target_desc.format = SDL_GetGPUSwapchainTextureFormat(device, window);
@@ -600,6 +615,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
+    /* Safe to release shader objects now — the pipeline keeps its own
+     * compiled copy, so the originals are no longer needed. */
     SDL_ReleaseGPUShader(device, fragment_shader);
     SDL_ReleaseGPUShader(device, vertex_shader);
 
@@ -837,7 +854,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         char title[TITLE_BUF_LEN];
         SDL_snprintf(title, sizeof(title), "%s — %s",
                      WINDOW_TITLE, sampler_mode_names[state->current_sampler]);
-        SDL_SetWindowTitle(state->window, title);
+        if (!SDL_SetWindowTitle(state->window, title)) {
+            SDL_Log("SDL_SetWindowTitle failed: %s", SDL_GetError());
+        }
 
         SDL_Log("Sampler: %s", sampler_mode_names[state->current_sampler]);
     }
@@ -974,6 +993,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     (void)result;
 
+    /* Release GPU resources in reverse order of creation so nothing
+     * references an already-freed object. */
     app_state *state = (app_state *)appstate;
     if (state) {
 #ifdef FORGE_CAPTURE
