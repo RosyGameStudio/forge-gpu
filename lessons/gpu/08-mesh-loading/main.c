@@ -1060,7 +1060,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 #endif
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
-        SDL_CancelGPUCommandBuffer(cmd);
         return SDL_APP_FAILURE;
     }
 
