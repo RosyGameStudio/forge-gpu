@@ -504,10 +504,13 @@ static bool forge_gltf__parse_materials(const cJSON *root,
         const cJSON *factor = cJSON_GetObjectItemCaseSensitive(
             pbr, "baseColorFactor");
         if (cJSON_IsArray(factor) && cJSON_GetArraySize(factor) == 4) {
-            m->base_color[0] = (float)cJSON_GetArrayItem(factor, 0)->valuedouble;
-            m->base_color[1] = (float)cJSON_GetArrayItem(factor, 1)->valuedouble;
-            m->base_color[2] = (float)cJSON_GetArrayItem(factor, 2)->valuedouble;
-            m->base_color[3] = (float)cJSON_GetArrayItem(factor, 3)->valuedouble;
+            /* Defaults if individual elements are malformed. */
+            const float defaults[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+            for (int fi = 0; fi < 4; fi++) {
+                const cJSON *elem = cJSON_GetArrayItem(factor, fi);
+                m->base_color[fi] = elem ? (float)elem->valuedouble
+                                         : defaults[fi];
+            }
         }
 
         /* Base color texture (resolve to file path). */
@@ -731,8 +734,9 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
         const cJSON *matrix = cJSON_GetObjectItemCaseSensitive(node, "matrix");
         if (cJSON_IsArray(matrix) && cJSON_GetArraySize(matrix) == 16) {
             for (int j = 0; j < 16; j++) {
-                gn->local_transform.m[j] =
-                    (float)cJSON_GetArrayItem(matrix, j)->valuedouble;
+                const cJSON *elem = cJSON_GetArrayItem(matrix, j);
+                gn->local_transform.m[j] = elem ? (float)elem->valuedouble
+                                                 : 0.0f;
             }
         } else {
             /* TRS decomposition: local = T * R * S */
@@ -743,31 +747,47 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
             const cJSON *trans = cJSON_GetObjectItemCaseSensitive(
                 node, "translation");
             if (cJSON_IsArray(trans) && cJSON_GetArraySize(trans) == 3) {
-                T = mat4_translate(vec3_create(
-                    (float)cJSON_GetArrayItem(trans, 0)->valuedouble,
-                    (float)cJSON_GetArrayItem(trans, 1)->valuedouble,
-                    (float)cJSON_GetArrayItem(trans, 2)->valuedouble));
+                const cJSON *t0 = cJSON_GetArrayItem(trans, 0);
+                const cJSON *t1 = cJSON_GetArrayItem(trans, 1);
+                const cJSON *t2 = cJSON_GetArrayItem(trans, 2);
+                if (t0 && t1 && t2) {
+                    T = mat4_translate(vec3_create(
+                        (float)t0->valuedouble,
+                        (float)t1->valuedouble,
+                        (float)t2->valuedouble));
+                }
             }
 
             const cJSON *rot = cJSON_GetObjectItemCaseSensitive(
                 node, "rotation");
             if (cJSON_IsArray(rot) && cJSON_GetArraySize(rot) == 4) {
                 /* glTF: [x, y, z, w] → our quat_create: (w, x, y, z) */
-                quat q = quat_create(
-                    (float)cJSON_GetArrayItem(rot, 3)->valuedouble,
-                    (float)cJSON_GetArrayItem(rot, 0)->valuedouble,
-                    (float)cJSON_GetArrayItem(rot, 1)->valuedouble,
-                    (float)cJSON_GetArrayItem(rot, 2)->valuedouble);
-                R = quat_to_mat4(q);
+                const cJSON *rx = cJSON_GetArrayItem(rot, 0);
+                const cJSON *ry = cJSON_GetArrayItem(rot, 1);
+                const cJSON *rz = cJSON_GetArrayItem(rot, 2);
+                const cJSON *rw = cJSON_GetArrayItem(rot, 3);
+                if (rx && ry && rz && rw) {
+                    quat q = quat_create(
+                        (float)rw->valuedouble,
+                        (float)rx->valuedouble,
+                        (float)ry->valuedouble,
+                        (float)rz->valuedouble);
+                    R = quat_to_mat4(q);
+                }
             }
 
             const cJSON *scl = cJSON_GetObjectItemCaseSensitive(
                 node, "scale");
             if (cJSON_IsArray(scl) && cJSON_GetArraySize(scl) == 3) {
-                S = mat4_scale(vec3_create(
-                    (float)cJSON_GetArrayItem(scl, 0)->valuedouble,
-                    (float)cJSON_GetArrayItem(scl, 1)->valuedouble,
-                    (float)cJSON_GetArrayItem(scl, 2)->valuedouble));
+                const cJSON *s0 = cJSON_GetArrayItem(scl, 0);
+                const cJSON *s1 = cJSON_GetArrayItem(scl, 1);
+                const cJSON *s2 = cJSON_GetArrayItem(scl, 2);
+                if (s0 && s1 && s2) {
+                    S = mat4_scale(vec3_create(
+                        (float)s0->valuedouble,
+                        (float)s1->valuedouble,
+                        (float)s2->valuedouble));
+                }
             }
 
             gn->local_transform = mat4_multiply(T, mat4_multiply(R, S));

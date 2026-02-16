@@ -119,15 +119,21 @@ static bool write_temp_gltf(const char *json_text,
     io = SDL_IOFromFile(out->gltf_path, "w");
     if (!io) return false;
     json_len = SDL_strlen(json_text);
-    SDL_WriteIO(io, json_text, json_len);
-    SDL_CloseIO(io);
+    if (SDL_WriteIO(io, json_text, json_len) != json_len) {
+        SDL_CloseIO(io);
+        return false;
+    }
+    if (!SDL_CloseIO(io)) return false;
 
     /* Write binary data (.bin) — must use "wb" on Windows. */
     if (bin_data && bin_size > 0) {
         io = SDL_IOFromFile(out->bin_path, "wb");
         if (!io) return false;
-        SDL_WriteIO(io, bin_data, bin_size);
-        SDL_CloseIO(io);
+        if (SDL_WriteIO(io, bin_data, bin_size) != bin_size) {
+            SDL_CloseIO(io);
+            return false;
+        }
+        if (!SDL_CloseIO(io)) return false;
     }
 
     return true;
@@ -996,6 +1002,86 @@ static void test_scale_transform(void)
     END_TEST();
 }
 
+/* ── Explicit matrix transform ─────────────────────────────────────────────── */
+
+static void test_node_explicit_matrix(void)
+{
+    float positions[9];
+    Uint16 indices[3];
+    Uint8 bin_data[42];
+    const char *json;
+    TempGltf tg;
+    ForgeGltfScene scene;
+    bool wrote;
+    bool ok;
+    const mat4 *m;
+
+    TEST("node with explicit 4x4 matrix transform");
+
+    positions[0] = 0; positions[1] = 0; positions[2] = 0;
+    positions[3] = 1; positions[4] = 0; positions[5] = 0;
+    positions[6] = 0; positions[7] = 1; positions[8] = 0;
+    indices[0] = 0; indices[1] = 1; indices[2] = 2;
+
+    SDL_memcpy(bin_data, positions, 36);
+    SDL_memcpy(bin_data + 36, indices, 6);
+
+    /* Column-major 4x4: 2x scale on X, 3x on Y, 1x on Z, translate (4,5,6).
+     *   col0=(2,0,0,0) col1=(0,3,0,0) col2=(0,0,1,0) col3=(4,5,6,1) */
+    json =
+        "{"
+        "  \"asset\": {\"version\": \"2.0\"},"
+        "  \"scene\": 0,"
+        "  \"scenes\": [{\"nodes\": [0]}],"
+        "  \"nodes\": [{\"mesh\": 0, \"matrix\": ["
+        "    2.0, 0.0, 0.0, 0.0,"
+        "    0.0, 3.0, 0.0, 0.0,"
+        "    0.0, 0.0, 1.0, 0.0,"
+        "    4.0, 5.0, 6.0, 1.0"
+        "  ]}],"
+        "  \"meshes\": [{\"primitives\": [{"
+        "    \"attributes\": {\"POSITION\": 0},"
+        "    \"indices\": 1"
+        "  }]}],"
+        "  \"accessors\": ["
+        "    {\"bufferView\": 0, \"componentType\": 5126,"
+        "     \"count\": 3, \"type\": \"VEC3\"},"
+        "    {\"bufferView\": 1, \"componentType\": 5123,"
+        "     \"count\": 3, \"type\": \"SCALAR\"}"
+        "  ],"
+        "  \"bufferViews\": ["
+        "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36},"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 6}"
+        "  ],"
+        "  \"buffers\": [{\"uri\": \"test_matrix.bin\", \"byteLength\": 42}]"
+        "}";
+
+    wrote = write_temp_gltf(json, bin_data, sizeof(bin_data),
+                             "test_matrix", &tg);
+    ASSERT_TRUE(wrote);
+
+    ok = forge_gltf_load(tg.gltf_path, &scene);
+    remove_temp_gltf(&tg);
+
+    ASSERT_TRUE(ok);
+    ASSERT_INT_EQ(scene.node_count, 1);
+
+    m = &scene.nodes[0].world_transform;
+    /* Scale: X=2, Y=3, Z=1 */
+    ASSERT_FLOAT_EQ(m->m[0],  2.0f);   /* col0.x */
+    ASSERT_FLOAT_EQ(m->m[5],  3.0f);   /* col1.y */
+    ASSERT_FLOAT_EQ(m->m[10], 1.0f);   /* col2.z */
+    /* Translation: (4, 5, 6) */
+    ASSERT_FLOAT_EQ(m->m[12], 4.0f);
+    ASSERT_FLOAT_EQ(m->m[13], 5.0f);
+    ASSERT_FLOAT_EQ(m->m[14], 6.0f);
+    /* Homogeneous w=1 */
+    ASSERT_FLOAT_EQ(m->m[15], 1.0f);
+
+    forge_gltf_free(&scene);
+    END_TEST();
+}
+
 /* ── Multiple primitives per mesh ─────────────────────────────────────────── */
 
 static void test_multiple_primitives(void)
@@ -1192,6 +1278,7 @@ int main(int argc, char *argv[])
     test_node_hierarchy();
     test_quaternion_rotation();
     test_scale_transform();
+    test_node_explicit_matrix();
 
     /* Multi-primitive */
     test_multiple_primitives();
