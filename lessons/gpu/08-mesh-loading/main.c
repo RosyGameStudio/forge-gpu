@@ -466,6 +466,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
      * (position/UV/normal) into one vertex per corner.  This wastes some
      * memory but lets us render with a simple DrawPrimitives call. */
     const char *base_path = SDL_GetBasePath();
+    if (!base_path) {
+        SDL_Log("SDL_GetBasePath failed: %s", SDL_GetError());
+        SDL_ReleaseGPUTexture(device, depth_texture);
+        SDL_ReleaseWindowFromGPUDevice(device, window);
+        SDL_DestroyWindow(window);
+        SDL_DestroyGPUDevice(device);
+        return SDL_APP_FAILURE;
+    }
     char obj_path[512];
     char tex_path[512];
     SDL_snprintf(obj_path, sizeof(obj_path), "%s%s", base_path, MODEL_PATH);
