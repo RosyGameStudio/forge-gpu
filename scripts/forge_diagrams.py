@@ -17,9 +17,14 @@ import argparse
 import os
 import sys
 
+import matplotlib
+import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import FancyArrowPatch, Polygon
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import Polygon, Rectangle
+
+matplotlib.use("Agg")
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LESSONS_DIR = os.path.join(REPO_ROOT, "lessons")
@@ -27,61 +32,76 @@ DPI = 200
 
 
 # ---------------------------------------------------------------------------
-# Shared style
+# Dark theme style (matching forge-gpu visual identity)
 # ---------------------------------------------------------------------------
 
-COLORS = {
-    "vec_a": "#2196F3",  # blue
-    "vec_b": "#F44336",  # red
-    "vec_sum": "#4CAF50",  # green
-    "vec_neg": "#9C27B0",  # purple
-    "grid": "#BDBDBD",  # light grey
-    "highlight": "#FF9800",  # orange
-    "text": "#212121",  # near-black
-    "bg": "#FFFFFF",  # white
-    "axis": "#757575",  # grey
-    "lerp_a": "#1565C0",  # dark blue
-    "lerp_b": "#C62828",  # dark red
-    "lerp_result": "#2E7D32",  # dark green
+STYLE = {
+    "bg": "#1a1a2e",  # Dark blue-gray background
+    "grid": "#2a2a4a",  # Subtle grid lines
+    "axis": "#8888aa",  # Axis lines and labels
+    "text": "#e0e0f0",  # Primary text
+    "text_dim": "#8888aa",  # Secondary/dim text
+    "accent1": "#4fc3f7",  # Cyan — primary vectors, highlights
+    "accent2": "#ff7043",  # Orange — secondary vectors, results
+    "accent3": "#66bb6a",  # Green — tertiary, normals
+    "accent4": "#ab47bc",  # Purple — special elements
+    "warn": "#ffd54f",  # Yellow — annotations, warnings
+    "surface": "#252545",  # Slightly lighter surface for fills
 }
 
+# Custom colormap for texture filtering diagrams
+_FORGE_CMAP = LinearSegmentedColormap.from_list(
+    "forge",
+    [STYLE["bg"], STYLE["accent1"], STYLE["accent2"], STYLE["warn"]],
+)
 
-def _style_axis(ax, xlim=None, ylim=None, grid=True):
-    """Apply consistent styling to an axis."""
-    ax.set_facecolor(COLORS["bg"])
-    ax.set_aspect("equal")
+
+def _setup_axes(ax, xlim=None, ylim=None, grid=True, aspect="equal"):
+    """Apply consistent forge-gpu dark styling to axes."""
+    ax.set_facecolor(STYLE["bg"])
     if xlim:
         ax.set_xlim(xlim)
     if ylim:
         ax.set_ylim(ylim)
+    if aspect:
+        ax.set_aspect(aspect)
+    ax.tick_params(colors=STYLE["axis"], labelsize=9)
+    for spine in ax.spines.values():
+        spine.set_color(STYLE["grid"])
+        spine.set_linewidth(0.5)
     if grid:
-        ax.grid(True, alpha=0.3, color=COLORS["grid"], linewidth=0.5)
-    ax.tick_params(labelsize=7)
+        ax.grid(True, color=STYLE["grid"], linewidth=0.5, alpha=0.5)
+    ax.set_axisbelow(True)
 
 
-def _draw_vector(ax, origin, vec, color, label, label_offset=(0.1, 0.1), lw=2.0):
-    """Draw a 2D vector arrow with a label."""
-    arrow = FancyArrowPatch(
-        origin,
-        (origin[0] + vec[0], origin[1] + vec[1]),
-        arrowstyle="->,head_length=6,head_width=4",
-        color=color,
-        linewidth=lw,
-        mutation_scale=1,
+def _draw_vector(ax, origin, vec, color, label=None, label_offset=(0.15, 0.15), lw=2.5):
+    """Draw a labeled arrow vector with text stroke for readability."""
+    ax.annotate(
+        "",
+        xy=(origin[0] + vec[0], origin[1] + vec[1]),
+        xytext=origin,
+        arrowprops={
+            "arrowstyle": "->,head_width=0.3,head_length=0.15",
+            "color": color,
+            "lw": lw,
+        },
     )
-    ax.add_patch(arrow)
-    mid_x = origin[0] + vec[0] / 2 + label_offset[0]
-    mid_y = origin[1] + vec[1] / 2 + label_offset[1]
-    ax.text(
-        mid_x,
-        mid_y,
-        label,
-        color=color,
-        fontsize=9,
-        fontweight="bold",
-        ha="center",
-        va="center",
-    )
+    if label:
+        mid = (
+            origin[0] + vec[0] / 2 + label_offset[0],
+            origin[1] + vec[1] / 2 + label_offset[1],
+        )
+        ax.text(
+            mid[0],
+            mid[1],
+            label,
+            color=color,
+            fontsize=11,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+        )
 
 
 def _save(fig, lesson_path, filename):
@@ -89,7 +109,13 @@ def _save(fig, lesson_path, filename):
     assets_dir = os.path.join(LESSONS_DIR, lesson_path, "assets")
     os.makedirs(assets_dir, exist_ok=True)
     out = os.path.join(assets_dir, filename)
-    fig.savefig(out, dpi=DPI, bbox_inches="tight", facecolor=COLORS["bg"])
+    fig.savefig(
+        out,
+        dpi=DPI,
+        bbox_inches="tight",
+        facecolor=STYLE["bg"],
+        pad_inches=0.2,
+    )
     plt.close(fig)
     rel = os.path.relpath(out, REPO_ROOT)
     print(f"  {rel}")
@@ -102,56 +128,53 @@ def _save(fig, lesson_path, filename):
 
 def diagram_vector_addition():
     """Vector addition with tail-to-head and parallelogram."""
-    fig, ax = plt.subplots(figsize=(5, 4))
-    _style_axis(ax, xlim=(-0.5, 5), ylim=(-0.5, 4.5))
-    ax.set_title("Vector Addition: a + b", fontsize=11, fontweight="bold", pad=10)
+    fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    _setup_axes(ax, xlim=(-0.5, 5), ylim=(-0.5, 4.5))
 
     a = (3, 1)
-    b = (1, 2)
-
-    # Parallelogram fill
-    para = Polygon(
-        [(0, 0), a, (a[0] + b[0], a[1] + b[1]), b],
-        closed=True,
-        alpha=0.08,
-        facecolor=COLORS["vec_sum"],
-        edgecolor="none",
-    )
-    ax.add_patch(para)
+    b = (1, 2.5)
+    result = (a[0] + b[0], a[1] + b[1])
 
     # Vectors
-    _draw_vector(ax, (0, 0), a, COLORS["vec_a"], "a", label_offset=(0.0, -0.3))
-    _draw_vector(ax, a, b, COLORS["vec_b"], "b", label_offset=(0.25, 0.0))
-    _draw_vector(
-        ax,
-        (0, 0),
-        (a[0] + b[0], a[1] + b[1]),
-        COLORS["vec_sum"],
-        "a + b",
-        label_offset=(-0.5, 0.2),
-    )
+    _draw_vector(ax, (0, 0), a, STYLE["accent1"], "a = (3, 1)")
+    _draw_vector(ax, a, b, STYLE["accent2"], "b = (1, 2.5)")
+    _draw_vector(ax, (0, 0), result, STYLE["accent3"], "a + b = (4, 3.5)")
 
-    # Dashed parallelogram sides
+    # Ghosted b from origin + parallelogram dashes
+    _draw_vector(ax, (0, 0), b, STYLE["accent2"], lw=1.0)
     ax.plot(
-        [b[0], a[0] + b[0]],
-        [b[1], a[1] + b[1]],
+        [b[0], result[0]],
+        [b[1], result[1]],
         "--",
-        color=COLORS["vec_a"],
-        alpha=0.4,
-        lw=1,
+        color=STYLE["text_dim"],
+        lw=0.8,
+        alpha=0.5,
     )
     ax.plot(
-        [0, b[0]],
-        [0, b[1]],
+        [a[0], result[0]],
+        [a[1], result[1]],
         "--",
-        color=COLORS["vec_b"],
-        alpha=0.4,
-        lw=1,
+        color=STYLE["text_dim"],
+        lw=0.8,
+        alpha=0.5,
     )
 
     # Origin dot
-    ax.plot(0, 0, "ko", markersize=4)
+    ax.plot(0, 0, "o", color=STYLE["text"], markersize=6, zorder=5)
+    ax.text(-0.3, -0.3, "O", color=STYLE["text_dim"], fontsize=10)
 
+    ax.set_title(
+        "Vector Addition: Tail-to-Head",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
+    )
+    ax.set_xlabel("x", color=STYLE["axis"], fontsize=10)
+    ax.set_ylabel("y", color=STYLE["axis"], fontsize=10)
+
+    fig.tight_layout()
     _save(fig, "math/01-vectors", "vector_addition.png")
 
 
@@ -162,22 +185,79 @@ def diagram_vector_addition():
 
 def diagram_dot_product():
     """Three-panel dot product: same, perpendicular, opposite."""
-    fig, axes = plt.subplots(1, 3, figsize=(9, 3))
+    fig = plt.figure(figsize=(9, 5), facecolor=STYLE["bg"])
+
     cases = [
-        ("Same direction", (1, 0.3), (0.8, 0.24), "> 0"),
-        ("Perpendicular", (1, 0), (0, 1), "= 0"),
-        ("Opposite", (1, 0.3), (-0.8, -0.24), "< 0"),
+        ("Same direction", (1, 0), (0.8, 0.3), "dot > 0"),
+        ("Perpendicular", (1, 0), (0, 1), "dot = 0"),
+        ("Opposite", (1, 0), (-0.7, -0.3), "dot < 0"),
     ]
 
-    for ax, (title, a, b, sign) in zip(axes, cases):
-        _style_axis(ax, xlim=(-1.5, 1.5), ylim=(-1.0, 1.5))
-        ax.set_title(f"{title}\na · b {sign}", fontsize=9, fontweight="bold")
+    for i, (title, a_dir, b_dir, result) in enumerate(cases):
+        ax = fig.add_subplot(1, 3, i + 1)
+        _setup_axes(ax, xlim=(-1.8, 1.8), ylim=(-1.8, 1.8), grid=False)
 
-        _draw_vector(ax, (0, 0), a, COLORS["vec_a"], "a", label_offset=(0.0, -0.2))
-        _draw_vector(ax, (0, 0), b, COLORS["vec_b"], "b", label_offset=(0.0, 0.2))
-        ax.plot(0, 0, "ko", markersize=3)
+        # Reference circle
+        theta = np.linspace(0, 2 * np.pi, 64)
+        ax.plot(
+            1.2 * np.cos(theta),
+            1.2 * np.sin(theta),
+            color=STYLE["grid"],
+            lw=0.5,
+            alpha=0.4,
+        )
+        ax.axhline(0, color=STYLE["grid"], lw=0.5, alpha=0.4)
+        ax.axvline(0, color=STYLE["grid"], lw=0.5, alpha=0.4)
 
-    fig.suptitle("Dot Product", fontsize=12, fontweight="bold", y=1.05)
+        # Vectors (scaled up for visibility)
+        scale = 1.3
+        a = (a_dir[0] * scale, a_dir[1] * scale)
+        b = (b_dir[0] * scale, b_dir[1] * scale)
+        _draw_vector(ax, (0, 0), a, STYLE["accent1"], "a")
+        _draw_vector(ax, (0, 0), b, STYLE["accent2"], "b")
+
+        # Angle arc
+        a_angle = np.arctan2(a[1], a[0])
+        b_angle = np.arctan2(b[1], b[0])
+        arc_t = np.linspace(a_angle, b_angle, 30)
+        arc_r = 0.5
+        ax.plot(
+            arc_r * np.cos(arc_t),
+            arc_r * np.sin(arc_t),
+            color=STYLE["warn"],
+            lw=1.5,
+            alpha=0.8,
+        )
+        ax.text(
+            0.6 * np.cos((a_angle + b_angle) / 2),
+            0.6 * np.sin((a_angle + b_angle) / 2),
+            "\u03b8",
+            color=STYLE["warn"],
+            fontsize=12,
+            ha="center",
+            va="center",
+        )
+
+        ax.plot(0, 0, "o", color=STYLE["text"], markersize=4, zorder=5)
+        ax.set_title(title, color=STYLE["text"], fontsize=11, fontweight="bold")
+        ax.text(
+            0,
+            -1.6,
+            result,
+            color=STYLE["accent3"],
+            fontsize=12,
+            ha="center",
+            fontweight="bold",
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+        )
+
+    fig.suptitle(
+        "Dot Product: Measuring Alignment",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        y=1.02,
+    )
     fig.tight_layout()
     _save(fig, "math/01-vectors", "dot_product.png")
 
@@ -189,95 +269,128 @@ def diagram_dot_product():
 
 def diagram_bilinear_interpolation():
     """Grid cell with the 3 lerp steps highlighted."""
-    fig, ax = plt.subplots(figsize=(5, 5))
-    _style_axis(ax, xlim=(-0.3, 1.5), ylim=(-0.3, 1.5), grid=False)
-    ax.set_title("Bilinear Interpolation\nThree lerps", fontsize=11, fontweight="bold")
+    fig = plt.figure(figsize=(8, 7), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    _setup_axes(ax, xlim=(-0.3, 1.5), ylim=(-0.3, 1.5), grid=False)
 
-    # Grid cell
-    corners = {"c00": (0, 0), "c10": (1, 0), "c01": (0, 1), "c11": (1, 1)}
-    cell = Polygon(
-        [corners["c00"], corners["c10"], corners["c11"], corners["c01"]],
-        closed=True,
-        fill=False,
-        edgecolor=COLORS["axis"],
+    # Corner values with distinct colors
+    corners = {
+        (0, 0): ("c00 = 10", STYLE["accent1"]),
+        (1, 0): ("c10 = 30", STYLE["accent2"]),
+        (0, 1): ("c01 = 20", STYLE["accent4"]),
+        (1, 1): ("c11 = 50", STYLE["accent3"]),
+    }
+
+    # Grid cell fill
+    rect = Rectangle(
+        (0, 0),
+        1,
+        1,
+        fill=True,
+        facecolor=STYLE["surface"],
+        edgecolor=STYLE["axis"],
         linewidth=1.5,
+        zorder=1,
     )
-    ax.add_patch(cell)
+    ax.add_patch(rect)
 
-    # Corner labels
-    for name, (cx, cy) in corners.items():
-        ax.plot(cx, cy, "o", color=COLORS["text"], markersize=6)
-        offset_x = -0.15 if cx == 0 else 0.1
-        offset_y = -0.12 if cy == 0 else 0.1
+    # Corner points and labels
+    for (cx, cy), (label, color) in corners.items():
+        ax.plot(cx, cy, "o", color=color, markersize=10, zorder=5)
+        offset_x = -0.22 if cx == 0 else 0.08
+        offset_y = -0.12 if cy == 0 else 0.08
         ax.text(
             cx + offset_x,
             cy + offset_y,
-            name,
-            fontsize=8,
+            label,
+            color=color,
+            fontsize=10,
             fontweight="bold",
-            color=COLORS["text"],
-            ha="center",
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
 
     tx, ty = 0.35, 0.7
 
-    # Step 1: bottom lerp
-    bot = (tx, 0)
-    ax.plot(*bot, "s", color=COLORS["lerp_a"], markersize=8, zorder=5)
-    ax.annotate(
-        "1. bot = lerp(c00, c10, tx)",
-        bot,
-        xytext=(0.6, -0.2),
-        fontsize=7,
-        color=COLORS["lerp_a"],
+    # Sample point
+    ax.plot(tx, ty, "*", color=STYLE["warn"], markersize=18, zorder=6)
+    ax.text(
+        tx + 0.06,
+        ty + 0.06,
+        f"({tx}, {ty})",
+        color=STYLE["warn"],
+        fontsize=11,
         fontweight="bold",
-        arrowprops={"arrowstyle": "->", "color": COLORS["lerp_a"], "lw": 1},
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # Step 1: bottom lerp
+    bot_val = 10 + tx * (30 - 10)
+    ax.plot(tx, 0, "s", color=STYLE["accent1"], markersize=8, zorder=5)
+    ax.plot([0, 1], [0, 0], "-", color=STYLE["accent1"], lw=2, alpha=0.6)
+    ax.text(
+        tx,
+        -0.18,
+        f"bot = {bot_val:.0f}",
+        color=STYLE["accent1"],
+        fontsize=9,
+        ha="center",
+        fontweight="bold",
+    )
+    ax.text(
+        1.15, 0.0, "1. lerp bottom", color=STYLE["accent1"], fontsize=9, va="center"
     )
 
     # Step 2: top lerp
-    top = (tx, 1)
-    ax.plot(*top, "s", color=COLORS["lerp_b"], markersize=8, zorder=5)
-    ax.annotate(
-        "2. top = lerp(c01, c11, tx)",
-        top,
-        xytext=(0.6, 1.2),
-        fontsize=7,
-        color=COLORS["lerp_b"],
+    top_val = 20 + tx * (50 - 20)
+    ax.plot(tx, 1, "s", color=STYLE["accent4"], markersize=8, zorder=5)
+    ax.plot([0, 1], [1, 1], "-", color=STYLE["accent4"], lw=2, alpha=0.6)
+    ax.text(
+        tx,
+        1.1,
+        f"top = {top_val:.1f}",
+        color=STYLE["accent4"],
+        fontsize=9,
+        ha="center",
         fontweight="bold",
-        arrowprops={"arrowstyle": "->", "color": COLORS["lerp_b"], "lw": 1},
     )
+    ax.text(1.15, 1.0, "2. lerp top", color=STYLE["accent4"], fontsize=9, va="center")
 
     # Step 3: vertical lerp
-    result = (tx, ty)
-    ax.plot([tx, tx], [0, 1], "--", color=COLORS["lerp_result"], alpha=0.5, lw=1)
-    ax.plot(*result, "*", color=COLORS["lerp_result"], markersize=14, zorder=6)
-    ax.annotate(
-        "3. result = lerp(bot, top, ty)",
-        result,
-        xytext=(1.0, 0.55),
-        fontsize=7,
-        color=COLORS["lerp_result"],
-        fontweight="bold",
-        arrowprops={"arrowstyle": "->", "color": COLORS["lerp_result"], "lw": 1},
-    )
-
-    # tx/ty labels
-    ax.annotate(
-        f"tx = {tx}",
-        (tx, -0.05),
-        fontsize=7,
+    result_val = bot_val + ty * (top_val - bot_val)
+    ax.plot([tx, tx], [0, 1], "--", color=STYLE["warn"], lw=1.5, alpha=0.7)
+    ax.text(
+        tx - 0.27,
+        0.5,
+        "3. lerp\nvertical",
+        color=STYLE["warn"],
+        fontsize=9,
         ha="center",
-        color=COLORS["axis"],
-    )
-    ax.annotate(
-        f"ty = {ty}",
-        (-0.05, ty),
-        fontsize=7,
-        ha="right",
         va="center",
-        color=COLORS["axis"],
     )
 
+    # Result annotation
+    ax.text(
+        0.5,
+        -0.22,
+        f"result = {result_val:.1f}",
+        color=STYLE["warn"],
+        fontsize=12,
+        ha="center",
+        fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    ax.set_title(
+        "Bilinear Interpolation: Three Lerps",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
+    )
+    ax.set_xlabel("tx", color=STYLE["axis"], fontsize=11)
+    ax.set_ylabel("ty", color=STYLE["axis"], fontsize=11)
+
+    fig.tight_layout()
     _save(fig, "math/03-bilinear-interpolation", "bilinear_interpolation.png")
 
 
@@ -288,44 +401,83 @@ def diagram_bilinear_interpolation():
 
 def diagram_matrix_basis_vectors():
     """Before/after basis vectors for a 45-degree rotation."""
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+    fig = plt.figure(figsize=(10, 5), facecolor=STYLE["bg"])
 
-    angle = np.pi / 4  # 45 degrees
-    cos_a, sin_a = np.cos(angle), np.sin(angle)
+    angle = np.radians(45)
+    c, s = np.cos(angle), np.sin(angle)
 
-    for idx, (ax, title, x_vec, y_vec) in enumerate(
-        zip(
-            axes,
-            ["Before (Identity)", "After (45° rotation)"],
-            [(1, 0), (cos_a, sin_a)],
-            [(0, 1), (-sin_a, cos_a)],
-        )
-    ):
-        _style_axis(ax, xlim=(-1.5, 1.5), ylim=(-0.5, 1.5))
-        ax.set_title(title, fontsize=10, fontweight="bold")
+    configs = [
+        (
+            "Before: Standard Basis (Identity)",
+            (1, 0),
+            (0, 1),
+            "x\u0302 = (1, 0)",
+            "y\u0302 = (0, 1)",
+            (-0.5, 2.5),
+            (-0.5, 2.5),
+        ),
+        (
+            "After: Rotated Basis (45\u00b0 Matrix)",
+            (c, s),
+            (-s, c),
+            f"col0 = ({c:.2f}, {s:.2f})",
+            f"col1 = ({-s:.2f}, {c:.2f})",
+            (-1.5, 2),
+            (-0.5, 2.5),
+        ),
+    ]
 
-        # Draw basis vectors
-        x_label_offset = (0.15, -0.15) if idx == 0 else (0.2, -0.05)
-        y_label_offset = (-0.25, 0.0) if idx == 0 else (-0.15, 0.15)
+    for i, (title, x_vec, y_vec, x_label, y_label, xlim, ylim) in enumerate(configs):
+        ax = fig.add_subplot(1, 2, i + 1)
+        _setup_axes(ax, xlim=xlim, ylim=ylim)
 
-        _draw_vector(
-            ax, (0, 0), x_vec, COLORS["vec_a"], "X", label_offset=x_label_offset
-        )
-        _draw_vector(
-            ax, (0, 0), y_vec, COLORS["vec_b"], "Y", label_offset=y_label_offset
-        )
-        ax.plot(0, 0, "ko", markersize=4)
+        _draw_vector(ax, (0, 0), x_vec, STYLE["accent1"], x_label, lw=3)
+        _draw_vector(ax, (0, 0), y_vec, STYLE["accent2"], y_label, lw=3)
+        ax.plot(0, 0, "o", color=STYLE["text"], markersize=6, zorder=5)
 
-        # Unit circle arc for reference
-        theta = np.linspace(0, 2 * np.pi, 100)
-        ax.plot(
-            np.cos(theta), np.sin(theta), "-", color=COLORS["grid"], alpha=0.3, lw=0.5
-        )
+        # Draw unit square / rotated square
+        if i == 0:
+            sq_x = [0, 1, 1, 0, 0]
+            sq_y = [0, 0, 1, 1, 0]
+        else:
+            rot_sq = np.array([[0, 0], [c, s], [c - s, s + c], [-s, c], [0, 0]])
+            sq_x = rot_sq[:, 0]
+            sq_y = rot_sq[:, 1]
+
+        ax.fill(sq_x, sq_y, color=STYLE["accent1"], alpha=0.08)
+        ax.plot(sq_x, sq_y, "--", color=STYLE["text_dim"], lw=0.8, alpha=0.5)
+
+        ax.set_title(title, color=STYLE["text"], fontsize=11, fontweight="bold")
+
+    # Arrow between panels
+    fig.text(
+        0.50,
+        0.5,
+        "\u2192",
+        color=STYLE["warn"],
+        fontsize=28,
+        ha="center",
+        va="center",
+        fontweight="bold",
+    )
+    fig.text(
+        0.50,
+        0.42,
+        "45\u00b0 rotation",
+        color=STYLE["text_dim"],
+        fontsize=10,
+        ha="center",
+        va="center",
+    )
 
     fig.suptitle(
-        "Matrix Basis Vectors (columns)", fontsize=12, fontweight="bold", y=1.02
+        "Matrix Columns = Where Basis Vectors Go",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        y=1.0,
     )
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
     _save(fig, "math/05-matrices", "matrix_basis_vectors.png")
 
 
@@ -336,13 +488,12 @@ def diagram_matrix_basis_vectors():
 
 def diagram_frustum():
     """Viewing frustum side view with near/far planes and FOV."""
-    fig, ax = plt.subplots(figsize=(7, 4))
-    ax.set_facecolor(COLORS["bg"])
+    fig = plt.figure(figsize=(7, 4), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    ax.set_facecolor(STYLE["bg"])
     ax.set_aspect("equal")
     ax.grid(False)
-    ax.set_title("Viewing Frustum (side view)", fontsize=11, fontweight="bold")
 
-    eye = (0, 0)
     near = 1.5
     far = 6
     fov_half = np.radians(30)
@@ -350,87 +501,89 @@ def diagram_frustum():
     near_h = near * np.tan(fov_half)
     far_h = far * np.tan(fov_half)
 
-    # Frustum trapezoid
+    # Frustum trapezoid fill
     frustum = Polygon(
-        [
-            (near, -near_h),
-            (far, -far_h),
-            (far, far_h),
-            (near, near_h),
-        ],
+        [(near, -near_h), (far, -far_h), (far, far_h), (near, near_h)],
         closed=True,
-        alpha=0.1,
-        facecolor=COLORS["vec_a"],
-        edgecolor=COLORS["vec_a"],
+        alpha=0.15,
+        facecolor=STYLE["accent1"],
+        edgecolor=STYLE["accent1"],
         linewidth=1.5,
     )
     ax.add_patch(frustum)
 
     # Eye point and rays
-    ax.plot(*eye, "ko", markersize=6, zorder=5)
-    ax.text(-0.3, 0.0, "Eye", fontsize=9, fontweight="bold", ha="right", va="center")
-
-    ax.plot([0, far], [0, far_h], "-", color=COLORS["axis"], alpha=0.4, lw=1)
-    ax.plot([0, far], [0, -far_h], "-", color=COLORS["axis"], alpha=0.4, lw=1)
+    ax.plot(0, 0, "o", color=STYLE["text"], markersize=6, zorder=5)
+    ax.text(
+        -0.3,
+        0.0,
+        "Eye",
+        fontsize=10,
+        fontweight="bold",
+        color=STYLE["text"],
+        ha="right",
+        va="center",
+    )
+    ax.plot([0, far], [0, far_h], "-", color=STYLE["axis"], alpha=0.4, lw=1)
+    ax.plot([0, far], [0, -far_h], "-", color=STYLE["axis"], alpha=0.4, lw=1)
 
     # Near plane
-    ax.plot([near, near], [-near_h, near_h], "-", color=COLORS["vec_sum"], lw=2)
+    ax.plot([near, near], [-near_h, near_h], "-", color=STYLE["accent3"], lw=2.5)
     ax.text(
         near,
         near_h + 0.25,
         "Near plane",
-        fontsize=8,
+        fontsize=9,
         ha="center",
-        color=COLORS["vec_sum"],
+        color=STYLE["accent3"],
         fontweight="bold",
     )
 
     # Far plane
-    ax.plot([far, far], [-far_h, far_h], "-", color=COLORS["vec_b"], lw=2)
+    ax.plot([far, far], [-far_h, far_h], "-", color=STYLE["accent2"], lw=2.5)
     ax.text(
         far,
         far_h + 0.25,
         "Far plane",
-        fontsize=8,
+        fontsize=9,
         ha="center",
-        color=COLORS["vec_b"],
+        color=STYLE["accent2"],
         fontweight="bold",
     )
 
     # FOV angle arc
     theta = np.linspace(-fov_half, fov_half, 30)
-    arc_r = 1.0
     ax.plot(
-        arc_r * np.cos(theta),
-        arc_r * np.sin(theta),
+        np.cos(theta),
+        np.sin(theta),
         "-",
-        color=COLORS["highlight"],
+        color=STYLE["warn"],
         lw=1.5,
     )
     ax.text(
         1.1,
         0.0,
         "FOV",
-        fontsize=8,
-        color=COLORS["highlight"],
+        fontsize=9,
+        color=STYLE["warn"],
         fontweight="bold",
         ha="left",
         va="center",
     )
 
-    # Depth axis
+    # Depth axis arrow
     ax.annotate(
         "",
         xy=(far + 0.3, 0),
         xytext=(-0.5, 0),
-        arrowprops={"arrowstyle": "->", "color": COLORS["axis"], "lw": 0.8},
+        arrowprops={"arrowstyle": "->", "color": STYLE["axis"], "lw": 0.8},
     )
     ax.text(
         far + 0.5,
         0,
         "-Z (into screen)",
-        fontsize=7,
-        color=COLORS["axis"],
+        fontsize=8,
+        color=STYLE["axis"],
         va="center",
     )
 
@@ -441,6 +594,15 @@ def diagram_frustum():
     for spine in ax.spines.values():
         spine.set_visible(False)
 
+    ax.set_title(
+        "Viewing Frustum (side view)",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
+    )
+
+    fig.tight_layout()
     _save(fig, "math/06-projections", "frustum.png")
 
 
@@ -451,88 +613,129 @@ def diagram_frustum():
 
 def diagram_uv_mapping():
     """Position space to UV space mapping."""
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+    fig = plt.figure(figsize=(10, 5), facecolor=STYLE["bg"])
 
-    # Position space
-    ax = axes[0]
-    _style_axis(ax, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0))
-    ax.set_title("Position Space", fontsize=10, fontweight="bold")
+    # Left: Position space (quad)
+    ax1 = fig.add_subplot(121)
+    _setup_axes(ax1, xlim=(-1, 1), ylim=(-1, 1), grid=False)
 
-    quad = Polygon(
-        [(-0.6, -0.6), (0.6, -0.6), (0.6, 0.6), (-0.6, 0.6)],
-        closed=True,
-        alpha=0.15,
-        facecolor=COLORS["vec_a"],
-        edgecolor=COLORS["vec_a"],
-        linewidth=1.5,
-    )
-    ax.add_patch(quad)
+    quad_x = [-0.6, 0.6, 0.6, -0.6, -0.6]
+    quad_y = [-0.6, -0.6, 0.6, 0.6, -0.6]
+    ax1.fill(quad_x, quad_y, color=STYLE["surface"], alpha=0.5)
+    ax1.plot(quad_x, quad_y, "-", color=STYLE["accent1"], lw=2)
 
-    pos_verts = [(-0.6, -0.6), (0.6, -0.6), (0.6, 0.6), (-0.6, 0.6)]
-    pos_labels = ["v3", "v2", "v1", "v0"]
-    for (px, py), label in zip(pos_verts, pos_labels):
-        ax.plot(px, py, "o", color=COLORS["vec_a"], markersize=6, zorder=5)
-        ox = -0.12 if px < 0 else 0.08
-        oy = -0.1 if py < 0 else 0.08
-        ax.text(
-            px + ox,
-            py + oy,
+    verts = [
+        (-0.6, -0.6, "v0\n(-0.6, -0.6)"),
+        (0.6, -0.6, "v1\n(0.6, -0.6)"),
+        (0.6, 0.6, "v2\n(0.6, 0.6)"),
+        (-0.6, 0.6, "v3\n(-0.6, 0.6)"),
+    ]
+    vert_colors = [
+        STYLE["accent1"],
+        STYLE["accent2"],
+        STYLE["accent3"],
+        STYLE["accent4"],
+    ]
+    for (vx, vy, label), vc in zip(verts, vert_colors):
+        ax1.plot(vx, vy, "o", color=vc, markersize=8, zorder=5)
+        ox = -0.32 if vx < 0 else 0.08
+        oy = -0.18 if vy < 0 else 0.06
+        ax1.text(
+            vx + ox,
+            vy + oy,
             label,
+            color=vc,
             fontsize=8,
             fontweight="bold",
-            color=COLORS["vec_a"],
+            path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
         )
 
-    ax.set_xlabel("X", fontsize=8)
-    ax.set_ylabel("Y", fontsize=8)
+    # Diagonal line (two triangles)
+    ax1.plot([-0.6, 0.6], [-0.6, 0.6], "--", color=STYLE["text_dim"], lw=1)
 
-    # UV space
-    ax = axes[1]
-    _style_axis(ax, xlim=(-0.2, 1.3), ylim=(-0.2, 1.3))
-    ax.set_title("UV Space (Texture)", fontsize=10, fontweight="bold")
+    ax1.set_title("Position Space", color=STYLE["text"], fontsize=12, fontweight="bold")
+    ax1.axhline(0, color=STYLE["grid"], lw=0.5, alpha=0.3)
+    ax1.axvline(0, color=STYLE["grid"], lw=0.5, alpha=0.3)
 
-    uv_quad = Polygon(
-        [(0, 0), (1, 0), (1, 1), (0, 1)],
-        closed=True,
-        alpha=0.15,
-        facecolor=COLORS["highlight"],
-        edgecolor=COLORS["highlight"],
-        linewidth=1.5,
+    # Arrow between subplots
+    fig.text(
+        0.50,
+        0.5,
+        "\u2192",
+        color=STYLE["warn"],
+        fontsize=28,
+        ha="center",
+        va="center",
+        fontweight="bold",
     )
-    ax.add_patch(uv_quad)
+    fig.text(
+        0.50,
+        0.42,
+        "UV mapping",
+        color=STYLE["text_dim"],
+        fontsize=10,
+        ha="center",
+        va="center",
+    )
 
-    uv_verts = [(0, 1), (1, 1), (1, 0), (0, 0)]
-    uv_labels = ["(0,1)", "(1,1)", "(1,0)", "(0,0)"]
-    for (ux, uy), label in zip(uv_verts, uv_labels):
-        ax.plot(ux, uy, "o", color=COLORS["highlight"], markersize=6, zorder=5)
-        ox = -0.15 if ux == 0 else 0.05
-        oy = -0.1 if uy == 1 else 0.08
-        ax.text(
+    # Right: UV space (texture)
+    ax2 = fig.add_subplot(122)
+    _setup_axes(ax2, xlim=(-0.15, 1.15), ylim=(-0.15, 1.15), grid=False)
+
+    # Checkerboard texture preview
+    for ci in range(4):
+        for cj in range(4):
+            shade = STYLE["surface"] if (ci + cj) % 2 == 0 else STYLE["grid"]
+            r = Rectangle(
+                (ci / 4, cj / 4),
+                0.25,
+                0.25,
+                facecolor=shade,
+                edgecolor=STYLE["grid"],
+                linewidth=0.5,
+                zorder=0,
+            )
+            ax2.add_patch(r)
+
+    # UV quad outline
+    uv_x = [0, 1, 1, 0, 0]
+    uv_y = [1, 1, 0, 0, 1]
+    ax2.plot(uv_x, uv_y, "-", color=STYLE["accent1"], lw=2, alpha=0.7)
+
+    uv_verts = [
+        (0, 1, "v0 (0, 1)", STYLE["accent1"]),
+        (1, 1, "v1 (1, 1)", STYLE["accent2"]),
+        (1, 0, "v2 (1, 0)", STYLE["accent3"]),
+        (0, 0, "v3 (0, 0)", STYLE["accent4"]),
+    ]
+    for ux, uy, label, uc in uv_verts:
+        ax2.plot(ux, uy, "o", color=uc, markersize=8, zorder=5)
+        ox = -0.12 if ux == 0 else 0.04
+        oy = 0.05 if uy == 0 else -0.1
+        ax2.text(
             ux + ox,
             uy + oy,
             label,
-            fontsize=7,
+            color=uc,
+            fontsize=8,
             fontweight="bold",
-            color=COLORS["highlight"],
+            path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
         )
 
-    ax.set_xlabel("U", fontsize=8)
-    ax.set_ylabel("V", fontsize=8)
-
-    # Arrow between panels
-    fig.text(
-        0.5,
-        0.5,
-        "UV\nmapping",
-        ha="center",
-        va="center",
-        fontsize=9,
-        fontweight="bold",
-        color=COLORS["axis"],
-        transform=fig.transFigure,
+    ax2.set_title(
+        "UV / Texture Space", color=STYLE["text"], fontsize=12, fontweight="bold"
     )
+    ax2.set_xlabel("U \u2192", color=STYLE["axis"], fontsize=10)
+    ax2.set_ylabel("V \u2193 (shown flipped)", color=STYLE["axis"], fontsize=10)
 
-    fig.tight_layout()
+    fig.suptitle(
+        "UV Mapping: Position \u2192 Texture Coordinates",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        y=1.0,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
     _save(fig, "gpu/04-textures-and-samplers", "uv_mapping.png")
 
 
@@ -543,51 +746,109 @@ def diagram_uv_mapping():
 
 def diagram_filtering_comparison():
     """NEAREST vs LINEAR filtering comparison."""
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+    fig = plt.figure(figsize=(10, 5), facecolor=STYLE["bg"])
 
-    # Create a small 4x4 checkerboard-like pattern
-    rng = np.random.default_rng(42)
-    data_small = rng.integers(50, 255, size=(4, 4)).astype(float)
+    # Create a small 4x4 "texture" with distinct values
+    texture = np.array(
+        [
+            [0.2, 0.4, 0.6, 0.8],
+            [0.3, 0.5, 0.7, 0.9],
+            [0.4, 0.6, 0.8, 1.0],
+            [0.1, 0.3, 0.5, 0.7],
+        ]
+    )
 
-    # NEAREST — blocky upscale
-    ax = axes[0]
-    ax.set_title("NEAREST Filtering\n(no blending)", fontsize=10, fontweight="bold")
-    ax.imshow(
-        data_small,
+    # Left: NEAREST (blocky)
+    ax1 = fig.add_subplot(121)
+    ax1.set_facecolor(STYLE["bg"])
+    nearest_up = np.repeat(np.repeat(texture, 8, axis=0), 8, axis=1)
+    ax1.imshow(
+        nearest_up,
+        cmap=_FORGE_CMAP,
         interpolation="nearest",
-        cmap="gray",
-        vmin=0,
-        vmax=255,
         extent=[0, 4, 0, 4],
+        origin="lower",
     )
-    # Draw grid lines for texel boundaries
     for i in range(5):
-        ax.axhline(i, color="white", lw=0.5, alpha=0.5)
-        ax.axvline(i, color="white", lw=0.5, alpha=0.5)
-    ax.set_xlabel("Texels", fontsize=8)
-    ax.set_xticks([])
-    ax.set_yticks([])
+        ax1.axhline(i, color=STYLE["grid"], lw=0.5, alpha=0.6)
+        ax1.axvline(i, color=STYLE["grid"], lw=0.5, alpha=0.6)
 
-    # LINEAR — smooth upscale
-    ax = axes[1]
-    ax.set_title("LINEAR Filtering\n(bilinear blend)", fontsize=10, fontweight="bold")
-    ax.imshow(
-        data_small,
+    # Sample point + selected texel highlight
+    ax1.plot(1.3, 2.7, "x", color=STYLE["warn"], markersize=12, mew=2.5, zorder=5)
+    ax1.text(1.5, 2.85, "sample", color=STYLE["warn"], fontsize=9, fontweight="bold")
+    selected = Rectangle(
+        (1, 2),
+        1,
+        1,
+        fill=False,
+        edgecolor=STYLE["warn"],
+        linewidth=2.5,
+        linestyle="--",
+        zorder=4,
+    )
+    ax1.add_patch(selected)
+
+    ax1.set_title(
+        "NEAREST \u2014 picks closest texel",
+        color=STYLE["text"],
+        fontsize=11,
+        fontweight="bold",
+    )
+    ax1.tick_params(colors=STYLE["axis"], labelsize=8)
+
+    # Right: LINEAR (smooth)
+    ax2 = fig.add_subplot(122)
+    ax2.set_facecolor(STYLE["bg"])
+    ax2.imshow(
+        texture,
+        cmap=_FORGE_CMAP,
         interpolation="bilinear",
-        cmap="gray",
-        vmin=0,
-        vmax=255,
         extent=[0, 4, 0, 4],
+        origin="lower",
     )
     for i in range(5):
-        ax.axhline(i, color="white", lw=0.5, alpha=0.3)
-        ax.axvline(i, color="white", lw=0.5, alpha=0.3)
-    ax.set_xlabel("Texels", fontsize=8)
-    ax.set_xticks([])
-    ax.set_yticks([])
+        ax2.axhline(i, color=STYLE["grid"], lw=0.5, alpha=0.6)
+        ax2.axvline(i, color=STYLE["grid"], lw=0.5, alpha=0.6)
 
-    fig.suptitle("Texture Filtering Comparison", fontsize=12, fontweight="bold", y=1.02)
-    fig.tight_layout()
+    # Sample point + contributing texels
+    ax2.plot(1.3, 2.7, "x", color=STYLE["warn"], markersize=12, mew=2.5, zorder=5)
+    ax2.text(1.5, 2.85, "sample", color=STYLE["warn"], fontsize=9, fontweight="bold")
+
+    for tx, ty in [(1, 2), (2, 2), (1, 3), (2, 3)]:
+        ax2.plot(
+            tx + 0.5,
+            ty + 0.5,
+            "o",
+            color=STYLE["accent3"],
+            markersize=6,
+            zorder=5,
+            alpha=0.8,
+        )
+        ax2.plot(
+            [1.3, tx + 0.5],
+            [2.7, ty + 0.5],
+            "--",
+            color=STYLE["accent3"],
+            lw=0.8,
+            alpha=0.5,
+        )
+
+    ax2.set_title(
+        "LINEAR \u2014 blends 4 nearest texels",
+        color=STYLE["text"],
+        fontsize=11,
+        fontweight="bold",
+    )
+    ax2.tick_params(colors=STYLE["axis"], labelsize=8)
+
+    fig.suptitle(
+        "Texture Filtering: NEAREST vs LINEAR",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        y=1.0,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
     _save(fig, "gpu/04-textures-and-samplers", "filtering_comparison.png")
 
 
