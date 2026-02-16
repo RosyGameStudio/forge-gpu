@@ -125,6 +125,10 @@
 /* Milliseconds to seconds. */
 #define MS_TO_SEC 1000.0f
 
+/* Maximum delta time (seconds) to prevent huge jumps when the app stalls
+ * or is paused (e.g., alt-tabbing away).  100 ms = ~10 FPS floor. */
+#define MAX_DELTA_TIME 0.1f
+
 /* ── Scene layout ────────────────────────────────────────────────────────── */
 /* Several cubes placed around the origin to make navigation interesting.
  * Each has a position, a Y-rotation speed, a scale, and an RGB color. */
@@ -714,8 +718,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     if (!SDL_SetWindowRelativeMouseMode(window, true)) {
         SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
         /* Not fatal — the camera just won't respond to mouse movement. */
+    } else {
+        state->mouse_captured = true;
     }
-    state->mouse_captured = true;
 #else
     /* When capturing frames, don't grab the mouse — the scene auto-animates
      * via the spinning cubes, and we want a fixed camera for screenshots. */
@@ -785,8 +790,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         if (!SDL_SetWindowRelativeMouseMode(state->window, true)) {
             SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s",
                     SDL_GetError());
+        } else {
+            state->mouse_captured = true;
         }
-        state->mouse_captured = true;
     }
 
     /* ── Mouse motion: update camera yaw and pitch ────────────────────── */
@@ -839,7 +845,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     /* Clamp dt to prevent huge jumps if the app stalls or is paused.
      * Without this, alt-tabbing away for 5 seconds would teleport
      * the camera forward by 5 * MOVE_SPEED units on the next frame. */
-    if (dt > 0.1f) dt = 0.1f;
+    if (dt > MAX_DELTA_TIME) dt = MAX_DELTA_TIME;
 
     /* Accumulate elapsed time for cube rotation animation. */
     state->elapsed += dt;
@@ -892,10 +898,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
      * We use world Y (not camera up) so "up" always means up,
      * even when looking at the ground — like a noclip camera. */
     if (keys[SDL_SCANCODE_SPACE]) {
-        state->cam_position.y += MOVE_SPEED * dt;
+        state->cam_position = vec3_add(state->cam_position,
+            vec3_create(0.0f, MOVE_SPEED * dt, 0.0f));
     }
     if (keys[SDL_SCANCODE_LSHIFT]) {
-        state->cam_position.y -= MOVE_SPEED * dt;
+        state->cam_position = vec3_add(state->cam_position,
+            vec3_create(0.0f, -MOVE_SPEED * dt, 0.0f));
     }
 
     /* ── 3. Build view and projection matrices ────────────────────────── */
@@ -1036,6 +1044,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             if (!SDL_SubmitGPUCommandBuffer(cmd)) {
                 SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s",
                         SDL_GetError());
+                SDL_CancelGPUCommandBuffer(cmd);
                 return SDL_APP_FAILURE;
             }
         }
@@ -1047,6 +1056,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     {
         if (!SDL_SubmitGPUCommandBuffer(cmd)) {
             SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+            SDL_CancelGPUCommandBuffer(cmd);
             return SDL_APP_FAILURE;
         }
     }
