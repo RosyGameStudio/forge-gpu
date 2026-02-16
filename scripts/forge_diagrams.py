@@ -1757,10 +1757,11 @@ def diagram_pixel_footprint():
         zorder=5,
         alpha=0.8,
     )
+    mip_iso = np.log2(sigma_v)
     ax2.text(
         offset_l,
         -sigma_v - 0.45,
-        "Isotropic\n1 sample, mip 2.5",
+        f"Isotropic\n1 sample, mip {mip_iso:.1f}",
         color=STYLE["accent2"],
         fontsize=9,
         ha="center",
@@ -1781,7 +1782,7 @@ def diagram_pixel_footprint():
 
     # Right half: anisotropic (multiple small samples along major axis)
     ax2.plot(ex + offset_r, ey, "-", color=STYLE["accent3"], lw=2, alpha=0.7)
-    n_samples = 6
+    n_samples = max(1, int(np.ceil(sigma_v / sigma_u)))
     for i in range(n_samples):
         t = (i + 0.5) / n_samples
         sy = -sigma_v + 2 * sigma_v * t
@@ -1802,10 +1803,11 @@ def diagram_pixel_footprint():
             zorder=5,
             alpha=0.7,
         )
+    mip_aniso = np.log2(max(sigma_u, 1e-6))
     ax2.text(
         offset_r,
         -sigma_v - 0.45,
-        f"Anisotropic\n{n_samples} samples, mip 0",
+        f"Anisotropic\n{n_samples} samples, mip {mip_aniso:.1f}",
         color=STYLE["accent3"],
         fontsize=9,
         ha="center",

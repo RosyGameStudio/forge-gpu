@@ -1014,7 +1014,7 @@ static inline vec2 mat2_singular_values(mat2 m)
 static inline float mat2_anisotropy_ratio(mat2 m)
 {
     vec2 sv = mat2_singular_values(m);
-    if (sv.y < 1e-7f) return 1.0f;  /* degenerate — avoid division by zero */
+    if (sv.y < FORGE_EPSILON) return 1.0f;  /* degenerate — avoid division by zero */
     return sv.x / sv.y;
 }
 
