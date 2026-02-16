@@ -1237,93 +1237,244 @@ def diagram_trilinear_interpolation():
 
 
 def diagram_view_transform():
-    """Two-panel: world space vs view space showing camera-as-inverse concept."""
-    fig = plt.figure(figsize=(10, 5), facecolor=STYLE["bg"])
+    """Two-panel top-down: world space vs view space with scene objects.
 
-    panels = [
-        ("World Space", 5, 3, "cam at Z=5", "vertex at Z=3"),
-        ("View Space", 0, -2, "cam at origin", "vertex at Z=\u22122"),
+    Inspired by 3D Math Primer illustrations — shows a 2D bird's-eye view
+    with a camera, colored axes, a view frustum, and scene objects.  The
+    camera looks along -Z (downward on screen).  The view matrix shifts
+    everything so the camera ends up at the origin.
+    """
+    fig = plt.figure(figsize=(11, 5.5), facecolor=STYLE["bg"])
+
+    # --- Scene definition (all positions in world space, XZ plane) ---
+    cam_pos = np.array([0.0, 4.0])  # camera at Z=4, looking down -Z
+
+    scene_objs = [
+        {
+            "pos": np.array([2.0, 1.5]),
+            "marker": "s",
+            "color": STYLE["accent2"],
+            "label": "cube",
+        },
+        {
+            "pos": np.array([-1.5, 2.5]),
+            "marker": "^",
+            "color": STYLE["accent3"],
+            "label": "tree",
+        },
+        {
+            "pos": np.array([0.5, 0.0]),
+            "marker": "D",
+            "color": STYLE["accent4"],
+            "label": "rock",
+        },
     ]
 
-    for i, (title, cam_z, vert_z, cam_label, vert_label) in enumerate(panels):
-        ax = fig.add_subplot(1, 2, i + 1)
-        _setup_axes(ax, xlim=(-4, 7), ylim=(-1.5, 2.5), grid=False)
+    frust_half = np.radians(30)
+    frust_len = 4.2
 
-        # Z axis line
-        ax.axhline(0, color=STYLE["grid"], lw=1, alpha=0.5)
-        ax.plot([-3, 6.5], [0, 0], "-", color=STYLE["axis"], lw=0.8, alpha=0.4)
+    panels = [
+        ("World Space", np.array([0.0, 0.0])),
+        ("View Space", -cam_pos),
+    ]
 
-        # Tick marks on the axis
-        for z in range(-3, 7):
-            ax.plot(z, 0, "|", color=STYLE["axis"], markersize=4, alpha=0.4)
-            ax.text(
-                z,
-                -0.35,
-                str(z),
-                color=STYLE["text_dim"],
-                fontsize=7,
-                ha="center",
+    for idx, (title, shift) in enumerate(panels):
+        ax = fig.add_subplot(1, 2, idx + 1)
+        ax.set_facecolor(STYLE["bg"])
+        ax.set_xlim(-5, 5)
+        ax.set_ylim(-5.5, 5.5)
+        ax.set_aspect("equal")
+
+        # Floor grid
+        for g in range(-5, 6):
+            ax.plot(
+                [-5, 5], [g, g], color=STYLE["grid"], lw=0.3, alpha=0.3
+            )
+            ax.plot(
+                [g, g], [-5.5, 5.5], color=STYLE["grid"], lw=0.3, alpha=0.3
             )
 
-        # Camera icon (simple triangle pointing left = looking down -Z)
-        cam_tri_x = [cam_z + 0.4, cam_z - 0.3, cam_z + 0.4]
-        cam_tri_y = [0.35, 0, -0.35]
-        cam_poly = Polygon(
-            list(zip(cam_tri_x, cam_tri_y)),
+        # Coordinate axes at diagram (0, 0)
+        al = 4.5
+        ax.annotate(
+            "",
+            xy=(al, 0),
+            xytext=(-al, 0),
+            arrowprops={
+                "arrowstyle": "->,head_width=0.15",
+                "color": "#bb5555",
+                "lw": 1.3,
+                "alpha": 0.5,
+            },
+        )
+        ax.text(
+            al + 0.15,
+            -0.4,
+            "+X",
+            color="#bb5555",
+            fontsize=8,
+            fontweight="bold",
+            alpha=0.6,
+        )
+        ax.annotate(
+            "",
+            xy=(0, al),
+            xytext=(0, -al),
+            arrowprops={
+                "arrowstyle": "->,head_width=0.15",
+                "color": "#5577cc",
+                "lw": 1.3,
+                "alpha": 0.5,
+            },
+        )
+        ax.text(
+            0.25,
+            al + 0.15,
+            "+Z",
+            color="#5577cc",
+            fontsize=8,
+            fontweight="bold",
+            alpha=0.6,
+        )
+
+        c = cam_pos + shift
+
+        # View frustum cone (faint wedge showing what the camera sees)
+        cos_f = np.cos(frust_half)
+        sin_f = np.sin(frust_half)
+        ld = np.array([-sin_f, -cos_f])  # left edge direction
+        rd = np.array([sin_f, -cos_f])  # right edge direction
+        frust = Polygon(
+            [c, c + ld * frust_len, c + rd * frust_len],
+            closed=True,
+            facecolor=STYLE["warn"],
+            alpha=0.05,
+            edgecolor=STYLE["warn"],
+            lw=0.7,
+            linestyle="--",
+            zorder=2,
+        )
+        ax.add_patch(frust)
+
+        # Camera icon (triangle pointing down = forward along -Z)
+        s = 0.38
+        cam_tri = Polygon(
+            [
+                (c[0] - s * 0.8, c[1] + s * 0.55),
+                (c[0], c[1] - s * 0.9),
+                (c[0] + s * 0.8, c[1] + s * 0.55),
+            ],
             closed=True,
             facecolor=STYLE["accent1"],
-            edgecolor=STYLE["accent1"],
-            alpha=0.8,
-            zorder=4,
+            edgecolor="white",
+            linewidth=1.2,
+            zorder=10,
+            alpha=0.9,
         )
-        ax.add_patch(cam_poly)
+        ax.add_patch(cam_tri)
+        cam_lbl = "camera" if idx == 0 else "camera (origin)"
         ax.text(
-            cam_z,
-            0.7,
-            cam_label,
+            c[0] + 0.5,
+            c[1] + 0.1,
+            cam_lbl,
             color=STYLE["accent1"],
             fontsize=10,
-            ha="center",
             fontweight="bold",
             path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
 
-        # Vertex dot
-        ax.plot(vert_z, 0, "o", color=STYLE["accent2"], markersize=10, zorder=5)
-        ax.text(
-            vert_z,
-            0.7,
-            vert_label,
-            color=STYLE["accent2"],
-            fontsize=10,
-            ha="center",
-            fontweight="bold",
-            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+        # Scene objects
+        for obj in scene_objs:
+            p = obj["pos"] + shift
+            ax.plot(
+                p[0],
+                p[1],
+                obj["marker"],
+                color=obj["color"],
+                markersize=11,
+                zorder=8,
+                markeredgecolor="white",
+                markeredgewidth=0.8,
+            )
+            ax.text(
+                p[0] + 0.35,
+                p[1] + 0.3,
+                obj["label"],
+                color=obj["color"],
+                fontsize=9,
+                fontweight="bold",
+                path_effects=[
+                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
+                ],
+            )
+
+        # Origin crosshair
+        ax.plot(0, 0, "+", color=STYLE["text"], markersize=10, mew=1.5, zorder=6)
+        if idx == 0:
+            ax.text(
+                0.3,
+                -0.5,
+                "origin",
+                color=STYLE["text_dim"],
+                fontsize=8,
+                style="italic",
+            )
+        else:
+            # Ghost marker showing where the world origin ended up
+            wo = np.array([0.0, 0.0]) + shift
+            ax.plot(
+                wo[0],
+                wo[1],
+                "+",
+                color=STYLE["text_dim"],
+                markersize=8,
+                mew=1,
+                zorder=5,
+                alpha=0.5,
+            )
+            ax.text(
+                wo[0] + 0.3,
+                wo[1] - 0.4,
+                "world origin",
+                color=STYLE["text_dim"],
+                fontsize=7,
+                style="italic",
+                alpha=0.7,
+            )
+            # Annotation: objects ahead are at -Z
+            ax.text(
+                3.5,
+                -4.8,
+                "objects ahead\nhave Z < 0",
+                color=STYLE["text_dim"],
+                fontsize=8,
+                ha="center",
+                style="italic",
+                alpha=0.6,
+            )
+
+        ax.set_title(
+            title, color=STYLE["text"], fontsize=13, fontweight="bold", pad=10
         )
-
-        # Origin marker
-        ax.plot(0, 0, "o", color=STYLE["text"], markersize=5, zorder=3)
-
-        ax.set_xlabel("Z axis", color=STYLE["axis"], fontsize=9)
-        ax.set_title(title, color=STYLE["text"], fontsize=12, fontweight="bold")
+        ax.set_xticks([])
         ax.set_yticks([])
-        for spine in ["left", "right", "top"]:
-            ax.spines[spine].set_visible(False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
     # Arrow between panels
     fig.text(
         0.50,
-        0.5,
+        0.50,
         "\u2192",
         color=STYLE["warn"],
-        fontsize=28,
+        fontsize=30,
         ha="center",
         va="center",
         fontweight="bold",
     )
     fig.text(
         0.50,
-        0.42,
+        0.40,
         "View matrix V",
         color=STYLE["text_dim"],
         fontsize=10,
@@ -1336,9 +1487,9 @@ def diagram_view_transform():
         color=STYLE["text"],
         fontsize=14,
         fontweight="bold",
-        y=1.0,
+        y=0.98,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
     _save(fig, "math/09-view-matrix", "view_transform.png")
 
 
