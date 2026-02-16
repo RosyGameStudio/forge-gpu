@@ -200,6 +200,36 @@ axes:
 | Right | (1, 0, 0) | `quat_right(q)` |
 | Up | (0, 1, 0) | `quat_up(q)` |
 
+**Why is forward -Z and not +Z?** It comes from the right-hand rule. When you
+sit in front of your monitor, everyone agrees on two axes: +X goes right, +Y
+goes up. The third axis is determined by the coordinate system's handedness. In
+a right-handed system, if you curl the fingers of your right hand from +X toward
++Y, your thumb points in the +Z direction — **out of the screen, toward you:**
+
+```text
+        +Y (up)
+         |
+         |
+         |
+         +-------> +X (right)
+        /
+       /
+      +Z (out of screen, toward you)
+```
+
+Since +Z points toward the viewer, the scene behind the screen is at negative Z.
+The camera looks *into* the screen, which is the **-Z direction**.
+
+A left-handed coordinate system (used by traditional DirectX) flips this: +Z
+goes into the screen, so the camera looks down +Z. Neither convention is better —
+it's a choice. We use right-handed because it matches Vulkan, OpenGL, and
+standard math textbooks.
+
+| Convention | +Z direction | Camera looks at | Used by |
+|-----------|-------------|----------------|---------|
+| Right-handed (ours) | Out of screen | -Z | OpenGL, Vulkan, math textbooks |
+| Left-handed | Into screen | +Z | Traditional DirectX |
+
 These are computed by rotating the default directions by the quaternion. The
 optimized functions expand the rotation formula for each specific input vector,
 avoiding the general `quat_rotate_vec3` overhead.

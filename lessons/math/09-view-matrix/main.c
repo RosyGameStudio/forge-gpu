@@ -216,11 +216,17 @@ int main(int argc, char *argv[])
      *         |/
      *  -------+--------> Right (X)
      *
-     * Why these particular defaults? In our right-handed Y-up system:
-     *   - +X is right (matches screen coordinates)
-     *   - +Y is up (matches screen coordinates)
-     *   - -Z is forward (into the screen) — because in view space the
-     *     camera looks down the negative Z axis
+     * Why is forward -Z and not +Z? It follows from the right-hand rule.
+     * Everyone agrees +X is right and +Y is up (matching screen layout).
+     * In a right-handed system, curl your right hand's fingers from +X
+     * toward +Y -- your thumb points in the +Z direction, which is OUT
+     * of the screen, toward you. So the scene behind the screen is at
+     * negative Z, and the camera looks INTO the screen: -Z.
+     *
+     * A left-handed system (traditional DirectX) flips this: +Z goes
+     * into the screen, camera looks down +Z. Neither is better -- it's
+     * a convention. We use right-handed to match Vulkan, OpenGL, and
+     * math textbooks.
      */
     printf("-- 2. Extracting basis vectors from a quaternion -----------\n\n");
 
