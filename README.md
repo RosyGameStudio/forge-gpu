@@ -16,8 +16,8 @@ From first triangle to full 3D scenes — here's what you'll build:
 <b>Lesson 02</b> — First Triangle
 </td>
 <td align="center">
-<a href="lessons/gpu/03-uniforms-and-motion/"><img src="lessons/gpu/03-uniforms-and-motion/assets/preview.gif" width="400" alt="Uniforms & Motion" /></a><br />
-<b>Lesson 03</b> — Uniforms & Motion
+<a href="lessons/gpu/10-basic-lighting/"><img src="lessons/gpu/10-basic-lighting/assets/screenshot.png" width="400" alt="Suzanne with Blinn-Phong lighting" /></a><br />
+<b>Lesson 10</b> — Basic Lighting (Blinn-Phong)
 </td>
 </tr>
 <tr>
@@ -31,11 +31,7 @@ From first triangle to full 3D scenes — here's what you'll build:
 </td>
 </tr>
 <tr>
-<td align="center">
-<a href="lessons/gpu/10-basic-lighting/"><img src="lessons/gpu/10-basic-lighting/assets/screenshot.png" width="400" alt="Suzanne with Blinn-Phong lighting" /></a><br />
-<b>Lesson 10</b> — Basic Lighting (Blinn-Phong)
-</td>
-<td align="center">
+<td align="center" colspan="2">
 <a href="lessons/gpu/09-scene-loading/"><img src="lessons/gpu/09-scene-loading/assets/city.png" width="400" alt="VirtualCity — 234 nodes, 167 materials, 20 textures" /></a><br />
 <b>Lesson 09</b> — VirtualCity (234 nodes, 167 materials, 20 textures)
 </td>
