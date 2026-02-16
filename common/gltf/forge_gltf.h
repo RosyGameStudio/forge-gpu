@@ -598,16 +598,28 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
             const cJSON *norm_acc = cJSON_GetObjectItemCaseSensitive(
                 attrs, "NORMAL");
             if (norm_acc) {
-                normals = (const float *)forge_gltf__get_accessor(
-                    root, scene, norm_acc->valueint, NULL, NULL);
+                int norm_count = 0;
+                int norm_comp = 0;
+                const float *n = (const float *)forge_gltf__get_accessor(
+                    root, scene, norm_acc->valueint, &norm_count, &norm_comp);
+                if (n && norm_count == vert_count
+                      && norm_comp == FORGE_GLTF_FLOAT) {
+                    normals = n;
+                }
             }
 
             const float *uvs = NULL;
             const cJSON *uv_acc = cJSON_GetObjectItemCaseSensitive(
                 attrs, "TEXCOORD_0");
             if (uv_acc) {
-                uvs = (const float *)forge_gltf__get_accessor(
-                    root, scene, uv_acc->valueint, NULL, NULL);
+                int uv_count = 0;
+                int uv_comp = 0;
+                const float *u = (const float *)forge_gltf__get_accessor(
+                    root, scene, uv_acc->valueint, &uv_count, &uv_comp);
+                if (u && uv_count == vert_count
+                      && uv_comp == FORGE_GLTF_FLOAT) {
+                    uvs = u;
+                }
             }
 
             gp->has_uvs = (uvs != NULL);

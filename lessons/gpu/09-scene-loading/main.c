@@ -1179,9 +1179,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 #ifndef FORGE_CAPTURE
     if (!SDL_SetWindowRelativeMouseMode(window, true)) {
         SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
-    } else {
-        state->mouse_captured = true;
+        SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
+        free_gpu_scene(device, state);
+        forge_gltf_free(&state->scene);
+        SDL_ReleaseGPUSampler(device, sampler);
+        SDL_ReleaseGPUTexture(device, white_texture);
+        SDL_ReleaseGPUTexture(device, depth_texture);
+        SDL_ReleaseWindowFromGPUDevice(device, window);
+        SDL_DestroyWindow(window);
+        SDL_DestroyGPUDevice(device);
+        SDL_free(state);
+        return SDL_APP_FAILURE;
     }
+    state->mouse_captured = true;
 #else
     state->mouse_captured = false;
 #endif
@@ -1231,9 +1241,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
             if (!SDL_SetWindowRelativeMouseMode(state->window, false)) {
                 SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s",
                         SDL_GetError());
-            } else {
-                state->mouse_captured = false;
+                return SDL_APP_FAILURE;
             }
+            state->mouse_captured = false;
         } else {
             return SDL_APP_SUCCESS;
         }
@@ -1244,9 +1254,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         if (!SDL_SetWindowRelativeMouseMode(state->window, true)) {
             SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s",
                     SDL_GetError());
-        } else {
-            state->mouse_captured = true;
+            return SDL_APP_FAILURE;
         }
+        state->mouse_captured = true;
     }
 
     /* Mouse motion: update camera yaw and pitch. */
