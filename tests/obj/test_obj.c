@@ -121,8 +121,19 @@ static char *write_temp_obj(const char *obj_content, const char *name)
         SDL_free(path);
         return NULL;
     }
-    SDL_WriteIO(io, obj_content, SDL_strlen(obj_content));
-    SDL_CloseIO(io);
+    size_t content_len = SDL_strlen(obj_content);
+    size_t written = SDL_WriteIO(io, obj_content, content_len);
+    if (written < content_len) {
+        SDL_Log("SDL_WriteIO failed for '%s': %s", path, SDL_GetError());
+        SDL_CloseIO(io);
+        SDL_free(path);
+        return NULL;
+    }
+    if (!SDL_CloseIO(io)) {
+        SDL_Log("SDL_CloseIO failed for '%s': %s", path, SDL_GetError());
+        SDL_free(path);
+        return NULL;
+    }
     return path;
 }
 
@@ -635,9 +646,9 @@ static void test_space_shuttle_model(void)
     bool ok = forge_obj_load(path, &mesh);
 
     if (!ok) {
-        /* Model not found — not a failure, just skip */
+        /* Model not found — not a failure, just skip.
+         * END_TEST() below handles the pass_count increment. */
         SDL_Log("    SKIP (model not found at %s)", path);
-        pass_count++;
     } else {
         /* 1032 quads + 172 triangles = 2236 triangles = 6708 vertices */
         ASSERT_UINT_EQ(mesh.vertex_count, 6708);

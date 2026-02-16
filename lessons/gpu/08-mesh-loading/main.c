@@ -129,6 +129,10 @@
 /* Model rotation speed (radians per second around Y axis). */
 #define MODEL_ROTATION_SPEED 0.3f
 
+/* Initial rotation so the shuttle presents its front face to the starting
+ * camera behind it.  Without this the first view is straight-on engines. */
+#define MODEL_INITIAL_ROTATION (FORGE_PI * 1.15f)
+
 /* ── Uniform data ─────────────────────────────────────────────────────────── */
 
 typedef struct Uniforms {
@@ -932,9 +936,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     mat4 vp = mat4_multiply(proj, view);
 
-    /* Model transform: gentle Y rotation so the shuttle slowly spins,
-     * giving the learner a good view from any angle. */
-    mat4 model = mat4_rotate_y(state->elapsed * MODEL_ROTATION_SPEED);
+    /* Model transform: start at an initial rotation so the shuttle presents
+     * a 3/4 front view, then spin slowly so the learner sees every angle. */
+    mat4 model = mat4_rotate_y(MODEL_INITIAL_ROTATION
+                               + state->elapsed * MODEL_ROTATION_SPEED);
 
     mat4 mvp = mat4_multiply(vp, model);
 
@@ -1024,25 +1029,20 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 #ifdef FORGE_CAPTURE
     if (state->capture.mode != FORGE_CAPTURE_NONE) {
-        if (!forge_capture_finish_frame(&state->capture, cmd, swapchain)) {
-            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
-                SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s",
-                        SDL_GetError());
-                SDL_CancelGPUCommandBuffer(cmd);
-                return SDL_APP_FAILURE;
+        if (forge_capture_finish_frame(&state->capture, cmd, swapchain)) {
+            /* Capture submitted the command buffer internally. */
+            if (forge_capture_should_quit(&state->capture)) {
+                return SDL_APP_SUCCESS;
             }
+            return SDL_APP_CONTINUE;
         }
-        if (forge_capture_should_quit(&state->capture)) {
-            return SDL_APP_SUCCESS;
-        }
-    } else
+        /* No capture this frame — fall through to normal submit below. */
+    }
 #endif
-    {
-        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
-            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
-            SDL_CancelGPUCommandBuffer(cmd);
-            return SDL_APP_FAILURE;
-        }
+    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+        SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        SDL_CancelGPUCommandBuffer(cmd);
+        return SDL_APP_FAILURE;
     }
 
     return SDL_APP_CONTINUE;
