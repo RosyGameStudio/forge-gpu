@@ -85,6 +85,7 @@ typedef struct ForgeGltfPrimitive {
     Uint32           index_count;
     Uint32           index_stride;  /* 2 = uint16, 4 = uint32 */
     int              material_index; /* -1 = no material assigned */
+    bool             has_uvs;       /* true if TEXCOORD_0 was present */
 } ForgeGltfPrimitive;
 
 /* ── Mesh ─────────────────────────────────────────────────────────────────── */
@@ -605,6 +606,8 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
                 uvs = (const float *)forge_gltf__get_accessor(
                     root, scene, uv_acc->valueint, NULL, NULL);
             }
+
+            gp->has_uvs = (uvs != NULL);
 
             /* Interleave into ForgeGltfVertex array. */
             gp->vertices = (ForgeGltfVertex *)SDL_calloc(

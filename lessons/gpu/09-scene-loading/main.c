@@ -169,6 +169,7 @@ typedef struct GpuPrimitive {
     Uint32         index_count;
     int            material_index;
     SDL_GPUIndexElementSize index_type;
+    bool           has_uvs;
 } GpuPrimitive;
 
 typedef struct GpuMaterial {
@@ -208,9 +209,6 @@ typedef struct app_state {
 
     /* Input */
     bool mouse_captured;
-
-    /* Model-specific: skip untextured white geometry in VirtualCity. */
-    bool skip_white_placeholders;
 
 #ifdef FORGE_CAPTURE
     ForgeCapture capture;
@@ -610,6 +608,7 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state)
 
         dst->material_index = src->material_index;
         dst->index_count = src->index_count;
+        dst->has_uvs = src->has_uvs;
 
         /* Upload vertex buffer. */
         if (src->vertices && src->vertex_count > 0) {
@@ -778,16 +777,13 @@ static void render_scene(SDL_GPURenderPass *pass, SDL_GPUCommandBuffer *cmd,
                 const GpuMaterial *mat =
                     &state->gpu_materials[prim->material_index];
 
-                /* VirtualCity contains placeholder geometry (light markers,
-                 * reference points) with a default white material and no
-                 * texture.  We skip these so they don't clutter the scene.
-                 * This heuristic is off by default — only enabled when
-                 * loading models that need it (see is_default_model). */
-                if (state->skip_white_placeholders &&
-                    !mat->has_texture &&
-                    mat->base_color[0] == 1.0f &&
-                    mat->base_color[1] == 1.0f &&
-                    mat->base_color[2] == 1.0f)
+                /* NOTE: This is not part of the glTF rendering lesson —
+                 * it works around a specific model issue.  VirtualCity
+                 * contains helper geometry (bounding boxes, camera
+                 * targets) exported from 3DS Max.  These primitives
+                 * have no UV coordinates and no texture, so we skip
+                 * them to avoid rendering white/gray boxes. */
+                if (!prim->has_uvs && !mat->has_texture)
                     continue;
 
                 fu.base_color[0] = mat->base_color[0];
@@ -1177,7 +1173,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     state->cam_yaw      = start_yaw_deg * FORGE_DEG2RAD;
     state->cam_pitch    = start_pitch_deg * FORGE_DEG2RAD;
     state->move_speed   = is_default_model ? MOVE_SPEED_TRUCK : MOVE_SPEED_OVERVIEW;
-    state->skip_white_placeholders = !is_default_model;
     state->last_ticks   = SDL_GetTicks();
 
     /* Capture mouse for FPS-style look. */
