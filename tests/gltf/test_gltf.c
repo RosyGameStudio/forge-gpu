@@ -638,6 +638,158 @@ static void test_normals_and_uvs(void)
     END_TEST();
 }
 
+/* ── Normal count mismatch → normals treated as missing ───────────────────── */
+
+static void test_normal_count_mismatch(void)
+{
+    float positions[9];
+    float normals[6];   /* only 2 normals, not 3 */
+    Uint16 indices[3];
+    Uint8 bin_data[66]; /* 36 + 24 + 6 */
+    const char *json;
+    TempGltf tg;
+    ForgeGltfScene scene;
+    bool wrote;
+    bool ok;
+
+    TEST("NORMAL accessor count != POSITION count → normals ignored");
+
+    positions[0] = 0; positions[1] = 0; positions[2] = 0;
+    positions[3] = 1; positions[4] = 0; positions[5] = 0;
+    positions[6] = 0; positions[7] = 1; positions[8] = 0;
+
+    normals[0] = 0; normals[1] = 0; normals[2] = 1;
+    normals[3] = 0; normals[4] = 0; normals[5] = 1;
+
+    indices[0] = 0; indices[1] = 1; indices[2] = 2;
+
+    SDL_memcpy(bin_data,      positions, 36);
+    SDL_memcpy(bin_data + 36, normals,   24);
+    SDL_memcpy(bin_data + 60, indices,    6);
+
+    /* NORMAL accessor count=2 but POSITION count=3. */
+    json =
+        "{"
+        "  \"asset\": {\"version\": \"2.0\"},"
+        "  \"scene\": 0,"
+        "  \"scenes\": [{\"nodes\": [0]}],"
+        "  \"nodes\": [{\"mesh\": 0}],"
+        "  \"meshes\": [{\"primitives\": [{"
+        "    \"attributes\": {\"POSITION\": 0, \"NORMAL\": 1},"
+        "    \"indices\": 2"
+        "  }]}],"
+        "  \"accessors\": ["
+        "    {\"bufferView\": 0, \"componentType\": 5126,"
+        "     \"count\": 3, \"type\": \"VEC3\"},"
+        "    {\"bufferView\": 1, \"componentType\": 5126,"
+        "     \"count\": 2, \"type\": \"VEC3\"},"
+        "    {\"bufferView\": 2, \"componentType\": 5123,"
+        "     \"count\": 3, \"type\": \"SCALAR\"}"
+        "  ],"
+        "  \"bufferViews\": ["
+        "    {\"buffer\": 0, \"byteOffset\": 0,  \"byteLength\": 36},"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 24},"
+        "    {\"buffer\": 0, \"byteOffset\": 60, \"byteLength\": 6}"
+        "  ],"
+        "  \"buffers\": [{\"uri\": \"test_normmis.bin\", \"byteLength\": 66}]"
+        "}";
+
+    wrote = write_temp_gltf(json, bin_data, sizeof(bin_data),
+                             "test_normmis", &tg);
+    ASSERT_TRUE(wrote);
+
+    ok = forge_gltf_load(tg.gltf_path, &scene);
+    remove_temp_gltf(&tg);
+
+    ASSERT_TRUE(ok);
+    ASSERT_UINT_EQ(scene.primitives[0].vertex_count, 3);
+
+    /* Normals should be zero — treated as missing due to count mismatch. */
+    ASSERT_VEC3_EQ(scene.primitives[0].vertices[0].normal,
+                   vec3_create(0.0f, 0.0f, 0.0f));
+    ASSERT_VEC3_EQ(scene.primitives[0].vertices[2].normal,
+                   vec3_create(0.0f, 0.0f, 0.0f));
+
+    forge_gltf_free(&scene);
+    END_TEST();
+}
+
+/* ── UV wrong componentType → UVs treated as missing ─────────────────────── */
+
+static void test_uv_wrong_component_type(void)
+{
+    float positions[9];
+    Uint16 fake_uvs[6]; /* uint16 instead of float */
+    Uint16 indices[3];
+    Uint8 bin_data[54]; /* 36 + 12 + 6 */
+    const char *json;
+    TempGltf tg;
+    ForgeGltfScene scene;
+    bool wrote;
+    bool ok;
+
+    TEST("TEXCOORD_0 with wrong componentType (USHORT) → UVs ignored");
+
+    positions[0] = 0; positions[1] = 0; positions[2] = 0;
+    positions[3] = 1; positions[4] = 0; positions[5] = 0;
+    positions[6] = 0; positions[7] = 1; positions[8] = 0;
+
+    fake_uvs[0] = 0; fake_uvs[1] = 0;
+    fake_uvs[2] = 1; fake_uvs[3] = 0;
+    fake_uvs[4] = 0; fake_uvs[5] = 1;
+
+    indices[0] = 0; indices[1] = 1; indices[2] = 2;
+
+    SDL_memcpy(bin_data,      positions, 36);
+    SDL_memcpy(bin_data + 36, fake_uvs,  12);
+    SDL_memcpy(bin_data + 48, indices,    6);
+
+    /* TEXCOORD_0 componentType=5123 (UNSIGNED_SHORT) instead of 5126 (FLOAT). */
+    json =
+        "{"
+        "  \"asset\": {\"version\": \"2.0\"},"
+        "  \"scene\": 0,"
+        "  \"scenes\": [{\"nodes\": [0]}],"
+        "  \"nodes\": [{\"mesh\": 0}],"
+        "  \"meshes\": [{\"primitives\": [{"
+        "    \"attributes\": {\"POSITION\": 0, \"TEXCOORD_0\": 1},"
+        "    \"indices\": 2"
+        "  }]}],"
+        "  \"accessors\": ["
+        "    {\"bufferView\": 0, \"componentType\": 5126,"
+        "     \"count\": 3, \"type\": \"VEC3\"},"
+        "    {\"bufferView\": 1, \"componentType\": 5123,"
+        "     \"count\": 3, \"type\": \"VEC2\"},"
+        "    {\"bufferView\": 2, \"componentType\": 5123,"
+        "     \"count\": 3, \"type\": \"SCALAR\"}"
+        "  ],"
+        "  \"bufferViews\": ["
+        "    {\"buffer\": 0, \"byteOffset\": 0,  \"byteLength\": 36},"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 12},"
+        "    {\"buffer\": 0, \"byteOffset\": 48, \"byteLength\": 6}"
+        "  ],"
+        "  \"buffers\": [{\"uri\": \"test_uvbad.bin\", \"byteLength\": 54}]"
+        "}";
+
+    wrote = write_temp_gltf(json, bin_data, sizeof(bin_data),
+                             "test_uvbad", &tg);
+    ASSERT_TRUE(wrote);
+
+    ok = forge_gltf_load(tg.gltf_path, &scene);
+    remove_temp_gltf(&tg);
+
+    ASSERT_TRUE(ok);
+    ASSERT_UINT_EQ(scene.primitives[0].vertex_count, 3);
+
+    /* UVs should be zero — wrong componentType means they're skipped. */
+    ASSERT_FALSE(scene.primitives[0].has_uvs);
+    ASSERT_VEC2_EQ(scene.primitives[0].vertices[0].uv,
+                   vec2_create(0.0f, 0.0f));
+
+    forge_gltf_free(&scene);
+    END_TEST();
+}
+
 /* ── Material: base color factor ──────────────────────────────────────────── */
 
 static void test_material_base_color(void)
@@ -1269,6 +1421,10 @@ int main(int argc, char *argv[])
     /* Basic parsing */
     test_minimal_triangle();
     test_normals_and_uvs();
+
+    /* Accessor validation (normals/UVs) */
+    test_normal_count_mismatch();
+    test_uv_wrong_component_type();
 
     /* Materials */
     test_material_base_color();
