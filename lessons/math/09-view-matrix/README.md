@@ -116,9 +116,9 @@ mean from the camera's perspective.
 The view matrix combines a rotation and a translation:
 
 ```text
-View = | right.x    right.y    right.z    -dot(right, pos)  |
-       | up.x       up.y       up.z       -dot(up, pos)     |
-       | -fwd.x     -fwd.y     -fwd.z      dot(fwd, pos)   |
+View = | right.x    right.y    right.z    -dot(right, pos)   |
+       | up.x       up.y       up.z       -dot(up, pos)      |
+       | -fwd.x     -fwd.y     -fwd.z      dot(fwd, pos)     |
        |  0          0          0           1                |
 ```
 
