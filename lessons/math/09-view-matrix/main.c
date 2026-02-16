@@ -109,8 +109,12 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    /* Disable stdout buffering so printf and SDL_Log (which writes to
+     * stderr) interleave correctly when output is captured by a pipe. */
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     printf("=============================================================\n");
-    printf("  Math Lesson 09 — View Matrix & Virtual Camera\n");
+    printf("  Math Lesson 09 - View Matrix & Virtual Camera\n");
     printf("  Building view matrices from scratch\n");
     printf("=============================================================\n\n");
 
@@ -533,12 +537,14 @@ int main(int argc, char *argv[])
         vec3 up = vec3_cross(right, fwd);
 
         /* Build a rotation matrix from basis vectors, then extract quaternion.
-         * The camera rotation matrix has right/up/forward as columns: */
+         * The camera rotation matrix maps local axes to world directions.
+         * Column 2 is -forward because the camera's local +Z points BEHIND
+         * it (the camera looks down -Z in its own space): */
         mat4 cam_rot_mat = {
-            right.x,  right.y,  right.z,  0.0f,
-            up.x,     up.y,     up.z,     0.0f,
-            fwd.x,    fwd.y,    fwd.z,    0.0f,
-            0.0f,     0.0f,     0.0f,     1.0f
+            right.x,   right.y,   right.z,   0.0f,
+            up.x,      up.y,      up.z,      0.0f,
+            -fwd.x,    -fwd.y,    -fwd.z,    0.0f,
+            0.0f,      0.0f,      0.0f,      1.0f
         };
         quat cam_quat = quat_from_mat4(cam_rot_mat);
 
@@ -603,8 +609,8 @@ int main(int argc, char *argv[])
 
             /* Alternate: walk forward, then turn right */
             if (step % 2 == 0) {
-                /* Walk forward */
-                pos = vec3_add(pos, vec3_scale(fwd, SEC7_MOVE_SPEED));
+                /* Walk forward — multiply by dt for frame-rate independence */
+                pos = vec3_add(pos, vec3_scale(fwd, SEC7_MOVE_SPEED * dt));
                 SDL_Log("  %4d | Walk forward  | (%6.2f, %5.2f, %6.2f) | %.0f deg",
                         step + 1, pos.x, pos.y, pos.z, yaw * FORGE_RAD2DEG);
             } else {
@@ -627,8 +633,6 @@ int main(int argc, char *argv[])
                 SDL_Log("  ERROR: camera not at origin in view space!");
             }
         }
-
-        (void)dt;  /* mentioned for context, not used in discrete steps */
 
         printf("\n");
         printf("  The view matrix is rebuilt every frame from:\n");

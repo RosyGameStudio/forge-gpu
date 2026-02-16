@@ -2379,7 +2379,16 @@ static inline quat quat_nlerp(quat a, quat b, float t)
     return quat_normalize(result);
 }
 
-/* ── View Matrix / Virtual Camera ─────────────────────────────────────── */
+/* ── View Matrix / Virtual Camera ─────────────────────────────────────── *
+ *
+ * Naming convention: these functions use the library's standard type_verb
+ * naming (quat_forward, mat4_view_from_quat), consistent with all other
+ * functions in this header (vec3_dot, mat4_look_at, quat_slerp, etc.).
+ * The forge_ prefix is reserved for non-type scalar helpers at the top of
+ * this file (forge_lerpf, forge_clampf, etc.).
+ *
+ * See: lessons/math/09-view-matrix
+ */
 
 /* Extract the forward direction from a quaternion orientation.
  *
