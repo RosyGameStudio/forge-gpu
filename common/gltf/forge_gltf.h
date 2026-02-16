@@ -179,7 +179,7 @@ static void forge_gltf_compute_world_transforms(ForgeGltfScene *scene,
 
 /* ── File I/O helpers ────────────────────────────────────────────────────── */
 
-static char *forge_gltf__read_text(const char *path)
+static char *read_text(const char *path)
 {
     SDL_IOStream *io = SDL_IOFromFile(path, "rb");
     if (!io) {
@@ -191,7 +191,10 @@ static char *forge_gltf__read_text(const char *path)
     if (size < 0) {
         SDL_Log("forge_gltf: failed to get size of '%s': %s",
                 path, SDL_GetError());
-        SDL_CloseIO(io);
+        if (!SDL_CloseIO(io)) {
+            SDL_Log("forge_gltf: SDL_CloseIO failed for '%s': %s",
+                    path, SDL_GetError());
+        }
         return NULL;
     }
 
@@ -199,22 +202,33 @@ static char *forge_gltf__read_text(const char *path)
     if (!buf) {
         SDL_Log("forge_gltf: alloc failed for '%s' (%lld bytes)",
                 path, (long long)size);
-        SDL_CloseIO(io);
+        if (!SDL_CloseIO(io)) {
+            SDL_Log("forge_gltf: SDL_CloseIO failed for '%s': %s",
+                    path, SDL_GetError());
+        }
         return NULL;
     }
 
     if (SDL_ReadIO(io, buf, (size_t)size) != (size_t)size) {
         SDL_Log("forge_gltf: read failed for '%s': %s", path, SDL_GetError());
         SDL_free(buf);
-        SDL_CloseIO(io);
+        if (!SDL_CloseIO(io)) {
+            SDL_Log("forge_gltf: SDL_CloseIO failed for '%s': %s",
+                    path, SDL_GetError());
+        }
         return NULL;
     }
 
-    SDL_CloseIO(io);
+    if (!SDL_CloseIO(io)) {
+        SDL_Log("forge_gltf: SDL_CloseIO failed for '%s': %s",
+                path, SDL_GetError());
+        SDL_free(buf);
+        return NULL;
+    }
     return buf;
 }
 
-static Uint8 *forge_gltf__read_binary(const char *path, Uint32 *out_size)
+static Uint8 *read_binary(const char *path, Uint32 *out_size)
 {
     SDL_IOStream *io = SDL_IOFromFile(path, "rb");
     if (!io) {
@@ -226,7 +240,10 @@ static Uint8 *forge_gltf__read_binary(const char *path, Uint32 *out_size)
     if (size < 0) {
         SDL_Log("forge_gltf: failed to get size of '%s': %s",
                 path, SDL_GetError());
-        SDL_CloseIO(io);
+        if (!SDL_CloseIO(io)) {
+            SDL_Log("forge_gltf: SDL_CloseIO failed for '%s': %s",
+                    path, SDL_GetError());
+        }
         return NULL;
     }
 
@@ -234,31 +251,42 @@ static Uint8 *forge_gltf__read_binary(const char *path, Uint32 *out_size)
     if (!buf) {
         SDL_Log("forge_gltf: alloc failed for '%s' (%lld bytes)",
                 path, (long long)size);
-        SDL_CloseIO(io);
+        if (!SDL_CloseIO(io)) {
+            SDL_Log("forge_gltf: SDL_CloseIO failed for '%s': %s",
+                    path, SDL_GetError());
+        }
         return NULL;
     }
 
     if (SDL_ReadIO(io, buf, (size_t)size) != (size_t)size) {
         SDL_Log("forge_gltf: read failed for '%s': %s", path, SDL_GetError());
         SDL_free(buf);
-        SDL_CloseIO(io);
+        if (!SDL_CloseIO(io)) {
+            SDL_Log("forge_gltf: SDL_CloseIO failed for '%s': %s",
+                    path, SDL_GetError());
+        }
         return NULL;
     }
 
-    SDL_CloseIO(io);
+    if (!SDL_CloseIO(io)) {
+        SDL_Log("forge_gltf: SDL_CloseIO failed for '%s': %s",
+                path, SDL_GetError());
+        SDL_free(buf);
+        return NULL;
+    }
     *out_size = (Uint32)size;
     return buf;
 }
 
 /* ── Path helpers ────────────────────────────────────────────────────────── */
 
-static void forge_gltf__build_path(char *out, size_t out_size,
+static void build_path(char *out, size_t out_size,
                                     const char *base_dir, const char *relative)
 {
     SDL_snprintf(out, (int)out_size, "%s%s", base_dir, relative);
 }
 
-static void forge_gltf__get_base_dir(char *base_dir, size_t base_dir_size,
+static void get_base_dir(char *base_dir, size_t base_dir_size,
                                       const char *gltf_path)
 {
     SDL_strlcpy(base_dir, gltf_path, base_dir_size);
@@ -275,7 +303,7 @@ static void forge_gltf__get_base_dir(char *base_dir, size_t base_dir_size,
 
 /* ── cJSON helpers ───────────────────────────────────────────────────────── */
 
-static void forge_gltf__copy_name(char *dst, size_t dst_size,
+static void copy_name(char *dst, size_t dst_size,
                                    const cJSON *obj)
 {
     dst[0] = '\0';
@@ -289,7 +317,7 @@ static void forge_gltf__copy_name(char *dst, size_t dst_size,
 
 /* Return the byte size of one component, or 0 if the type is invalid.
  * glTF 2.0 allows six component types (5120–5126, skipping 5124). */
-static int forge_gltf__component_size(int component_type)
+static int component_size(int component_type)
 {
     switch (component_type) {
     case FORGE_GLTF_BYTE:           return 1;
@@ -304,7 +332,7 @@ static int forge_gltf__component_size(int component_type)
 
 /* Return the number of scalar components for an accessor type string.
  * E.g. "VEC3" → 3, "SCALAR" → 1.  Returns 0 for unknown types. */
-static int forge_gltf__type_component_count(const char *type)
+static int type_component_count(const char *type)
 {
     if (SDL_strcmp(type, "SCALAR") == 0) return 1;
     if (SDL_strcmp(type, "VEC2") == 0)   return 2;
@@ -339,7 +367,7 @@ static const void *forge_gltf__get_accessor(
     if (!bv_idx || !comp || !cnt || !cJSON_IsString(type_str)) return NULL;
 
     /* Validate componentType is one of the six values allowed by the spec. */
-    int comp_size = forge_gltf__component_size(comp->valueint);
+    int comp_size = component_size(comp->valueint);
     if (comp_size == 0) {
         SDL_Log("forge_gltf: accessor %d has invalid componentType %d",
                 accessor_idx, comp->valueint);
@@ -347,7 +375,7 @@ static const void *forge_gltf__get_accessor(
     }
 
     /* Determine element size from accessor type (SCALAR, VEC2, VEC3, etc.). */
-    int num_components = forge_gltf__type_component_count(type_str->valuestring);
+    int num_components = type_component_count(type_str->valuestring);
     if (num_components == 0) {
         SDL_Log("forge_gltf: accessor %d has unknown type '%s'",
                 accessor_idx, type_str->valuestring);
@@ -449,11 +477,11 @@ static bool forge_gltf__parse_buffers(const cJSON *root, const char *base_dir,
         }
 
         char path[FORGE_GLTF_PATH_SIZE];
-        forge_gltf__build_path(path, sizeof(path), base_dir,
+        build_path(path, sizeof(path), base_dir,
                                 uri->valuestring);
 
         Uint32 file_size = 0;
-        scene->buffers[i].data = forge_gltf__read_binary(path, &file_size);
+        scene->buffers[i].data = read_binary(path, &file_size);
         if (!scene->buffers[i].data) return false;
         scene->buffers[i].size = file_size;
     }
@@ -494,7 +522,7 @@ static bool forge_gltf__parse_materials(const cJSON *root,
         m->base_color[3] = 1.0f;
         m->texture_path[0] = '\0';
         m->has_texture = false;
-        forge_gltf__copy_name(m->name, sizeof(m->name), mat);
+        copy_name(m->name, sizeof(m->name), mat);
 
         const cJSON *pbr = cJSON_GetObjectItemCaseSensitive(
             mat, "pbrMetallicRoughness");
@@ -531,7 +559,7 @@ static bool forge_gltf__parse_materials(const cJSON *root,
                             const cJSON *uri = cJSON_GetObjectItemCaseSensitive(
                                 img, "uri");
                             if (cJSON_IsString(uri)) {
-                                forge_gltf__build_path(
+                                build_path(
                                     m->texture_path,
                                     sizeof(m->texture_path),
                                     base_dir, uri->valuestring);
@@ -568,7 +596,7 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
         ForgeGltfMesh *gm = &scene->meshes[mi];
         gm->first_primitive = scene->primitive_count;
         gm->primitive_count = 0;
-        forge_gltf__copy_name(gm->name, sizeof(gm->name), mesh);
+        copy_name(gm->name, sizeof(gm->name), mesh);
 
         int prim_count = cJSON_GetArraySize(prims);
         for (int pi = 0; pi < prim_count; pi++) {
@@ -716,7 +744,7 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
         gn->child_count = 0;
         gn->local_transform = mat4_identity();
         gn->world_transform = mat4_identity();
-        forge_gltf__copy_name(gn->name, sizeof(gn->name), node);
+        copy_name(gn->name, sizeof(gn->name), node);
 
         /* Mesh reference. */
         const cJSON *mesh_idx = cJSON_GetObjectItemCaseSensitive(node, "mesh");
@@ -865,7 +893,7 @@ static bool forge_gltf_load(const char *gltf_path, ForgeGltfScene *scene)
 {
     SDL_memset(scene, 0, sizeof(*scene));
 
-    char *json_text = forge_gltf__read_text(gltf_path);
+    char *json_text = read_text(gltf_path);
     if (!json_text) return false;
 
     cJSON *root = cJSON_Parse(json_text);
@@ -876,7 +904,7 @@ static bool forge_gltf_load(const char *gltf_path, ForgeGltfScene *scene)
     }
 
     char base_dir[FORGE_GLTF_PATH_SIZE];
-    forge_gltf__get_base_dir(base_dir, sizeof(base_dir), gltf_path);
+    get_base_dir(base_dir, sizeof(base_dir), gltf_path);
 
     bool ok = forge_gltf__parse_buffers(root, base_dir, scene);
     if (ok) ok = forge_gltf__parse_materials(root, base_dir, scene);

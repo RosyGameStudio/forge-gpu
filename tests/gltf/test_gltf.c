@@ -94,8 +94,8 @@ static bool vec3_eq(vec3 a, vec3 b)
 /* ── Helper: write temp files for glTF tests ─────────────────────────────── */
 
 typedef struct TempGltf {
-    char gltf_path[512];
-    char bin_path[512];
+    char gltf_path[FORGE_GLTF_PATH_SIZE];
+    char bin_path[FORGE_GLTF_PATH_SIZE];
 } TempGltf;
 
 /* Write a .gltf JSON file and .bin binary file next to the executable. */
@@ -120,29 +120,63 @@ static bool write_temp_gltf(const char *json_text,
     if (!io) return false;
     json_len = SDL_strlen(json_text);
     if (SDL_WriteIO(io, json_text, json_len) != json_len) {
-        SDL_CloseIO(io);
+        if (!SDL_CloseIO(io)) {
+            SDL_LogError(SDL_LOG_CATEGORY_TEST,
+                         "SDL_CloseIO failed for '%s': %s",
+                         out->gltf_path, SDL_GetError());
+        }
         return false;
     }
-    if (!SDL_CloseIO(io)) return false;
+    if (!SDL_CloseIO(io)) {
+        SDL_LogError(SDL_LOG_CATEGORY_TEST,
+                     "SDL_CloseIO failed for '%s': %s",
+                     out->gltf_path, SDL_GetError());
+        return false;
+    }
 
     /* Write binary data (.bin) — must use "wb" on Windows. */
     if (bin_data && bin_size > 0) {
         io = SDL_IOFromFile(out->bin_path, "wb");
         if (!io) return false;
         if (SDL_WriteIO(io, bin_data, bin_size) != bin_size) {
-            SDL_CloseIO(io);
+            if (!SDL_CloseIO(io)) {
+                SDL_LogError(SDL_LOG_CATEGORY_TEST,
+                             "SDL_CloseIO failed for '%s': %s",
+                             out->bin_path, SDL_GetError());
+            }
             return false;
         }
-        if (!SDL_CloseIO(io)) return false;
+        if (!SDL_CloseIO(io)) {
+            SDL_LogError(SDL_LOG_CATEGORY_TEST,
+                         "SDL_CloseIO failed for '%s': %s",
+                         out->bin_path, SDL_GetError());
+            return false;
+        }
     }
 
     return true;
 }
 
-static void remove_temp_gltf(TempGltf *tg)
+static bool remove_temp_gltf(TempGltf *tg)
 {
-    if (tg->gltf_path[0]) SDL_RemovePath(tg->gltf_path);
-    if (tg->bin_path[0])  SDL_RemovePath(tg->bin_path);
+    bool ok = true;
+    if (tg->gltf_path[0]) {
+        if (!SDL_RemovePath(tg->gltf_path)) {
+            SDL_LogError(SDL_LOG_CATEGORY_TEST,
+                         "SDL_RemovePath failed for '%s': %s",
+                         tg->gltf_path, SDL_GetError());
+            ok = false;
+        }
+    }
+    if (tg->bin_path[0]) {
+        if (!SDL_RemovePath(tg->bin_path)) {
+            SDL_LogError(SDL_LOG_CATEGORY_TEST,
+                         "SDL_RemovePath failed for '%s': %s",
+                         tg->bin_path, SDL_GetError());
+            ok = false;
+        }
+    }
+    return ok;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
