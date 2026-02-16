@@ -119,7 +119,9 @@ studied matrices of partial derivatives extensively in his work on differential
 equations and determinant theory. A Jacobian is a 2x2 matrix of partial
 derivatives:
 
-$$J = \begin{bmatrix} \frac{\partial u}{\partial x} & \frac{\partial u}{\partial y} \\ \frac{\partial v}{\partial x} & \frac{\partial v}{\partial y} \end{bmatrix}$$
+$$
+J = \begin{bmatrix} \frac{\partial u}{\partial x} & \frac{\partial u}{\partial y} \\ \frac{\partial v}{\partial x} & \frac{\partial v}{\partial y} \end{bmatrix}
+$$
 
 Each entry answers a specific question:
 
@@ -132,7 +134,9 @@ Each entry answers a specific question:
 **Example — tilted plane:** A flat textured plane tilted around the horizontal
 axis by angle $\theta$:
 
-$$J = \begin{bmatrix} 1 & 0 \\ 0 & \frac{1}{\cos\theta} \end{bmatrix}$$
+$$
+J = \begin{bmatrix} 1 & 0 \\ 0 & \frac{1}{\cos\theta} \end{bmatrix}
+$$
 
 - **Horizontal** (U axis): one pixel still maps to one texel (unchanged).
 - **Vertical** (V axis): each pixel spans $1/\cos\theta$ texels. As $\theta$
@@ -158,7 +162,9 @@ For any 2x2 matrix $M$:
 For a 2x2 symmetric matrix $S = \begin{bmatrix} p & q \\ q & r \end{bmatrix}$,
 the eigenvalues have a closed-form solution:
 
-$$\lambda = \frac{p + r}{2} \pm \sqrt{\left(\frac{p - r}{2}\right)^2 + q^2}$$
+$$
+\lambda = \frac{p + r}{2} \pm \sqrt{\left(\frac{p - r}{2}\right)^2 + q^2}
+$$
 
 The larger eigenvalue gives $\sigma_1$ (major axis), the smaller gives $\sigma_2$
 (minor axis).
@@ -184,7 +190,9 @@ the other unchanged — an anisotropy ratio of 4:1.
 
 The **anisotropy ratio** is:
 
-$$\text{ratio} = \frac{\sigma_1}{\sigma_2} = \frac{\text{major axis}}{\text{minor axis}}$$
+$$
+\text{ratio} = \frac{\sigma_1}{\sigma_2} = \frac{\text{major axis}}{\text{minor axis}}
+$$
 
 | Ratio | Description | Filtering impact |
 |-------|-------------|------------------|
@@ -201,7 +209,9 @@ the cost grows linearly with the ratio and returns diminish beyond ~16 samples.
 **Isotropic filtering (trilinear)** treats the footprint as a circle. It uses the
 *largest* singular value to pick the mip level:
 
-$$\text{mip}_\text{iso} = \log_2(\sigma_1)$$
+$$
+\text{mip}_\text{iso} = \log_2(\sigma_1)
+$$
 
 This guarantees no aliasing, but blurs the axis that didn't need such a high mip
 level. At 80 degrees tilt with a 5.76:1 ratio, trilinear picks mip 2.53 — the
@@ -211,8 +221,12 @@ untilted axis gets blurred 5.76x more than necessary.
 *smallest* singular value for the mip level (preserving detail) and takes
 multiple samples along the major axis:
 
-$$\text{mip}_\text{aniso} = \log_2(\sigma_2)$$
-$$\text{samples} = \lceil \sigma_1 / \sigma_2 \rceil$$
+$$
+\text{mip}_\text{aniso} = \log_2(\sigma_2)
+$$
+$$
+\text{samples} = \lceil \sigma_1 / \sigma_2 \rceil
+$$
 
 At 80 degrees tilt: mip 0 (full detail) with 6 samples along the stretched axis.
 The result is sharp *and* alias-free.
