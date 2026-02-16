@@ -209,6 +209,9 @@ typedef struct app_state {
     /* Input */
     bool mouse_captured;
 
+    /* Model-specific: skip untextured white geometry in VirtualCity. */
+    bool skip_white_placeholders;
+
 #ifdef FORGE_CAPTURE
     ForgeCapture capture;
 #endif
@@ -582,6 +585,9 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device)
 }
 
 /* ── Upload parsed scene to GPU ──────────────────────────────────────────── */
+/* Forward declaration: free_gpu_scene is defined later but called from upload_scene_to_gpu */
+static void free_gpu_scene(SDL_GPUDevice *device, app_state *state);
+
 /* Takes the CPU-side data from forge_gltf_load() and creates GPU buffers
  * and textures.  Keeps GPU resources separate from the parser library. */
 
@@ -610,7 +616,10 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state)
             Uint32 vb_size = src->vertex_count * (Uint32)sizeof(ForgeGltfVertex);
             dst->vertex_buffer = upload_gpu_buffer(
                 device, SDL_GPU_BUFFERUSAGE_VERTEX, src->vertices, vb_size);
-            if (!dst->vertex_buffer) return false;
+            if (!dst->vertex_buffer) {
+                free_gpu_scene(device, state);
+                return false;
+            }
         }
 
         /* Upload index buffer. */
@@ -618,7 +627,10 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state)
             Uint32 ib_size = src->index_count * src->index_stride;
             dst->index_buffer = upload_gpu_buffer(
                 device, SDL_GPU_BUFFERUSAGE_INDEX, src->indices, ib_size);
-            if (!dst->index_buffer) return false;
+            if (!dst->index_buffer) {
+                free_gpu_scene(device, state);
+                return false;
+            }
 
             dst->index_type = (src->index_stride == 2)
                 ? SDL_GPU_INDEXELEMENTSIZE_16BIT
@@ -633,6 +645,7 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state)
         sizeof(GpuMaterial));
     if (!state->gpu_materials) {
         SDL_Log("Failed to allocate GPU materials");
+        free_gpu_scene(device, state);
         return false;
     }
 
@@ -765,13 +778,13 @@ static void render_scene(SDL_GPURenderPass *pass, SDL_GPUCommandBuffer *cmd,
                 const GpuMaterial *mat =
                     &state->gpu_materials[prim->material_index];
 
-                /* NOTE: This is a quirk of the VirtualCity model, not
-                 * part of glTF loading in general.  The model was converted
-                 * from COLLADA and contains placeholder geometry (light
-                 * markers, reference points) with a default white material
-                 * and no texture.  We skip these so they don't clutter the
-                 * scene.  A real engine would not need this check. */
-                if (!mat->has_texture &&
+                /* VirtualCity contains placeholder geometry (light markers,
+                 * reference points) with a default white material and no
+                 * texture.  We skip these so they don't clutter the scene.
+                 * This heuristic is off by default — only enabled when
+                 * loading models that need it (see is_default_model). */
+                if (state->skip_white_placeholders &&
+                    !mat->has_texture &&
                     mat->base_color[0] == 1.0f &&
                     mat->base_color[1] == 1.0f &&
                     mat->base_color[2] == 1.0f)
@@ -1164,6 +1177,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     state->cam_yaw      = start_yaw_deg * FORGE_DEG2RAD;
     state->cam_pitch    = start_pitch_deg * FORGE_DEG2RAD;
     state->move_speed   = is_default_model ? MOVE_SPEED_TRUCK : MOVE_SPEED_OVERVIEW;
+    state->skip_white_placeholders = !is_default_model;
     state->last_ticks   = SDL_GetTicks();
 
     /* Capture mouse for FPS-style look. */

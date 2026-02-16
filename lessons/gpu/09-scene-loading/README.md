@@ -1,10 +1,5 @@
 # Lesson 09 — Loading a Scene (glTF)
 
-In this lesson you'll load a complete 3D scene from a glTF file — multiple
-meshes with different materials, arranged in a node hierarchy with nested
-transforms. This is a significant step up from Lesson 08 (OBJ), which loaded a
-single mesh with one material.
-
 ## What you'll learn
 
 - The **glTF 2.0** file format — the "JPEG of 3D"
@@ -15,6 +10,11 @@ single mesh with one material.
 - **Quaternion transforms** — loading glTF's `[x,y,z,w]` quaternions into rotation matrices
 - Using a **reusable glTF parser library** (`common/gltf/forge_gltf.h`)
 - **cJSON** — a lightweight C library for parsing JSON
+
+In this lesson you'll load a complete 3D scene from a glTF file — multiple
+meshes with different materials, arranged in a node hierarchy with nested
+transforms. This is a significant step up from Lesson 08 (OBJ), which loaded a
+single mesh with one material.
 
 ## Result
 
@@ -243,6 +243,11 @@ repository, licensed under
 The patterns from this lesson are distilled into a reusable Claude Code skill:
 [`.claude/skills/scene-loading/SKILL.md`](../../../.claude/skills/scene-loading/SKILL.md)
 
+## What's next
+
+In **Lesson 10 — Basic Lighting**, we'll use the normal vectors we're already
+loading to add diffuse and specular shading with the Phong model.
+
 ## Exercises
 
 1. **Load VirtualCity** — Run with `assets/VirtualCity/VirtualCity.gltf` on the
@@ -261,8 +266,3 @@ The patterns from this lesson are distilled into a reusable Claude Code skill:
 4. **Print scene stats** — After loading, print each node's name, mesh index,
    parent, and world position (column 3 of the world transform matrix). This
    helps understand how the hierarchy is structured.
-
-## What's next
-
-In **Lesson 10 — Basic Lighting**, we'll use the normal vectors we're already
-loading to add diffuse and specular shading with the Phong model.

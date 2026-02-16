@@ -307,6 +307,10 @@ static const void *forge_gltf__get_accessor(
     const cJSON *acc_off = cJSON_GetObjectItemCaseSensitive(acc, "byteOffset");
     if (cJSON_IsNumber(acc_off)) acc_offset = acc_off->valueint;
 
+    /* Bounds-check the bufferView index before accessing the array. */
+    int view_count = cJSON_GetArraySize(views);
+    if (bv_idx->valueint < 0 || bv_idx->valueint >= view_count) return NULL;
+
     const cJSON *view = cJSON_GetArrayItem(views, bv_idx->valueint);
     if (!view) return NULL;
 
@@ -622,10 +626,14 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
                         i, cc, FORGE_GLTF_MAX_CHILDREN);
                 cc = FORGE_GLTF_MAX_CHILDREN;
             }
+            int valid = 0;
             for (int c = 0; c < cc; c++) {
-                gn->children[c] = cJSON_GetArrayItem(children, c)->valueint;
+                const cJSON *item = cJSON_GetArrayItem(children, c);
+                if (item) {
+                    gn->children[valid++] = item->valueint;
+                }
             }
-            gn->child_count = cc;
+            gn->child_count = valid;
         }
 
         /* Compute local transform from TRS or matrix. */
@@ -697,10 +705,14 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
         const cJSON *roots = cJSON_GetObjectItemCaseSensitive(sc, "nodes");
         if (cJSON_IsArray(roots)) {
             int rc = cJSON_GetArraySize(roots);
+            int valid_roots = 0;
             for (int i = 0; i < rc && i < FORGE_GLTF_MAX_NODES; i++) {
-                scene->root_nodes[i] = cJSON_GetArrayItem(roots, i)->valueint;
+                const cJSON *item = cJSON_GetArrayItem(roots, i);
+                if (item) {
+                    scene->root_nodes[valid_roots++] = item->valueint;
+                }
             }
-            scene->root_node_count = rc;
+            scene->root_node_count = valid_roots;
         }
     }
 
