@@ -18,13 +18,14 @@ import os
 import sys
 
 import matplotlib
-import matplotlib.patheffects as pe
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import Polygon, Rectangle
 
-matplotlib.use("Agg")
+matplotlib.use("Agg")  # noqa: E402 — must precede pyplot/patheffects imports
+
+import matplotlib.patheffects as pe  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np
+from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
+from matplotlib.patches import Polygon, Rectangle  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LESSONS_DIR = os.path.join(REPO_ROOT, "lessons")
