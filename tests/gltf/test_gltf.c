@@ -196,6 +196,262 @@ static void test_free_zeroed_scene(void)
     END_TEST();
 }
 
+/* ── Invalid componentType ─────────────────────────────────────────────────── */
+/* Accessor with an invalid componentType (not one of the six glTF values)
+ * should be rejected — the primitive is skipped. */
+
+static void test_invalid_component_type(void)
+{
+    float positions[9];
+    Uint16 indices[3];
+    Uint8 bin_data[42];
+    const char *json;
+    TempGltf tg;
+    ForgeGltfScene scene;
+    bool wrote;
+    bool ok;
+
+    TEST("invalid componentType (9999) rejects accessor");
+
+    positions[0] = 0; positions[1] = 0; positions[2] = 0;
+    positions[3] = 1; positions[4] = 0; positions[5] = 0;
+    positions[6] = 0; positions[7] = 1; positions[8] = 0;
+    indices[0] = 0; indices[1] = 1; indices[2] = 2;
+
+    SDL_memcpy(bin_data, positions, 36);
+    SDL_memcpy(bin_data + 36, indices, 6);
+
+    /* componentType 9999 is not one of the six allowed values. */
+    json =
+        "{"
+        "  \"asset\": {\"version\": \"2.0\"},"
+        "  \"scene\": 0,"
+        "  \"scenes\": [{\"nodes\": [0]}],"
+        "  \"nodes\": [{\"mesh\": 0}],"
+        "  \"meshes\": [{\"primitives\": [{"
+        "    \"attributes\": {\"POSITION\": 0},"
+        "    \"indices\": 1"
+        "  }]}],"
+        "  \"accessors\": ["
+        "    {\"bufferView\": 0, \"componentType\": 9999,"
+        "     \"count\": 3, \"type\": \"VEC3\"},"
+        "    {\"bufferView\": 1, \"componentType\": 5123,"
+        "     \"count\": 3, \"type\": \"SCALAR\"}"
+        "  ],"
+        "  \"bufferViews\": ["
+        "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36},"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 6}"
+        "  ],"
+        "  \"buffers\": [{\"uri\": \"test_badcomp.bin\", \"byteLength\": 42}]"
+        "}";
+
+    wrote = write_temp_gltf(json, bin_data, sizeof(bin_data),
+                             "test_badcomp", &tg);
+    ASSERT_TRUE(wrote);
+
+    ok = forge_gltf_load(tg.gltf_path, &scene);
+    remove_temp_gltf(&tg);
+
+    /* Scene loads but primitive is skipped due to bad componentType. */
+    ASSERT_TRUE(ok);
+    ASSERT_INT_EQ(scene.primitive_count, 0);
+
+    forge_gltf_free(&scene);
+    END_TEST();
+}
+
+/* ── Accessor exceeds bufferView bounds ───────────────────────────────────── */
+/* An accessor claiming 3 VEC3 floats (36 bytes) in a bufferView of only
+ * 12 bytes should be rejected. */
+
+static void test_accessor_exceeds_buffer_view(void)
+{
+    float positions[9];
+    Uint16 indices[3];
+    Uint8 bin_data[42];
+    const char *json;
+    TempGltf tg;
+    ForgeGltfScene scene;
+    bool wrote;
+    bool ok;
+
+    TEST("accessor exceeding bufferView.byteLength is rejected");
+
+    positions[0] = 0; positions[1] = 0; positions[2] = 0;
+    positions[3] = 1; positions[4] = 0; positions[5] = 0;
+    positions[6] = 0; positions[7] = 1; positions[8] = 0;
+    indices[0] = 0; indices[1] = 1; indices[2] = 2;
+
+    SDL_memcpy(bin_data, positions, 36);
+    SDL_memcpy(bin_data + 36, indices, 6);
+
+    /* bufferView 0 only claims 12 bytes, but accessor wants 3 VEC3 = 36. */
+    json =
+        "{"
+        "  \"asset\": {\"version\": \"2.0\"},"
+        "  \"scene\": 0,"
+        "  \"scenes\": [{\"nodes\": [0]}],"
+        "  \"nodes\": [{\"mesh\": 0}],"
+        "  \"meshes\": [{\"primitives\": [{"
+        "    \"attributes\": {\"POSITION\": 0},"
+        "    \"indices\": 1"
+        "  }]}],"
+        "  \"accessors\": ["
+        "    {\"bufferView\": 0, \"componentType\": 5126,"
+        "     \"count\": 3, \"type\": \"VEC3\"},"
+        "    {\"bufferView\": 1, \"componentType\": 5123,"
+        "     \"count\": 3, \"type\": \"SCALAR\"}"
+        "  ],"
+        "  \"bufferViews\": ["
+        "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 12},"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 6}"
+        "  ],"
+        "  \"buffers\": [{\"uri\": \"test_bvsmall.bin\", \"byteLength\": 42}]"
+        "}";
+
+    wrote = write_temp_gltf(json, bin_data, sizeof(bin_data),
+                             "test_bvsmall", &tg);
+    ASSERT_TRUE(wrote);
+
+    ok = forge_gltf_load(tg.gltf_path, &scene);
+    remove_temp_gltf(&tg);
+
+    /* Scene loads but primitive is skipped — accessor overflows bufferView. */
+    ASSERT_TRUE(ok);
+    ASSERT_INT_EQ(scene.primitive_count, 0);
+
+    forge_gltf_free(&scene);
+    END_TEST();
+}
+
+/* ── bufferView exceeds buffer bounds ─────────────────────────────────────── */
+/* A bufferView whose offset + length exceeds the binary buffer should be
+ * rejected. */
+
+static void test_buffer_view_exceeds_buffer(void)
+{
+    float positions[9];
+    Uint16 indices[3];
+    Uint8 bin_data[42];
+    const char *json;
+    TempGltf tg;
+    ForgeGltfScene scene;
+    bool wrote;
+    bool ok;
+
+    TEST("bufferView exceeding buffer size is rejected");
+
+    positions[0] = 0; positions[1] = 0; positions[2] = 0;
+    positions[3] = 1; positions[4] = 0; positions[5] = 0;
+    positions[6] = 0; positions[7] = 1; positions[8] = 0;
+    indices[0] = 0; indices[1] = 1; indices[2] = 2;
+
+    SDL_memcpy(bin_data, positions, 36);
+    SDL_memcpy(bin_data + 36, indices, 6);
+
+    /* bufferView 0: offset=20 + length=36 = 56 > buffer size (42). */
+    json =
+        "{"
+        "  \"asset\": {\"version\": \"2.0\"},"
+        "  \"scene\": 0,"
+        "  \"scenes\": [{\"nodes\": [0]}],"
+        "  \"nodes\": [{\"mesh\": 0}],"
+        "  \"meshes\": [{\"primitives\": [{"
+        "    \"attributes\": {\"POSITION\": 0},"
+        "    \"indices\": 1"
+        "  }]}],"
+        "  \"accessors\": ["
+        "    {\"bufferView\": 0, \"componentType\": 5126,"
+        "     \"count\": 3, \"type\": \"VEC3\"},"
+        "    {\"bufferView\": 1, \"componentType\": 5123,"
+        "     \"count\": 3, \"type\": \"SCALAR\"}"
+        "  ],"
+        "  \"bufferViews\": ["
+        "    {\"buffer\": 0, \"byteOffset\": 20, \"byteLength\": 36},"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 6}"
+        "  ],"
+        "  \"buffers\": [{\"uri\": \"test_bvover.bin\", \"byteLength\": 42}]"
+        "}";
+
+    wrote = write_temp_gltf(json, bin_data, sizeof(bin_data),
+                             "test_bvover", &tg);
+    ASSERT_TRUE(wrote);
+
+    ok = forge_gltf_load(tg.gltf_path, &scene);
+    remove_temp_gltf(&tg);
+
+    /* Primitive skipped — bufferView overflows the binary buffer. */
+    ASSERT_TRUE(ok);
+    ASSERT_INT_EQ(scene.primitive_count, 0);
+
+    forge_gltf_free(&scene);
+    END_TEST();
+}
+
+/* ── Missing bufferView.byteLength ────────────────────────────────────────── */
+/* bufferView.byteLength is required by the glTF spec.  A view missing it
+ * should be rejected. */
+
+static void test_missing_buffer_view_byte_length(void)
+{
+    float positions[9];
+    Uint16 indices[3];
+    Uint8 bin_data[42];
+    const char *json;
+    TempGltf tg;
+    ForgeGltfScene scene;
+    bool wrote;
+    bool ok;
+
+    TEST("missing bufferView.byteLength rejects accessor");
+
+    positions[0] = 0; positions[1] = 0; positions[2] = 0;
+    positions[3] = 1; positions[4] = 0; positions[5] = 0;
+    positions[6] = 0; positions[7] = 1; positions[8] = 0;
+    indices[0] = 0; indices[1] = 1; indices[2] = 2;
+
+    SDL_memcpy(bin_data, positions, 36);
+    SDL_memcpy(bin_data + 36, indices, 6);
+
+    /* bufferView 0 is missing byteLength entirely. */
+    json =
+        "{"
+        "  \"asset\": {\"version\": \"2.0\"},"
+        "  \"scene\": 0,"
+        "  \"scenes\": [{\"nodes\": [0]}],"
+        "  \"nodes\": [{\"mesh\": 0}],"
+        "  \"meshes\": [{\"primitives\": [{"
+        "    \"attributes\": {\"POSITION\": 0},"
+        "    \"indices\": 1"
+        "  }]}],"
+        "  \"accessors\": ["
+        "    {\"bufferView\": 0, \"componentType\": 5126,"
+        "     \"count\": 3, \"type\": \"VEC3\"},"
+        "    {\"bufferView\": 1, \"componentType\": 5123,"
+        "     \"count\": 3, \"type\": \"SCALAR\"}"
+        "  ],"
+        "  \"bufferViews\": ["
+        "    {\"buffer\": 0, \"byteOffset\": 0},"
+        "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 6}"
+        "  ],"
+        "  \"buffers\": [{\"uri\": \"test_nobvlen.bin\", \"byteLength\": 42}]"
+        "}";
+
+    wrote = write_temp_gltf(json, bin_data, sizeof(bin_data),
+                             "test_nobvlen", &tg);
+    ASSERT_TRUE(wrote);
+
+    ok = forge_gltf_load(tg.gltf_path, &scene);
+    remove_temp_gltf(&tg);
+
+    /* Primitive skipped — bufferView has no byteLength. */
+    ASSERT_TRUE(ok);
+    ASSERT_INT_EQ(scene.primitive_count, 0);
+
+    forge_gltf_free(&scene);
+    END_TEST();
+}
+
 /* ── Minimal triangle (positions + indices) ───────────────────────────────── */
 
 static void test_minimal_triangle(void)
@@ -917,6 +1173,12 @@ int main(int argc, char *argv[])
     test_nonexistent_file();
     test_invalid_json();
     test_free_zeroed_scene();
+
+    /* Accessor validation */
+    test_invalid_component_type();
+    test_accessor_exceeds_buffer_view();
+    test_buffer_view_exceeds_buffer();
+    test_missing_buffer_view_byte_length();
 
     /* Basic parsing */
     test_minimal_triangle();

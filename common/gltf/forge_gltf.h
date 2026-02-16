@@ -284,8 +284,41 @@ static void forge_gltf__copy_name(char *dst, size_t dst_size,
     }
 }
 
+/* ── Accessor helpers ─────────────────────────────────────────────────────── */
+
+/* Return the byte size of one component, or 0 if the type is invalid.
+ * glTF 2.0 allows six component types (5120–5126, skipping 5124). */
+static int forge_gltf__component_size(int component_type)
+{
+    switch (component_type) {
+    case FORGE_GLTF_BYTE:           return 1;
+    case FORGE_GLTF_UNSIGNED_BYTE:  return 1;
+    case FORGE_GLTF_SHORT:          return 2;
+    case FORGE_GLTF_UNSIGNED_SHORT: return 2;
+    case FORGE_GLTF_UNSIGNED_INT:   return 4;
+    case FORGE_GLTF_FLOAT:          return 4;
+    default: return 0;
+    }
+}
+
+/* Return the number of scalar components for an accessor type string.
+ * E.g. "VEC3" → 3, "SCALAR" → 1.  Returns 0 for unknown types. */
+static int forge_gltf__type_component_count(const char *type)
+{
+    if (SDL_strcmp(type, "SCALAR") == 0) return 1;
+    if (SDL_strcmp(type, "VEC2") == 0)   return 2;
+    if (SDL_strcmp(type, "VEC3") == 0)   return 3;
+    if (SDL_strcmp(type, "VEC4") == 0)   return 4;
+    if (SDL_strcmp(type, "MAT2") == 0)   return 4;
+    if (SDL_strcmp(type, "MAT3") == 0)   return 9;
+    if (SDL_strcmp(type, "MAT4") == 0)   return 16;
+    return 0;
+}
+
 /* ── Accessor data access ────────────────────────────────────────────────── */
-/* Follow the glTF accessor → bufferView → buffer chain to find raw data. */
+/* Follow the glTF accessor → bufferView → buffer chain to find raw data.
+ * Validates componentType, bufferView.byteLength, and accessor bounds
+ * per the glTF 2.0 specification before returning a pointer. */
 
 static const void *forge_gltf__get_accessor(
     const cJSON *root, const ForgeGltfScene *scene,
@@ -301,7 +334,24 @@ static const void *forge_gltf__get_accessor(
     const cJSON *bv_idx = cJSON_GetObjectItemCaseSensitive(acc, "bufferView");
     const cJSON *comp = cJSON_GetObjectItemCaseSensitive(acc, "componentType");
     const cJSON *cnt = cJSON_GetObjectItemCaseSensitive(acc, "count");
-    if (!bv_idx || !comp || !cnt) return NULL;
+    const cJSON *type_str = cJSON_GetObjectItemCaseSensitive(acc, "type");
+    if (!bv_idx || !comp || !cnt || !cJSON_IsString(type_str)) return NULL;
+
+    /* Validate componentType is one of the six values allowed by the spec. */
+    int comp_size = forge_gltf__component_size(comp->valueint);
+    if (comp_size == 0) {
+        SDL_Log("forge_gltf: accessor %d has invalid componentType %d",
+                accessor_idx, comp->valueint);
+        return NULL;
+    }
+
+    /* Determine element size from accessor type (SCALAR, VEC2, VEC3, etc.). */
+    int num_components = forge_gltf__type_component_count(type_str->valuestring);
+    if (num_components == 0) {
+        SDL_Log("forge_gltf: accessor %d has unknown type '%s'",
+                accessor_idx, type_str->valuestring);
+        return NULL;
+    }
 
     int acc_offset = 0;
     const cJSON *acc_off = cJSON_GetObjectItemCaseSensitive(acc, "byteOffset");
@@ -315,22 +365,60 @@ static const void *forge_gltf__get_accessor(
     if (!view) return NULL;
 
     const cJSON *buf_idx = cJSON_GetObjectItemCaseSensitive(view, "buffer");
-    const cJSON *bv_offset = cJSON_GetObjectItemCaseSensitive(view, "byteOffset");
+    const cJSON *bv_off_json = cJSON_GetObjectItemCaseSensitive(view, "byteOffset");
+    const cJSON *bv_len_json = cJSON_GetObjectItemCaseSensitive(view, "byteLength");
     if (!buf_idx) return NULL;
 
     int bi = buf_idx->valueint;
     if (bi < 0 || bi >= scene->buffer_count) return NULL;
 
-    Uint32 offset = 0;
-    if (cJSON_IsNumber(bv_offset)) offset = (Uint32)bv_offset->valueint;
-    offset += (Uint32)acc_offset;
+    Uint32 bv_offset = 0;
+    if (cJSON_IsNumber(bv_off_json)) bv_offset = (Uint32)bv_off_json->valueint;
 
-    if (offset >= scene->buffers[bi].size) return NULL;
+    /* bufferView.byteLength is required by the spec — reject if missing. */
+    if (!cJSON_IsNumber(bv_len_json) || bv_len_json->valueint <= 0) {
+        SDL_Log("forge_gltf: bufferView %d missing or invalid byteLength",
+                bv_idx->valueint);
+        return NULL;
+    }
+    Uint32 bv_byte_length = (Uint32)bv_len_json->valueint;
 
-    if (out_count) *out_count = cnt->valueint;
+    /* Ensure the bufferView itself fits within the binary buffer. */
+    if (bv_offset + bv_byte_length > scene->buffers[bi].size) {
+        SDL_Log("forge_gltf: bufferView %d exceeds buffer %d bounds "
+                "(offset %u + length %u > %u)",
+                bv_idx->valueint, bi,
+                bv_offset, bv_byte_length, scene->buffers[bi].size);
+        return NULL;
+    }
+
+    /* Validate the accessor's data range fits within the bufferView.
+     * Per glTF spec: byteOffset + (count-1)*stride + elementSize <= byteLength */
+    int element_size = num_components * comp_size;
+    int byte_stride = element_size; /* tightly packed by default */
+    const cJSON *bv_stride_json = cJSON_GetObjectItemCaseSensitive(
+        view, "byteStride");
+    if (cJSON_IsNumber(bv_stride_json) && bv_stride_json->valueint > 0) {
+        byte_stride = bv_stride_json->valueint;
+    }
+
+    int count = cnt->valueint;
+    if (count > 0) {
+        Uint32 required = (Uint32)acc_offset
+                        + (Uint32)(count - 1) * (Uint32)byte_stride
+                        + (Uint32)element_size;
+        if (required > bv_byte_length) {
+            SDL_Log("forge_gltf: accessor %d exceeds bufferView %d bounds "
+                    "(need %u bytes, view has %u)",
+                    accessor_idx, bv_idx->valueint, required, bv_byte_length);
+            return NULL;
+        }
+    }
+
+    if (out_count) *out_count = count;
     if (out_component_type) *out_component_type = comp->valueint;
 
-    return scene->buffers[bi].data + offset;
+    return scene->buffers[bi].data + bv_offset + (Uint32)acc_offset;
 }
 
 /* ── Parse binary buffers ────────────────────────────────────────────────── */
