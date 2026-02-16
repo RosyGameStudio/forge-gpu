@@ -768,8 +768,12 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         if (state->mouse_captured) {
             /* First press: release the mouse so the user can interact
              * with the window title bar, taskbar, etc. */
-            SDL_SetWindowRelativeMouseMode(state->window, false);
-            state->mouse_captured = false;
+            if (!SDL_SetWindowRelativeMouseMode(state->window, false)) {
+                SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s",
+                        SDL_GetError());
+            } else {
+                state->mouse_captured = false;
+            }
         } else {
             /* Second press (mouse already released): quit the app. */
             return SDL_APP_SUCCESS;
