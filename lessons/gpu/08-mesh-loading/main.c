@@ -1058,6 +1058,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         /* No capture this frame — fall through to normal submit below. */
     }
 #endif
+    /* NOTE: Submit consumes the command buffer whether it succeeds or fails.
+     * Do NOT call SDL_CancelGPUCommandBuffer after a failed submit — the
+     * buffer is already gone.  Cancel is only valid on a buffer that was
+     * never submitted (e.g. when an earlier step like BeginRenderPass fails
+     * and you need to abandon the whole frame). */
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
