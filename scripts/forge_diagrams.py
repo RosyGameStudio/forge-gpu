@@ -1287,12 +1287,8 @@ def diagram_view_transform():
 
         # Floor grid
         for g in range(-5, 6):
-            ax.plot(
-                [-5, 5], [g, g], color=STYLE["grid"], lw=0.3, alpha=0.3
-            )
-            ax.plot(
-                [g, g], [-5.5, 5.5], color=STYLE["grid"], lw=0.3, alpha=0.3
-            )
+            ax.plot([-5, 5], [g, g], color=STYLE["grid"], lw=0.3, alpha=0.3)
+            ax.plot([g, g], [-5.5, 5.5], color=STYLE["grid"], lw=0.3, alpha=0.3)
 
         # Coordinate axes at diagram (0, 0)
         al = 4.5
@@ -1403,9 +1399,7 @@ def diagram_view_transform():
                 color=obj["color"],
                 fontsize=9,
                 fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             )
 
         # Origin crosshair
@@ -1453,9 +1447,7 @@ def diagram_view_transform():
                 alpha=0.6,
             )
 
-        ax.set_title(
-            title, color=STYLE["text"], fontsize=13, fontweight="bold", pad=10
-        )
+        ax.set_title(title, color=STYLE["text"], fontsize=13, fontweight="bold", pad=10)
         ax.set_xticks([])
         ax.set_yticks([])
         for spine in ax.spines.values():

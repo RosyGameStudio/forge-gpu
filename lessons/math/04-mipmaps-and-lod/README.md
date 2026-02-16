@@ -17,7 +17,7 @@ output walks through each concept with concrete numbers.
 
 ## Key concepts
 
-- **Mip chain** — a series of progressively halved textures, from full size down to 1x1
+- **Mip chain** — a series of progressively-halved textures, from full size down to 1x1
 - **LOD (Level of Detail)** — $\log_2(\text{footprint})$, how the GPU picks which mip level to sample
 - **Trilinear interpolation** — bilinear sample from two adjacent mip levels, then lerp between them
 - **Screen-space derivatives** — `ddx`/`ddy` measure how fast UVs change across pixels, driving LOD selection
@@ -89,7 +89,9 @@ aliasing.
 **LOD** (Level of Detail) determines which mip level to sample from. The GPU
 computes it automatically from screen-space derivatives:
 
-$$\text{footprint} = \max\!\left(\left|\frac{\partial U}{\partial x}\right|, \left|\frac{\partial V}{\partial y}\right|\right) \times \text{texture\_size}$$
+$$g_x = \sqrt{\left(\frac{\partial U}{\partial x}\right)^2 + \left(\frac{\partial V}{\partial x}\right)^2}, \quad g_y = \sqrt{\left(\frac{\partial U}{\partial y}\right)^2 + \left(\frac{\partial V}{\partial y}\right)^2}$$
+
+$$\text{footprint} = \max(g_x,\; g_y) \times \text{texture\_size}$$
 
 $$\text{LOD} = \log_2(\text{footprint})$$
 
