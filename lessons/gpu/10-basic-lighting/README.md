@@ -83,7 +83,7 @@ float3 ambient_term = ambient * surface_color.rgb;
 ### 2. Diffuse — Lambert's cosine law
 
 $$
-C_{\text{diffuse}} = \max(\mathbf{N} \cdot \mathbf{L},\; 0) \cdot C_{\text{surface}}
+C_{\text{diffuse}} = \max(\mathbf{N} \cdot \mathbf{L}, 0) \cdot C_{\text{surface}}
 $$
 
 This is the core of shading and the oldest lighting model in computer
@@ -121,7 +121,7 @@ $$
 $$
 
 $$
-C_{\text{specular}} = k_s \cdot \max(\mathbf{N} \cdot \mathbf{H},\; 0)^{\text{shininess}}
+C_{\text{specular}} = k_s \cdot \max(\mathbf{N} \cdot \mathbf{H}, 0)^{\text{shininess}}
 $$
 
 Where $k_s$ is the specular intensity (we use 0.5).
@@ -169,7 +169,7 @@ $$
 $$
 
 $$
-C_{\text{specular}}^{\text{Phong}} = \max(\mathbf{R} \cdot \mathbf{V},\; 0)^{\text{shininess}}
+C_{\text{specular}}^{\text{Phong}} = \max(\mathbf{R} \cdot \mathbf{V}, 0)^{\text{shininess}}
 $$
 
 Blinn's modification (James Blinn, 1977) replaced this with:
@@ -179,7 +179,7 @@ $$
 $$
 
 $$
-C_{\text{specular}}^{\text{Blinn}} = \max(\mathbf{N} \cdot \mathbf{H},\; 0)^{\text{shininess}}
+C_{\text{specular}}^{\text{Blinn}} = \max(\mathbf{N} \cdot \mathbf{H}, 0)^{\text{shininess}}
 $$
 
 Why did Blinn's version become the industry standard?
@@ -370,7 +370,7 @@ f(\mathbf{L}, \mathbf{V}) = \frac{D(\mathbf{H}) \cdot F(\mathbf{V}, \mathbf{H}) 
 $$
 
 Where $D$ is the microfacet distribution (like a better
-$\max(\mathbf{N} \cdot \mathbf{H},\; 0)^{\text{shininess}}$), $F$ is the
+$\max(\mathbf{N} \cdot \mathbf{H}, 0)^{\text{shininess}}$), $F$ is the
 Fresnel term, and $G$ is the geometry/shadowing term. This looks
 complex, but each piece has clear physical meaning — and the Blinn half-vector
 you learned in this lesson is at the heart of it.

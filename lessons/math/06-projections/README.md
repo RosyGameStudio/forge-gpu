@@ -146,7 +146,7 @@ The result is in Normalized Device Coordinates:
 The GPU performs:
 
 $$
-\text{NDC} = \left(\frac{x_c}{w_c},\; \frac{y_c}{w_c},\; \frac{z_c}{w_c}\right)
+\text{NDC} = \left(\frac{x_c}{w_c}, \frac{y_c}{w_c}, \frac{z_c}{w_c}\right)
 $$
 
 For perspective projection, $w_c = -z_{\text{view}}$ (the negated view-space depth).
