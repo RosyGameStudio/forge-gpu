@@ -666,6 +666,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_EndGPUCopyPass(copy_pass);
     if (!SDL_SubmitGPUCommandBuffer(upload_cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        SDL_CancelGPUCommandBuffer(upload_cmd);
         SDL_ReleaseGPUTransferBuffer(device, transfer);
         SDL_ReleaseGPUBuffer(device, index_buffer);
         SDL_ReleaseGPUBuffer(device, vertex_buffer);
