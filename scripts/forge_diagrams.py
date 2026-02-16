@@ -1666,19 +1666,19 @@ def diagram_pixel_footprint():
     tilt75 = np.radians(75)
     sv_major = min(1.0 / np.cos(tilt75), 2.3)
 
-    # Major axis arrow (vertical, on the left side)
+    # Major axis arrow (vertical, center to edge = singular value)
     ax1.annotate(
         "",
-        xy=(-0.2, sv_major),
-        xytext=(-0.2, 0),
+        xy=(0, sv_major),
+        xytext=(0, 0),
         arrowprops={
-            "arrowstyle": "<->",
+            "arrowstyle": "->",
             "color": STYLE["warn"],
             "lw": 1.5,
         },
     )
     ax1.text(
-        -0.55,
+        -0.35,
         sv_major / 2,
         "\u03c3\u2081",
         color=STYLE["warn"],
@@ -1688,20 +1688,20 @@ def diagram_pixel_footprint():
         va="center",
         path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
-    # Minor axis arrow (horizontal, below center)
+    # Minor axis arrow (horizontal, center to edge = singular value)
     ax1.annotate(
         "",
-        xy=(1.0, -0.2),
-        xytext=(0, -0.2),
+        xy=(1.0, 0),
+        xytext=(0, 0),
         arrowprops={
-            "arrowstyle": "<->",
+            "arrowstyle": "->",
             "color": STYLE["warn"],
             "lw": 1.5,
         },
     )
     ax1.text(
         0.5,
-        -0.55,
+        -0.35,
         "\u03c3\u2082",
         color=STYLE["warn"],
         fontsize=13,
