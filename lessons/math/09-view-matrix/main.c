@@ -314,9 +314,9 @@ int main(int argc, char *argv[])
      *      - Dot each basis vector with -position
      *      - This is R^T * (-pos), not just -pos!
      *
-     *   View = | right.x    right.y    right.z    -dot(right, pos)  |
-     *          | up.x       up.y       up.z       -dot(up, pos)     |
-     *          | -fwd.x     -fwd.y     -fwd.z      dot(fwd, pos)   |
+     *   View = | right.x    right.y    right.z    -dot(right, pos)   |
+     *          | up.x       up.y       up.z       -dot(up, pos)      |
+     *          | -fwd.x     -fwd.y     -fwd.z      dot(fwd, pos)     |
      *          |  0          0          0           1                |
      *
      * Note: we store column-major, so right/up/-fwd appear as rows
