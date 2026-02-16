@@ -67,7 +67,7 @@ level is half the size of the previous one.
 ### How many levels?
 
 $$
-\text{num\_levels} = \lfloor \log_2(\max(\text{width}, \text{height})) \rfloor + 1
+\text{num}\_\text{levels} = \lfloor \log_2(\max(\text{width}, \text{height})) \rfloor + 1
 $$
 
 ```c
@@ -98,7 +98,7 @@ g_x = \sqrt{\left(\frac{\partial U}{\partial x}\right)^2 + \left(\frac{\partial 
 $$
 
 $$
-\text{footprint} = \max(g_x,\; g_y) \times \text{texture\_size}
+\text{footprint} = \max(g_x,\; g_y) \times \text{texture}\_\text{size}
 $$
 
 $$
