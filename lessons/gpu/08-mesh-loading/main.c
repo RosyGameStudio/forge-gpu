@@ -87,8 +87,9 @@
 
 /* File paths for the model and texture.  These files are copied next to
  * the executable at build time by CMakeLists.txt. */
-#define MODEL_PATH   "models/space-shuttle/space-shuttle.obj"
-#define TEXTURE_PATH "models/space-shuttle/ShuttleDiffuseMap.png"
+#define MODEL_PATH       "models/space-shuttle/space-shuttle.obj"
+#define TEXTURE_PATH     "models/space-shuttle/ShuttleDiffuseMap.png"
+#define PATH_BUFFER_SIZE 512
 
 /* Texture mip levels: log2(1024) + 1 = 11 levels for a 1024x1024 texture. */
 #define TEXTURE_SIZE     1024
@@ -325,7 +326,17 @@ static SDL_GPUTexture *load_texture(SDL_GPUDevice *device, const char *path)
         SDL_DestroySurface(converted);
         return NULL;
     }
-    SDL_memcpy(mapped, converted->pixels, total_bytes);
+    /* Copy row-by-row to respect SDL_Surface.pitch — the surface may
+     * have padding bytes at the end of each row for alignment.  The GPU
+     * transfer buffer is tightly packed (dest stride = width * bpp). */
+    Uint32 dest_row_bytes = (Uint32)(tex_w * BYTES_PER_PIXEL);
+    const Uint8 *src = (const Uint8 *)converted->pixels;
+    Uint8 *dst = (Uint8 *)mapped;
+    for (Uint32 row = 0; row < (Uint32)tex_h; row++) {
+        SDL_memcpy(dst + row * dest_row_bytes,
+                   src + row * converted->pitch,
+                   dest_row_bytes);
+    }
     SDL_UnmapGPUTransferBuffer(device, transfer);
     SDL_DestroySurface(converted);
 
@@ -474,10 +485,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_DestroyGPUDevice(device);
         return SDL_APP_FAILURE;
     }
-    char obj_path[512];
-    char tex_path[512];
-    SDL_snprintf(obj_path, sizeof(obj_path), "%s%s", base_path, MODEL_PATH);
-    SDL_snprintf(tex_path, sizeof(tex_path), "%s%s", base_path, TEXTURE_PATH);
+    char obj_path[PATH_BUFFER_SIZE];
+    char tex_path[PATH_BUFFER_SIZE];
+    SDL_snprintf(obj_path, PATH_BUFFER_SIZE, "%s%s", base_path, MODEL_PATH);
+    SDL_snprintf(tex_path, PATH_BUFFER_SIZE, "%s%s", base_path, TEXTURE_PATH);
 
     ForgeObjMesh mesh;
     if (!forge_obj_load(obj_path, &mesh)) {
