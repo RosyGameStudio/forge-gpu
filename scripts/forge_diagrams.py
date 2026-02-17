@@ -2259,9 +2259,7 @@ def diagram_normal_transformation():
         lw=2,
         alpha=0.8,
     )
-    ax1.fill(
-        np.cos(theta), np.sin(theta), color=STYLE["surface"], alpha=0.4
-    )
+    ax1.fill(np.cos(theta), np.sin(theta), color=STYLE["surface"], alpha=0.4)
 
     # Draw point
     ax1.plot(px, py, "o", color=STYLE["text"], markersize=6, zorder=5)
@@ -2299,11 +2297,13 @@ def diagram_normal_transformation():
     sq_size = 0.12
     sq_t = np.array([tx, ty]) * sq_size
     sq_n = np.array([nx, ny]) * sq_size
-    sq_pts = np.array([
-        [px + sq_t[0], py + sq_t[1]],
-        [px + sq_t[0] + sq_n[0], py + sq_t[1] + sq_n[1]],
-        [px + sq_n[0], py + sq_n[1]],
-    ])
+    sq_pts = np.array(
+        [
+            [px + sq_t[0], py + sq_t[1]],
+            [px + sq_t[0] + sq_n[0], py + sq_t[1] + sq_n[1]],
+            [px + sq_n[0], py + sq_n[1]],
+        ]
+    )
     ax1.plot(
         [sq_pts[0, 0], sq_pts[1, 0], sq_pts[2, 0]],
         [sq_pts[0, 1], sq_pts[1, 1], sq_pts[2, 1]],
@@ -2450,11 +2450,13 @@ def diagram_normal_transformation():
     sq_size2 = 0.15
     sq_t2 = tdir * sq_size2
     sq_n2 = cdir * sq_size2
-    sq_pts2 = np.array([
-        [wpx + sq_t2[0], wpy + sq_t2[1]],
-        [wpx + sq_t2[0] + sq_n2[0], wpy + sq_t2[1] + sq_n2[1]],
-        [wpx + sq_n2[0], wpy + sq_n2[1]],
-    ])
+    sq_pts2 = np.array(
+        [
+            [wpx + sq_t2[0], wpy + sq_t2[1]],
+            [wpx + sq_t2[0] + sq_n2[0], wpy + sq_t2[1] + sq_n2[1]],
+            [wpx + sq_n2[0], wpy + sq_n2[1]],
+        ]
+    )
     ax2.plot(
         [sq_pts2[0, 0], sq_pts2[1, 0], sq_pts2[2, 0]],
         [sq_pts2[0, 1], sq_pts2[1, 1], sq_pts2[2, 1]],

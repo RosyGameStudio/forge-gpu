@@ -580,8 +580,8 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device)
     SDL_GPUTextureRegion dst;
     SDL_zero(dst);
     dst.texture = texture;
-    dst.w = 1;
-    dst.h = 1;
+    dst.w = WHITE_TEX_DIM;
+    dst.h = WHITE_TEX_DIM;
     dst.d = 1;
 
     SDL_UploadToGPUTexture(copy, &src, &dst, false);
