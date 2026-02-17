@@ -173,7 +173,7 @@ Correct (perspective-correct):
       lerp(1/w_near, 1/w_far, t)        ← divide to recover
 ```
 
-The trick: interpolate `attribute/w` and `1/w` in screen space (both of which
+The key insight: interpolate `attribute/w` and `1/w` in screen space (both of which
 vary linearly in screen space), then divide to get the correct attribute value.
 The GPU does this automatically for every interpolated value.
 

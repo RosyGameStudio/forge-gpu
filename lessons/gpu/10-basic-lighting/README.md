@@ -6,7 +6,7 @@
 - The three components: **ambient**, **diffuse** (Lambert), and **specular** (Blinn)
 - How to **transform normals** from object space to world space
 - Why you must **normalize interpolated normals** in the fragment shader
-- The **half-vector** trick and why Blinn replaced Phong in real-time graphics
+- The **half-vector** insight and why Blinn replaced Phong in real-time graphics
 - How to pass **lighting parameters** (light direction, camera position) as uniforms
 
 ## Result
@@ -230,39 +230,122 @@ But Gouraud shading is worth knowing about — you'll encounter it in older
 engines, retro-style renderers, and any context where understanding the
 history of real-time graphics matters.
 
-### Normal transformation — object space to world space
+### Normal transformation — the adjugate transpose
 
 Normals live in **object space** (attached to the mesh). To do lighting in
 world space (where the light direction and camera position are defined), we
-need to transform them. The vertex shader does:
+need to transform them. But normals **don't transform the same way as
+positions** — and getting this wrong is a subtle, common bug.
+
+#### Why normals are special
+
+A position transforms by the model matrix: $\mathbf{p}_{\text{world}} = M \cdot \mathbf{p}_{\text{object}}$.
+A tangent vector (a direction along the surface) also transforms by $M$.
+But a **normal** must remain **perpendicular to the surface** after
+transformation, and multiplying by $M$ doesn't guarantee this.
+
+![Normal transformation under non-uniform scale](assets/normal_transformation.png)
+
+Consider a circle with a normal pointing straight up. If we scale by
+$(2, 1)$ — stretching horizontally — the circle becomes an ellipse. The
+tangent at the top tilts, so the normal must tilt too to stay perpendicular.
+But if we apply the same scale matrix to the normal, it stretches
+horizontally and stays pointing straight up — which is **wrong**. The
+transformed normal is no longer perpendicular to the surface.
+
+For **rigid transforms** (rotation only, or rotation + uniform scale),
+the model matrix preserves angles, so `(float3x3)model` works fine. The
+problem only appears with **non-uniform scale** or shear. But we should
+use the correct transform anyway — it costs almost nothing extra and means
+the code works for any model matrix, not just well-behaved ones.
+
+#### The correct matrix: adjugate transpose
+
+Many textbooks teach the **inverse-transpose** $(M^{-1})^T$ for normal
+transformation. This works, but it has a problem: the matrix must be
+invertible (non-singular). If your model matrix has a zero scale on any
+axis — which happens with 2D projections, degenerate animations, or
+artist mistakes — the inverse doesn't exist and you get garbage.
+
+The real answer is the **adjugate transpose**. The adjugate of $M$ is
+defined as the transpose of the cofactor matrix:
+
+$$
+\text{adj}(M) = \text{cof}(M)^T
+$$
+
+For invertible matrices, the adjugate relates to the inverse by:
+
+$$
+M^{-1} = \frac{\text{adj}(M)}{\det(M)}
+$$
+
+So the inverse-transpose is:
+
+$$
+(M^{-1})^T = \frac{\text{adj}(M)^T}{\det(M)}
+$$
+
+Since we **normalize the result** in the fragment shader anyway, the scalar
+$\frac{1}{\det(M)}$ cancels out. That means we can use $\text{adj}(M)^T$
+directly — no division, no determinant check, no singularity problem:
+
+$$
+\mathbf{N}_{\text{world}} = \text{adj}(M_{3 \times 3})^T \cdot \mathbf{N}_{\text{object}}
+$$
+
+This is the **adjugate transpose** — it gives the correct normal direction
+for *any* model matrix, invertible or not.
+
+#### The cross-product method
+
+The adjugate transpose of a $3 \times 3$ matrix equals its **cofactor
+matrix**, and the cofactor matrix has an elegant formulation using cross
+products. If $\mathbf{r}_0, \mathbf{r}_1, \mathbf{r}_2$ are the rows of
+$M_{3 \times 3}$:
+
+$$
+\text{adj}(M)^T = \begin{bmatrix} \mathbf{r}_1 \times \mathbf{r}_2 \\ \mathbf{r}_2 \times \mathbf{r}_0 \\ \mathbf{r}_0 \times \mathbf{r}_1 \end{bmatrix}
+$$
+
+Each row of the result is a cross product of two rows of the model matrix.
+The cross product of two rows gives a vector perpendicular to the plane
+they span — which is exactly what we need for correct normal transformation.
+
+In our vertex shader, this becomes three cross products:
 
 ```hlsl
-output.world_norm = mul((float3x3)model, input.normal);
+float3x3 m = (float3x3)model;
+float3x3 adj_t;
+adj_t[0] = cross(m[1], m[2]);
+adj_t[1] = cross(m[2], m[0]);
+adj_t[2] = cross(m[0], m[1]);
+output.world_norm = mul(adj_t, input.normal);
 ```
 
-We extract the upper-left **3x3** of the model matrix — this drops the
-translation (which doesn't apply to directions, only to points). This is
-correct for **rigid transforms** (rotation + uniform scale) like Suzanne's
-identity transform.
+This is cheap (three cross products), correct for all matrices, and avoids
+the pitfalls of the inverse-transpose. The fragment shader still normalizes
+per-pixel after interpolation — the adjugate transpose gives the right
+*direction*, and normalize gives unit length.
 
-For **non-uniform scale** (e.g. `scale(2, 1, 1)`), normals get skewed
-because the normal must remain perpendicular to the surface after
-transformation. In that case you need the **inverse-transpose** of the
-model matrix:
+#### Why not just use the inverse-transpose?
 
-$$
-\mathbf{N}_{\text{world}} = (M^{-1})^T \cdot \mathbf{N}_{\text{object}}
-$$
+| | Adjugate transpose | Inverse-transpose |
+|---|---|---|
+| **Singular matrices** | Works correctly | Undefined (division by zero) |
+| **Cost** | 3 cross products | Full matrix inverse + transpose |
+| **Determinant** | Not needed (normalize cancels it) | Must be non-zero |
+| **Result direction** | Always correct | Correct when it exists |
 
-Why? If you stretch a sphere into an ellipsoid along X, the surface tilts
-but the normal should still point perpendicular to the *new* surface. The
-regular matrix skews the normal away from perpendicular; the
-inverse-transpose corrects this. We skip the inverse-transpose here because
-Suzanne has no non-uniform scale, keeping things simple for a first lighting
-lesson.
+The adjugate transpose is strictly better — same result for invertible
+matrices, correct behavior for singular ones, and cheaper to compute.
+Textbooks teach the inverse-transpose because it follows naturally from the
+perpendicularity proof, but the adjugate transpose is what you should
+actually use.
 
-(See [Math Lesson 05 — Matrices](../../math/05-matrices/) for matrix
-operations and [Math Lesson 02 — Coordinate Spaces](../../math/02-coordinate-spaces/)
+(For the full mathematical background, see
+[Math Lesson 05 — Matrices](../../math/05-matrices/) for matrix operations
+and [Math Lesson 02 — Coordinate Spaces](../../math/02-coordinate-spaces/)
 for the object-to-world transform pipeline.)
 
 ### Normalize after interpolation

@@ -78,19 +78,25 @@ cbuffer FragUniforms : register(b0, space3)
 
 ## Code template
 
-### Vertex shader — normal transformation
+### Vertex shader — normal transformation (adjugate transpose)
 
 ```hlsl
 /* World-space position for view direction calculation */
 float4 wp = mul(model, float4(input.position, 1.0));
 output.world_pos = wp.xyz;
 
-/* Transform normal by upper-left 3x3 of model matrix.
- * Correct for rotation + uniform scale.  For non-uniform scale,
- * use the inverse-transpose instead. */
-output.world_norm = mul((float3x3)model, input.normal);
-/* Do NOT normalize here — the rasterizer will interpolate,
- * and we normalize per-pixel in the fragment shader. */
+/* Transform normal by the ADJUGATE TRANSPOSE of the model matrix's
+ * upper-left 3x3.  Unlike (float3x3)model, this preserves
+ * perpendicularity even under non-uniform scale.  The rows of the
+ * adjugate transpose are cross products of pairs of model matrix rows.
+ * Do NOT normalize here — the rasterizer will interpolate, and we
+ * normalize per-pixel in the fragment shader. */
+float3x3 m = (float3x3)model;
+float3x3 adj_t;
+adj_t[0] = cross(m[1], m[2]);
+adj_t[1] = cross(m[2], m[0]);
+adj_t[2] = cross(m[0], m[1]);
+output.world_norm = mul(adj_t, input.normal);
 ```
 
 ### Fragment shader — Blinn-Phong
@@ -166,8 +172,10 @@ SDL_PushGPUFragmentUniformData(cmd, 0, &fu, sizeof(fu));
    normalization pointless. Save it for the fragment shader.
 
 6. **Normal transformation with non-uniform scale** — `(float3x3)model`
-   only works correctly for rotation + uniform scale. For non-uniform scale,
-   you need the inverse-transpose: `transpose(inverse((float3x3)model))`.
+   only works correctly for rotation + uniform scale. Always use the
+   adjugate transpose instead — three cross products of the matrix rows:
+   `adj_t[0] = cross(m[1], m[2])` etc. This is correct for ALL matrices
+   (including singular ones) and cheaper than inverse-transpose.
 
 ## Typical parameter values
 

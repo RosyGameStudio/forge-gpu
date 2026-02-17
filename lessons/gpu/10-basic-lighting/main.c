@@ -14,7 +14,7 @@
  * What's new compared to Lesson 09:
  *   - Two vertex uniforms: MVP (clip space) + Model (world space)
  *   - Fragment uniforms: light direction, camera position, material params
- *   - Normal transformation: (float3x3)model in the vertex shader
+ *   - Normal transformation: adjugate transpose via cross products
  *   - Per-pixel normalize of interpolated normals in the fragment shader
  *   - Single model (Suzanne) instead of multi-model scene selector
  *
@@ -95,6 +95,12 @@
 
 /* Bytes per pixel for RGBA textures. */
 #define BYTES_PER_PIXEL 4
+
+/* White placeholder texture — 1x1 fully opaque white. */
+#define WHITE_TEX_DIM    1     /* width and height in pixels */
+#define WHITE_TEX_LAYERS 1
+#define WHITE_TEX_LEVELS 1
+#define WHITE_RGBA       255   /* R, G, B, A — fully white, fully opaque */
 
 /* Maximum LOD — effectively unlimited, standard GPU convention. */
 #define MAX_LOD_UNLIMITED 1000.0f
@@ -513,10 +519,10 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device)
     tex_info.type                 = SDL_GPU_TEXTURETYPE_2D;
     tex_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
     tex_info.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    tex_info.width                = 1;
-    tex_info.height               = 1;
-    tex_info.layer_count_or_depth = 1;
-    tex_info.num_levels           = 1;
+    tex_info.width                = WHITE_TEX_DIM;
+    tex_info.height               = WHITE_TEX_DIM;
+    tex_info.layer_count_or_depth = WHITE_TEX_LAYERS;
+    tex_info.num_levels           = WHITE_TEX_LEVELS;
 
     SDL_GPUTexture *texture = SDL_CreateGPUTexture(device, &tex_info);
     if (!texture) {
@@ -524,7 +530,9 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device)
         return NULL;
     }
 
-    Uint8 white_pixel[4] = { 255, 255, 255, 255 };
+    Uint8 white_pixel[BYTES_PER_PIXEL] = {
+        WHITE_RGBA, WHITE_RGBA, WHITE_RGBA, WHITE_RGBA
+    };
 
     SDL_GPUTransferBufferCreateInfo xfer_info;
     SDL_zero(xfer_info);
@@ -966,8 +974,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     char gltf_path[PATH_BUFFER_SIZE];
-    SDL_snprintf(gltf_path, sizeof(gltf_path), "%s%s",
-                 base_path, DEFAULT_MODEL_PATH);
+    int path_len = SDL_snprintf(gltf_path, sizeof(gltf_path), "%s%s",
+                                base_path, DEFAULT_MODEL_PATH);
+    if (path_len < 0 || (size_t)path_len >= sizeof(gltf_path)) {
+        SDL_Log("Model path too long or formatting error (len=%d, max=%u)",
+                path_len, (unsigned)sizeof(gltf_path));
+        SDL_ReleaseGPUSampler(device, sampler);
+        SDL_ReleaseGPUTexture(device, white_texture);
+        SDL_ReleaseGPUTexture(device, depth_texture);
+        SDL_ReleaseWindowFromGPUDevice(device, window);
+        SDL_DestroyWindow(window);
+        SDL_DestroyGPUDevice(device);
+        return SDL_APP_FAILURE;
+    }
 
     /* Allocate state first so we can store the scene in it. */
     app_state *state = (app_state *)SDL_calloc(1, sizeof(app_state));

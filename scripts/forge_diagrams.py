@@ -2206,6 +2206,291 @@ def diagram_specular_comparison():
 
 
 # ---------------------------------------------------------------------------
+# gpu/10-basic-lighting — normal_transformation.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_normal_transformation():
+    """Two-panel diagram showing why normals need special transformation.
+
+    Left:  Object space — a circle with a tangent and a perpendicular normal.
+    Right: After non-uniform scale (2x horizontal) — shows the WRONG result
+           (plain model matrix) and the CORRECT result (adjugate transpose).
+    The wrong normal is visibly not perpendicular to the surface; the correct
+    one is.
+    """
+    fig = plt.figure(figsize=(12, 5.5), facecolor=STYLE["bg"])
+
+    # --- Shared geometry ---
+    theta = np.linspace(0, 2 * np.pi, 200)
+
+    # Point on the circle at ~60 degrees (nice visual angle)
+    t_param = np.radians(60)
+    px, py = np.cos(t_param), np.sin(t_param)
+
+    # Tangent at that point (derivative of (cos t, sin t) = (-sin t, cos t))
+    tx, ty = -np.sin(t_param), np.cos(t_param)
+    tangent_len = 0.9
+
+    # Normal at that point (perpendicular to tangent, pointing outward)
+    nx, ny = np.cos(t_param), np.sin(t_param)
+    normal_len = 1.1
+
+    # Non-uniform scale: stretch X by 2, keep Y
+    sx, sy = 2.0, 1.0
+
+    # --- Left panel: Object space ---
+    ax1 = fig.add_subplot(121)
+    _setup_axes(ax1, xlim=(-2.0, 2.5), ylim=(-1.8, 2.5), grid=False)
+    ax1.set_title(
+        "Object Space (circle)",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        pad=12,
+    )
+
+    # Draw circle
+    ax1.plot(
+        np.cos(theta),
+        np.sin(theta),
+        "-",
+        color=STYLE["text_dim"],
+        lw=2,
+        alpha=0.8,
+    )
+    ax1.fill(
+        np.cos(theta), np.sin(theta), color=STYLE["surface"], alpha=0.4
+    )
+
+    # Draw point
+    ax1.plot(px, py, "o", color=STYLE["text"], markersize=6, zorder=5)
+    ax1.text(
+        px + 0.15,
+        py + 0.2,
+        "P",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # Draw tangent
+    _draw_vector(
+        ax1,
+        (px, py),
+        (tx * tangent_len, ty * tangent_len),
+        STYLE["accent1"],
+        "T",
+        label_offset=(0.2, 0.1),
+    )
+
+    # Draw normal
+    _draw_vector(
+        ax1,
+        (px, py),
+        (nx * normal_len, ny * normal_len),
+        STYLE["accent3"],
+        "N",
+        label_offset=(0.15, 0.15),
+    )
+
+    # Perpendicularity indicator (small square)
+    sq_size = 0.12
+    sq_t = np.array([tx, ty]) * sq_size
+    sq_n = np.array([nx, ny]) * sq_size
+    sq_pts = np.array([
+        [px + sq_t[0], py + sq_t[1]],
+        [px + sq_t[0] + sq_n[0], py + sq_t[1] + sq_n[1]],
+        [px + sq_n[0], py + sq_n[1]],
+    ])
+    ax1.plot(
+        [sq_pts[0, 0], sq_pts[1, 0], sq_pts[2, 0]],
+        [sq_pts[0, 1], sq_pts[1, 1], sq_pts[2, 1]],
+        "-",
+        color=STYLE["text"],
+        lw=1.0,
+        alpha=0.6,
+    )
+
+    ax1.text(
+        0.0,
+        -1.5,
+        "N \u22a5 T  (perpendicular)",
+        color=STYLE["accent3"],
+        fontsize=10,
+        ha="center",
+        fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # --- Right panel: After non-uniform scale ---
+    ax2 = fig.add_subplot(122)
+    _setup_axes(ax2, xlim=(-3.5, 4.5), ylim=(-2.0, 3.8), grid=False)
+    ax2.set_title(
+        "World Space  (scale 2\u00d71)",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        pad=12,
+    )
+
+    # Draw ellipse (scaled circle)
+    ax2.plot(
+        sx * np.cos(theta),
+        sy * np.sin(theta),
+        "-",
+        color=STYLE["text_dim"],
+        lw=2,
+        alpha=0.8,
+    )
+    ax2.fill(
+        sx * np.cos(theta),
+        sy * np.sin(theta),
+        color=STYLE["surface"],
+        alpha=0.4,
+    )
+
+    # Transformed point
+    wpx, wpy = sx * px, sy * py
+    ax2.plot(wpx, wpy, "o", color=STYLE["text"], markersize=6, zorder=5)
+    ax2.text(
+        wpx + 0.2,
+        wpy - 0.25,
+        "P'",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # Transformed tangent (correct — tangents transform by M)
+    wtx, wty = sx * tx, sy * ty
+    wt_len = np.sqrt(wtx**2 + wty**2)
+    wtx_n, wty_n = wtx / wt_len * tangent_len, wty / wt_len * tangent_len
+    t_scale = 1.5
+    _draw_vector(
+        ax2,
+        (wpx, wpy),
+        (wtx_n * t_scale, wty_n * t_scale),
+        STYLE["accent1"],
+        label=None,
+    )
+    # Label at arrow tip
+    t_end = (wpx + wtx_n * t_scale, wpy + wty_n * t_scale)
+    ax2.text(
+        t_end[0] - 0.35,
+        t_end[1] + 0.2,
+        "M\u00b7T",
+        color=STYLE["accent1"],
+        fontsize=11,
+        fontweight="bold",
+        ha="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # WRONG normal: transform by M (same as tangent) — not perpendicular
+    wnx_bad, wny_bad = sx * nx, sy * ny
+    wn_bad_len = np.sqrt(wnx_bad**2 + wny_bad**2)
+    wnx_bad_n = wnx_bad / wn_bad_len * normal_len
+    wny_bad_n = wny_bad / wn_bad_len * normal_len
+    n_scale = 1.4
+    _draw_vector(
+        ax2,
+        (wpx, wpy),
+        (wnx_bad_n * n_scale, wny_bad_n * n_scale),
+        STYLE["accent2"],
+        label=None,
+        lw=2.0,
+    )
+    # Label at arrow tip — offset to the right
+    bad_end = (wpx + wnx_bad_n * n_scale, wpy + wny_bad_n * n_scale)
+    ax2.text(
+        bad_end[0] + 0.55,
+        bad_end[1] + 0.1,
+        "M\u00b7N  \u2717",
+        color=STYLE["accent2"],
+        fontsize=11,
+        fontweight="bold",
+        ha="left",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # CORRECT normal: adjugate transpose = (sy, sx) for diagonal 2D scale
+    # For scale(sx, sy), adj^T = diag(sy, sx) (the cofactor matrix)
+    cnx, cny = sy * nx, sx * ny
+    cn_len = np.sqrt(cnx**2 + cny**2)
+    cnx_n = cnx / cn_len * normal_len
+    cny_n = cny / cn_len * normal_len
+    _draw_vector(
+        ax2,
+        (wpx, wpy),
+        (cnx_n * n_scale, cny_n * n_scale),
+        STYLE["accent3"],
+        label=None,
+    )
+    # Label at arrow tip — offset to the left
+    good_end = (wpx + cnx_n * n_scale, wpy + cny_n * n_scale)
+    ax2.text(
+        good_end[0] - 0.55,
+        good_end[1] + 0.1,
+        "\u2713  adj\u1d40\u00b7N",
+        color=STYLE["accent3"],
+        fontsize=11,
+        fontweight="bold",
+        ha="right",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # Perpendicularity marker between correct normal and tangent
+    cdir = np.array([cnx_n, cny_n])
+    cdir = cdir / np.linalg.norm(cdir)
+    tdir = np.array([wtx_n, wty_n])
+    tdir = tdir / np.linalg.norm(tdir)
+    sq_size2 = 0.15
+    sq_t2 = tdir * sq_size2
+    sq_n2 = cdir * sq_size2
+    sq_pts2 = np.array([
+        [wpx + sq_t2[0], wpy + sq_t2[1]],
+        [wpx + sq_t2[0] + sq_n2[0], wpy + sq_t2[1] + sq_n2[1]],
+        [wpx + sq_n2[0], wpy + sq_n2[1]],
+    ])
+    ax2.plot(
+        [sq_pts2[0, 0], sq_pts2[1, 0], sq_pts2[2, 0]],
+        [sq_pts2[0, 1], sq_pts2[1, 1], sq_pts2[2, 1]],
+        "-",
+        color=STYLE["accent3"],
+        lw=1.0,
+        alpha=0.8,
+    )
+
+    # Legend — two separate colored text elements, no overlapping markers
+    ax2.text(
+        -1.4,
+        -1.7,
+        "\u2717  M\u00b7N is wrong",
+        color=STYLE["accent2"],
+        fontsize=10,
+        ha="center",
+        fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+    ax2.text(
+        2.4,
+        -1.7,
+        "\u2713  adj(M)\u1d40\u00b7N is correct",
+        color=STYLE["accent3"],
+        fontsize=10,
+        ha="center",
+        fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    fig.tight_layout()
+    _save(fig, "gpu/10-basic-lighting", "normal_transformation.png")
+
+
+# ---------------------------------------------------------------------------
 # Diagram registry
 # ---------------------------------------------------------------------------
 
@@ -2241,6 +2526,7 @@ DIAGRAMS = {
     "gpu/10": [
         ("blinn_phong_vectors.png", diagram_blinn_phong_vectors),
         ("specular_comparison.png", diagram_specular_comparison),
+        ("normal_transformation.png", diagram_normal_transformation),
     ],
 }
 
