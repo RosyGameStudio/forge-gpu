@@ -76,6 +76,13 @@ struct VSInput {
     float4 model_c3 : TEXCOORD6;
 };
 
+struct VSOutput {
+    float4 clip_pos   : SV_Position; /* clip-space position */
+    float2 uv         : TEXCOORD0;   /* texture coordinates */
+    float3 world_norm : TEXCOORD1;   /* world-space normal  */
+    float3 world_pos  : TEXCOORD2;   /* world-space position */
+};
+
 VSOutput main(VSInput input) {
     VSOutput output;
 
@@ -96,6 +103,8 @@ VSOutput main(VSInput input) {
     adj_t[1] = cross(m[2], m[0]);
     adj_t[2] = cross(m[0], m[1]);
     output.world_norm = mul(adj_t, input.normal);
+
+    output.uv = input.uv;
 
     return output;
 }
