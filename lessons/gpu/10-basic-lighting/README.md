@@ -239,7 +239,7 @@ positions** — and getting this wrong is a subtle, common bug.
 
 #### Why normals are special
 
-A position transforms by the model matrix: $\mathbf{p}_{\text{world}} = M \cdot \mathbf{p}_{\text{object}}$.
+A position transforms by the model matrix: $`\mathbf{p}_{\text{world}} = M \cdot \mathbf{p}_{\text{object}}`$.
 A tangent vector (a direction along the surface) also transforms by $M$.
 But a **normal** must remain **perpendicular to the surface** after
 transformation, and multiplying by $M$ doesn't guarantee this.
@@ -301,8 +301,8 @@ for *any* model matrix, invertible or not.
 
 The adjugate transpose of a $3 \times 3$ matrix equals its **cofactor
 matrix**, and the cofactor matrix has an elegant formulation using cross
-products. If $\mathbf{r}_0, \mathbf{r}_1, \mathbf{r}_2$ are the rows of
-$M_{3 \times 3}$:
+products. If $`\mathbf{r}_0, \mathbf{r}_1, \mathbf{r}_2`$ are the rows of
+$`M_{3 \times 3}`$:
 
 $$
 \text{adj}(M)^T = \begin{bmatrix} \mathbf{r}_1 \times \mathbf{r}_2 \\ \mathbf{r}_2 \times \mathbf{r}_0 \\ \mathbf{r}_0 \times \mathbf{r}_1 \end{bmatrix}
