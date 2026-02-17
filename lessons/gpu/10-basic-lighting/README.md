@@ -21,9 +21,11 @@ Suzanne (the Blender monkey head) rendered with Blinn-Phong lighting. Notice:
   to dark (facing away)
 - **Ambient light** preventing surfaces in shadow from being pure black
 
-## The math of lighting
+## Key concepts
 
-### The five vectors
+### The math of lighting
+
+#### The five vectors
 
 Every lighting calculation comes down to five vectors at a point on a surface.
 This diagram is the one you'll find in every graphics textbook — understand it
@@ -49,7 +51,7 @@ between them. Same direction: $\cos 0° = 1$. Perpendicular: $\cos 90° = 0$.
 Opposing: $\cos 180° = -1$. This is exactly what we need — "how much does
 this surface face the light?" is a dot product.
 
-### The Blinn-Phong equation
+#### The Blinn-Phong equation
 
 The final color at each pixel is the sum of three independent terms:
 
@@ -59,7 +61,7 @@ $$
 
 Each term models a different aspect of how light interacts with a surface.
 
-### 1. Ambient
+#### 1. Ambient
 
 $$
 C_{\text{ambient}} = k_a \cdot C_{\text{surface}}
@@ -80,7 +82,7 @@ In our shader:
 float3 ambient_term = ambient * surface_color.rgb;
 ```
 
-### 2. Diffuse — Lambert's cosine law
+#### 2. Diffuse — Lambert's cosine law
 
 $$
 C_{\text{diffuse}} = \max(\mathbf{N} \cdot \mathbf{L}, 0) \cdot C_{\text{surface}}
@@ -114,7 +116,7 @@ float NdotL = max(dot(N, L), 0.0);
 float3 diffuse_term = NdotL * surface_color.rgb;
 ```
 
-### 3. Specular — the Blinn half-vector
+#### 3. Specular — the Blinn half-vector
 
 $$
 \mathbf{H} = \frac{\mathbf{L} + \mathbf{V}}{|\mathbf{L} + \mathbf{V}|}
@@ -160,7 +162,7 @@ color — specular reflections on dielectric (non-metal) surfaces are the color
 of the light, not the surface. This is a simplification; metals reflect light
 with their own color. PBR models (discussed below) handle this distinction.
 
-### Blinn vs Phong — why the half-vector?
+#### Blinn vs Phong — why the half-vector?
 
 The original Phong model (Bui Tuong Phong, 1975) computed specular differently:
 
@@ -202,7 +204,7 @@ Why did Blinn's version become the industry standard?
    until ~2008) implemented Blinn-Phong, not original Phong. It became the
    de facto standard for real-time rendering.
 
-### Gouraud vs Phong shading — per-vertex vs per-pixel
+#### Gouraud vs Phong shading — per-vertex vs per-pixel
 
 There are two ways to evaluate a lighting equation across a triangle:
 
@@ -230,14 +232,14 @@ But Gouraud shading is worth knowing about — you'll encounter it in older
 engines, retro-style renderers, and any context where understanding the
 history of real-time graphics matters.
 
-### Normal transformation — the adjugate transpose
+#### Normal transformation — the adjugate transpose
 
 Normals live in **object space** (attached to the mesh). To do lighting in
 world space (where the light direction and camera position are defined), we
 need to transform them. But normals **don't transform the same way as
 positions** — and getting this wrong is a subtle, common bug.
 
-#### Why normals are special
+##### Why normals are special
 
 A position transforms by the model matrix: $`\mathbf{p}_{\text{world}} = M \cdot \mathbf{p}_{\text{object}}`$.
 A tangent vector (a direction along the surface) also transforms by $M$.
@@ -259,7 +261,7 @@ problem only appears with **non-uniform scale** or shear. But we should
 use the correct transform anyway — it costs almost nothing extra and means
 the code works for any model matrix, not just well-behaved ones.
 
-#### The correct matrix: adjugate transpose
+##### The correct matrix: adjugate transpose
 
 Many textbooks teach the **inverse-transpose** $(M^{-1})^T$ for normal
 transformation. This works, but it has a problem: the matrix must be
@@ -297,7 +299,7 @@ $$
 This is the **adjugate transpose** — it gives the correct normal direction
 for *any* model matrix, invertible or not.
 
-#### The cross-product method
+##### The cross-product method
 
 The adjugate transpose of a $3 \times 3$ matrix equals its **cofactor
 matrix**, and the cofactor matrix has an elegant formulation using cross
@@ -328,7 +330,7 @@ the pitfalls of the inverse-transpose. The fragment shader still normalizes
 per-pixel after interpolation — the adjugate transpose gives the right
 *direction*, and normalize gives unit length.
 
-#### Why not just use the inverse-transpose?
+##### Why not just use the inverse-transpose?
 
 | | Adjugate transpose | Inverse-transpose |
 |---|---|---|
@@ -348,7 +350,7 @@ actually use.
 and [Math Lesson 02 — Coordinate Spaces](../../math/02-coordinate-spaces/)
 for the object-to-world transform pipeline.)
 
-### Normalize after interpolation
+#### Normalize after interpolation
 
 The rasterizer linearly interpolates vertex shader outputs across each
 triangle. Even if every vertex normal is unit length, the interpolated
@@ -372,7 +374,7 @@ hard to spot because the normals are *almost* unit length. On a curved
 surface like Suzanne, the difference is clearly visible once you know to
 look for it.
 
-### World-space lighting
+#### World-space lighting
 
 We chose **world space** for all lighting calculations because it's the
 simplest to understand:
@@ -387,7 +389,7 @@ origin. View space avoids passing `eye_pos` to the shader (it's always `(0,0,0)`
 but requires transforming the light direction into view space each frame.
 World space is more intuitive for learning, which is why we use it here.
 
-### Uniform layout — why float4 for vec3?
+#### Uniform layout — why float4 for vec3?
 
 You might wonder why we pass `light_dir` and `eye_pos` as `float4` in the
 cbuffer instead of `float3`:
@@ -406,12 +408,12 @@ both sides and avoids subtle alignment bugs.
 (The alternative is `packoffset` annotations, but explicit `float4` is
 simpler and less error-prone.)
 
-## Beyond Blinn-Phong — what comes next
+### Beyond Blinn-Phong — what comes next
 
 Blinn-Phong is a great starting point, but modern rendering has moved
 beyond it. Here's where the field has gone:
 
-### BRDFs — the general framework
+#### BRDFs — the general framework
 
 Blinn-Phong is an example of a **BRDF** (Bidirectional Reflectance
 Distribution Function) — a function that describes how light reflects off
@@ -429,7 +431,7 @@ especially at high ambient + specular values. It also can't distinguish
 metals from plastics, or rough surfaces from smooth ones beyond the single
 shininess parameter.
 
-### PBR — Physically Based Rendering
+#### PBR — Physically Based Rendering
 
 Modern engines (Unreal, Unity, Godot) use **PBR** (Physically Based
 Rendering) models that replace Blinn-Phong's ad hoc terms with physically
@@ -462,7 +464,7 @@ Understanding Blinn-Phong first makes PBR much easier to learn. The
 concepts — dot products, half-vectors, surface normals, energy from light —
 are all the same; PBR just does them more carefully.
 
-## Math references
+### Math references
 
 This lesson uses concepts from several math lessons:
 
@@ -472,41 +474,6 @@ This lesson uses concepts from several math lessons:
   object space, world space, view space, the transform pipeline
 - [Math Lesson 05 — Matrices](../../math/05-matrices/): model matrix,
   matrix-vector multiplication, 3x3 extraction for direction transforms
-
-## Exercises
-
-Try these modifications to deepen your understanding:
-
-1. **Change the light direction** — Edit `LIGHT_DIR_X/Y/Z` to move the light.
-   Try `(-1, 1, 0)` for side lighting, or `(0, -1, 0)` for bottom lighting.
-   How does the specular highlight move?
-
-2. **Vary shininess** — Change `SHININESS` from 8 to 256 and observe how the
-   specular highlight changes. Low values give a broad, matte look; high
-   values give a tight, glossy highlight. Compare with the graph above.
-
-3. **Implement original Phong** — Replace the Blinn half-vector with the
-   original Phong reflection:
-
-   ```hlsl
-   float3 R = reflect(-L, N);
-   float spec = pow(max(dot(R, V), 0), shininess);
-   ```
-
-   Compare the result — the highlights are slightly different at grazing angles.
-
-4. **Add a point light** — Instead of a directional light (constant direction),
-   compute `L = normalize(light_position - world_pos)` per-pixel. Add
-   attenuation: `1.0 / (1.0 + distance * distance)`.
-
-5. **Colored light** — Add a `light_color` uniform and multiply it into the
-   diffuse and specular terms. Try warm orange `(1.0, 0.8, 0.6)` or cool
-   blue `(0.6, 0.8, 1.0)`.
-
-6. **Try Gouraud shading** — Move the entire lighting calculation to the
-   vertex shader. Compute the final color per-vertex and interpolate colors
-   instead of normals. Notice how specular highlights disappear between
-   vertices on Suzanne's low-poly surface.
 
 ## Controls
 
@@ -544,3 +511,38 @@ To regenerate the diagrams:
 ```bash
 python scripts/forge_diagrams.py --lesson gpu/10
 ```
+
+## Exercises
+
+Try these modifications to deepen your understanding:
+
+1. **Change the light direction** — Edit `LIGHT_DIR_X/Y/Z` to move the light.
+   Try `(-1, 1, 0)` for side lighting, or `(0, -1, 0)` for bottom lighting.
+   How does the specular highlight move?
+
+2. **Vary shininess** — Change `SHININESS` from 8 to 256 and observe how the
+   specular highlight changes. Low values give a broad, matte look; high
+   values give a tight, glossy highlight. Compare with the graph above.
+
+3. **Implement original Phong** — Replace the Blinn half-vector with the
+   original Phong reflection:
+
+   ```hlsl
+   float3 R = reflect(-L, N);
+   float spec = pow(max(dot(R, V), 0), shininess);
+   ```
+
+   Compare the result — the highlights are slightly different at grazing angles.
+
+4. **Add a point light** — Instead of a directional light (constant direction),
+   compute `L = normalize(light_position - world_pos)` per-pixel. Add
+   attenuation: `1.0 / (1.0 + distance * distance)`.
+
+5. **Colored light** — Add a `light_color` uniform and multiply it into the
+   diffuse and specular terms. Try warm orange `(1.0, 0.8, 0.6)` or cool
+   blue `(0.6, 0.8, 1.0)`.
+
+6. **Try Gouraud shading** — Move the entire lighting calculation to the
+   vertex shader. Compute the final color per-vertex and interpolate colors
+   instead of normals. Notice how specular highlights disappear between
+   vertices on Suzanne's low-poly surface.
