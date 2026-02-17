@@ -713,6 +713,18 @@ static SDL_GPUTexture *create_cubemap_texture(SDL_GPUDevice *device,
             return NULL;
         }
 
+        /* Validate that the loaded face matches the expected dimensions. */
+        if (converted->w != CUBEMAP_FACE_SIZE ||
+            converted->h != CUBEMAP_FACE_SIZE) {
+            SDL_Log("Cubemap face '%s' is %dx%d, expected %dx%d",
+                    face_path, converted->w, converted->h,
+                    CUBEMAP_FACE_SIZE, CUBEMAP_FACE_SIZE);
+            SDL_DestroySurface(converted);
+            SDL_ReleaseGPUTransferBuffer(device, transfer);
+            SDL_ReleaseGPUTexture(device, texture);
+            return NULL;
+        }
+
         /* Map transfer buffer and copy pixel data. */
         void *mapped = SDL_MapGPUTransferBuffer(device, transfer, false);
         if (!mapped) {
@@ -833,7 +845,11 @@ static bool create_skybox_geometry(SDL_GPUDevice *device, app_state *state)
     state->skybox_ib = upload_gpu_buffer(
         device, SDL_GPU_BUFFERUSAGE_INDEX,
         indices, sizeof(indices));
-    if (!state->skybox_ib) return false;
+    if (!state->skybox_ib) {
+        SDL_ReleaseGPUBuffer(device, state->skybox_vb);
+        state->skybox_vb = NULL;
+        return false;
+    }
 
     return true;
 }

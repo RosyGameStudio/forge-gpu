@@ -196,6 +196,25 @@ def main():
         print(f"Input file not found: {args.input}", file=sys.stderr)
         return 1
 
+    if args.size <= 0:
+        print(
+            f"Face size must be a positive integer, got: {args.size}", file=sys.stderr
+        )
+        return 1
+
+    # Validate that the input image has an approximately 2:1 aspect ratio
+    # (expected for equirectangular projections).
+    img = Image.open(args.input)
+    ratio = img.width / img.height
+    if abs(ratio - 2.0) > 0.02:
+        print(
+            f"Input image aspect ratio is {ratio:.3f}:1, expected ~2:1 "
+            f"for equirectangular projection ({img.width}x{img.height})",
+            file=sys.stderr,
+        )
+        return 1
+    img.close()
+
     convert(args.input, args.output_dir, args.size)
     return 0
 
