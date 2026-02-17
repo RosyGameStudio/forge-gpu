@@ -22,8 +22,15 @@ import argparse
 import os
 import sys
 
-import numpy as np
-from PIL import Image
+try:
+    import numpy as np
+except ImportError:
+    sys.exit("Missing dependency: numpy — install with: pip install numpy")
+
+try:
+    from PIL import Image
+except ImportError:
+    sys.exit("Missing dependency: Pillow — install with: pip install Pillow")
 
 # Face order matching SDL_GPUCubeMapFace enum
 FACES = ["px", "nx", "py", "ny", "pz", "nz"]

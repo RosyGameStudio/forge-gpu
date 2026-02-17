@@ -978,6 +978,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* ── 8. Create white placeholder texture ──────────────────────────── */
     state->white_texture = create_white_texture(device);
     if (!state->white_texture) {
+        SDL_ReleaseGPUSampler(device, state->cubemap_sampler);
         SDL_ReleaseGPUSampler(device, state->sampler);
         SDL_free(state);
         SDL_ReleaseGPUTexture(device, depth_texture);
@@ -1009,6 +1010,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     state->cubemap_texture = create_cubemap_texture(device, cubemap_dir);
     if (!state->cubemap_texture) {
         SDL_ReleaseGPUTexture(device, state->white_texture);
+        SDL_ReleaseGPUSampler(device, state->cubemap_sampler);
         SDL_ReleaseGPUSampler(device, state->sampler);
         SDL_free(state);
         SDL_ReleaseGPUTexture(device, depth_texture);
@@ -1023,6 +1025,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_Log("Failed to create skybox geometry");
         SDL_ReleaseGPUTexture(device, state->cubemap_texture);
         SDL_ReleaseGPUTexture(device, state->white_texture);
+        SDL_ReleaseGPUSampler(device, state->cubemap_sampler);
         SDL_ReleaseGPUSampler(device, state->sampler);
         SDL_free(state);
         SDL_ReleaseGPUTexture(device, depth_texture);
@@ -1045,6 +1048,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_ReleaseGPUBuffer(device, state->skybox_vb);
         SDL_ReleaseGPUTexture(device, state->cubemap_texture);
         SDL_ReleaseGPUTexture(device, state->white_texture);
+        SDL_ReleaseGPUSampler(device, state->cubemap_sampler);
         SDL_ReleaseGPUSampler(device, state->sampler);
         SDL_free(state);
         SDL_ReleaseGPUTexture(device, depth_texture);
@@ -1066,6 +1070,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_ReleaseGPUBuffer(device, state->skybox_vb);
         SDL_ReleaseGPUTexture(device, state->cubemap_texture);
         SDL_ReleaseGPUTexture(device, state->white_texture);
+        SDL_ReleaseGPUSampler(device, state->cubemap_sampler);
         SDL_ReleaseGPUSampler(device, state->sampler);
         SDL_free(state);
         SDL_ReleaseGPUTexture(device, depth_texture);
