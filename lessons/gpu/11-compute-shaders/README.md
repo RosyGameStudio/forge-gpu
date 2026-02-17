@@ -110,7 +110,7 @@ This lesson uses a two-pass approach on each frame:
 2. **Render pass** — a graphics pipeline samples that texture and draws it
    fullscreen
 
-Both passes happen on the same command buffer. SDL3 automatically synchronises
+Both passes happen on the same command buffer. SDL3 automatically synchronizes
 between them — the compute pass finishes writing before the render pass starts
 reading. No manual barriers or fences needed.
 

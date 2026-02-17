@@ -89,7 +89,7 @@ Let the sRGB swapchain handle gamma conversion.
 ## Compute-then-render pattern
 
 Each frame: compute pass writes to texture, render pass samples it.
-SDL3 synchronises automatically between passes on the same command buffer.
+SDL3 synchronizes automatically between passes on the same command buffer.
 
 ```c
 /* Push compute uniforms BEFORE the pass */
@@ -153,8 +153,14 @@ Draw 3 vertices from `SV_VertexID` — no vertex buffer needed. The triangle
 overshoots the screen and is clipped to fill it exactly:
 
 ```hlsl
+struct VSOutput {
+    float4 position : SV_Position;
+    float2 uv       : TEXCOORD0;
+};
+
 VSOutput main(uint id : SV_VertexID)
 {
+    VSOutput output;
     float2 pos;
     pos.x = (float)((id & 1u) << 1) - 1.0;
     pos.y = (float)((id & 2u))       - 1.0;

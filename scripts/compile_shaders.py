@@ -109,13 +109,10 @@ def compile_shader(dxc_path, shader_path, verbose=False):
     basename = os.path.basename(base)  # e.g. triangle
     shader_dir = os.path.dirname(shader_path)
 
-    # Determine short stage name for naming output files
-    if ".vert." in shader_path:
-        stage = "vert"
-    elif ".frag." in shader_path:
-        stage = "frag"
-    else:
-        stage = "comp"
+    # Derive short stage name from the validated suffix
+    stage = suffix.removeprefix(".").removesuffix(
+        ".hlsl"
+    )  # e.g. ".vert.hlsl" -> "vert"
 
     spirv_out = f"{base}.{stage}.spv"
     dxil_out = f"{base}.{stage}.dxil"
