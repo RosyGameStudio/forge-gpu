@@ -193,7 +193,7 @@ def main():
     args = parser.parse_args()
 
     if not os.path.isfile(args.input):
-        print(f"Input file not found: {args.input}")
+        print(f"Input file not found: {args.input}", file=sys.stderr)
         return 1
 
     convert(args.input, args.output_dir, args.size)

@@ -993,6 +993,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     if (!base_path) {
         SDL_Log("SDL_GetBasePath failed: %s", SDL_GetError());
         SDL_ReleaseGPUTexture(device, state->white_texture);
+        SDL_ReleaseGPUSampler(device, state->cubemap_sampler);
         SDL_ReleaseGPUSampler(device, state->sampler);
         SDL_free(state);
         SDL_ReleaseGPUTexture(device, depth_texture);
