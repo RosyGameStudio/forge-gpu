@@ -77,6 +77,8 @@ struct VSInput {
 };
 
 VSOutput main(VSInput input) {
+    VSOutput output;
+
     /* Reconstruct column-major model matrix.
      * float4x4() takes ROWS, so transpose to get columns. */
     float4x4 model = transpose(float4x4(
@@ -94,6 +96,8 @@ VSOutput main(VSInput input) {
     adj_t[1] = cross(m[2], m[0]);
     adj_t[2] = cross(m[0], m[1]);
     output.world_norm = mul(adj_t, input.normal);
+
+    return output;
 }
 ```
 
