@@ -4,7 +4,7 @@
 
 - How to render a procedural grid entirely in a fragment shader (no texture)
 - Screen-space derivatives (`fwidth`) and `smoothstep` for anti-aliased lines
-- Distance fade to prevent moire artifacts at the horizon
+- Distance fade to prevent moiré artifacts at the horizon
 - Using **two graphics pipelines** in a single render pass
 - Combining procedural geometry (grid) with 3D models (CesiumMilkTruck)
 - Simplified Blinn-Phong lighting on a flat surface (constant normal)
@@ -84,7 +84,7 @@ small relative to the grid spacing, so the anti-aliased band is narrow and the
 line looks crisp. When the grid is far away and many lines crowd into a few
 pixels, `fwidth` is large, and the anti-aliased transition covers most of the
 line — effectively blurring it into the background. This is precisely what
-prevents moire patterns.
+prevents moiré patterns.
 
 ### Why grids alias: the Nyquist-Shannon sampling theorem
 
@@ -106,7 +106,7 @@ per world unit, and the "sampling rate" is the number of pixels covering that
 same world unit. When the camera is close, each grid cell spans many pixels —
 the sampling rate is well above Nyquist, and the lines resolve cleanly. As the
 camera moves away, grid cells shrink until multiple lines fall within a single
-pixel. The sampling rate drops below Nyquist, and the grid aliases into moire.
+pixel. The sampling rate drops below Nyquist, and the grid aliases into moiré.
 
 ![Undersampling and the Nyquist limit](assets/undersampling.png)
 

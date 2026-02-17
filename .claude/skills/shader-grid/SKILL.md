@@ -40,7 +40,7 @@ float2 aa_line = 1.0 - smoothstep(line_width, line_width + fw, dist);
 /* Step 5: Combine X and Z lines */
 float grid = max(aa_line.x, aa_line.y);
 
-/* Step 6: Distance fade (prevent far-field moire) */
+/* Step 6: Distance fade (prevent far-field moiré) */
 float cam_dist = length(world_pos - eye_pos.xyz);
 float fade = 1.0 - smoothstep(fade_distance * 0.5, fade_distance, cam_dist);
 grid *= fade;
@@ -53,7 +53,7 @@ float3 surface = lerp(bg_color.rgb, line_color.rgb, grid);
 
 - `fwidth()` uses the same derivative hardware as mip selection (Lesson 05)
 - The transition width is always one pixel, so lines look crisp at any distance
-- Distance fade removes moire when grid cells become sub-pixel
+- Distance fade removes moiré when grid cells become sub-pixel
 
 ## Multiple pipelines pattern
 
@@ -131,10 +131,109 @@ typedef struct GridFragUniforms {
 } GridFragUniforms;
 ```
 
+## Key API calls (in order)
+
+1. `SDL_CreateGPUGraphicsPipeline` — create grid pipeline (position-only vertex format, `CULL_NONE`, 1 vertex uniform, 1 fragment uniform, 0 samplers)
+2. `SDL_CreateGPUBuffer` + `SDL_CreateGPUTransferBuffer` — upload grid quad vertices and indices
+3. `SDL_BeginGPURenderPass` — begin pass with color + depth targets
+4. `SDL_BindGPUGraphicsPipeline(pass, grid_pipeline)` — bind grid pipeline
+5. `SDL_PushGPUVertexUniformData(cmd, 0, &vp_matrix, ...)` — push view-projection matrix
+6. `SDL_PushGPUFragmentUniformData(cmd, 0, &grid_frag_uniforms, ...)` — push grid parameters
+7. `SDL_BindGPUVertexBuffers` / `SDL_BindGPUIndexBuffer` — bind grid geometry
+8. `SDL_DrawGPUIndexedPrimitives` — draw grid quad
+9. `SDL_BindGPUGraphicsPipeline(pass, model_pipeline)` — switch to model pipeline (if needed)
+10. `SDL_EndGPURenderPass`
+
+## Ready-to-use template
+
+### Minimal vertex shader (`grid.vert.hlsl`)
+
+```hlsl
+cbuffer VertUniforms : register(b0, space1)
+{
+    float4x4 vp_matrix;
+};
+
+struct VSInput  { float3 pos : TEXCOORD0; };
+struct VSOutput { float4 clip_pos : SV_Position; float3 world_pos : TEXCOORD0; };
+
+VSOutput main(VSInput input)
+{
+    VSOutput output;
+    output.world_pos = input.pos;
+    output.clip_pos  = mul(vp_matrix, float4(input.pos, 1.0));
+    return output;
+}
+```
+
+### Minimal fragment shader (`grid.frag.hlsl`)
+
+```hlsl
+cbuffer FragUniforms : register(b0, space3)
+{
+    float4 line_color;
+    float4 bg_color;
+    float4 eye_pos;
+    float  grid_spacing;
+    float  line_width;
+    float  fade_distance;
+    float  _pad0;
+};
+
+float4 main(float4 clip_pos : SV_Position, float3 world_pos : TEXCOORD0) : SV_Target
+{
+    float2 grid_uv = world_pos.xz / grid_spacing;
+    float2 dist    = abs(frac(grid_uv - 0.5) - 0.5);
+    float2 fw      = fwidth(grid_uv);
+    float2 aa_line = 1.0 - smoothstep(line_width, line_width + fw, dist);
+    float  grid    = max(aa_line.x, aa_line.y);
+
+    float cam_dist = length(world_pos - eye_pos.xyz);
+    float fade     = 1.0 - smoothstep(fade_distance * 0.5, fade_distance, cam_dist);
+    grid *= fade;
+
+    float3 surface = lerp(bg_color.rgb, line_color.rgb, grid);
+    return float4(surface, 1.0);
+}
+```
+
+### Minimal C setup
+
+```c
+/* Grid geometry — flat quad on XZ plane */
+#define GRID_HALF_SIZE 50.0f
+float grid_verts[] = {
+    -GRID_HALF_SIZE, 0.0f, -GRID_HALF_SIZE,
+     GRID_HALF_SIZE, 0.0f, -GRID_HALF_SIZE,
+     GRID_HALF_SIZE, 0.0f,  GRID_HALF_SIZE,
+    -GRID_HALF_SIZE, 0.0f,  GRID_HALF_SIZE,
+};
+Uint16 grid_indices[] = { 0, 1, 2, 0, 2, 3 };
+
+/* Grid fragment uniforms */
+typedef struct GridFragUniforms {
+    float line_color[4];
+    float bg_color[4];
+    float eye_pos[4];
+    float grid_spacing;
+    float line_width;
+    float fade_distance;
+    float _pad0;
+} GridFragUniforms;
+
+/* Pipeline switch in render pass */
+SDL_BindGPUGraphicsPipeline(pass, grid_pipeline);
+SDL_PushGPUVertexUniformData(cmd, 0, &vp_matrix, sizeof(vp_matrix));
+SDL_PushGPUFragmentUniformData(cmd, 0, &grid_frag, sizeof(grid_frag));
+/* bind VB/IB, draw indexed */
+SDL_BindGPUGraphicsPipeline(pass, model_pipeline);
+/* push model uniforms, bind model VB/IB, draw */
+```
+
 ## Common mistakes
 
 1. **Forgetting `fwidth()`** — without it, lines alias badly at distance
-2. **No distance fade** — distant grid creates moire/shimmer at the horizon
+2. **No distance fade** — distant grid creates moiré/shimmer at the horizon
 3. **Using `frac()` directly** — `frac(grid_uv)` puts the discontinuity at
    the grid line; `frac(grid_uv - 0.5) - 0.5` centers the smooth region on
    the line, which is what you want
