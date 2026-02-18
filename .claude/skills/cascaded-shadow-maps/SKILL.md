@@ -12,6 +12,26 @@ to an SDL3 GPU application.  Based on Lesson 15.
 - Single shadow maps lack resolution for your scene
 - You want soft shadow edges without expensive techniques
 
+## Key API calls
+
+- `SDL_CreateGPUTexture` — shadow map textures (D32_FLOAT, DEPTH_STENCIL_TARGET | SAMPLER)
+- `SDL_CreateGPUSampler` — NEAREST filter, CLAMP_TO_EDGE for shadow map sampling
+- `SDL_CreateGPUGraphicsPipeline` — shadow pipeline (depth-only, front-face cull, depth bias)
+- `SDL_BeginGPURenderPass` / `SDL_EndGPURenderPass` — one pass per cascade (depth only)
+- `SDL_BindGPUFragmentSamplers` — bind shadow maps + sampler for scene pass
+- `SDL_PushGPUVertexUniformData` / `SDL_PushGPUFragmentUniformData` — per-draw uniforms
+
+## Correct order
+
+1. **Create shadow map textures + sampler** (in `SDL_AppInit`)
+2. **Create shadow pipeline** — depth-only, front-face culling, depth bias
+3. **Create scene pipeline** — binds shadow maps as fragment samplers
+4. **Each frame:**
+   a. Compute cascade split depths (logarithmic-linear blend)
+   b. Compute light VP matrix per cascade (frustum corners → light-space AABB)
+   c. **Shadow pass**: render all casters into each cascade's depth map
+   d. **Scene pass**: render with shadow maps bound, fragment shader selects cascade by view-space depth
+
 ## Key concepts
 
 1. **Shadow map textures** need `DEPTH_STENCIL_TARGET | SAMPLER` usage flags

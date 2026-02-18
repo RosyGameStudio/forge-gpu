@@ -3851,7 +3851,7 @@ def diagram_cascade_ortho_projections():
     # the upper-right and shines toward the lower-left.  We use the direction
     # the light travels (negated): roughly (-1, -1) normalized, but we tilt
     # it to ~60° from horizontal so the angle is visually clear.
-    light_angle = np.radians(120)  # 120° from +X = upper-left origin
+    light_angle = np.radians(240)  # 240° from +X = lower-left direction
     light_dx = np.cos(light_angle)  # light travel direction x
     light_dy = np.sin(light_angle)  # light travel direction y
 

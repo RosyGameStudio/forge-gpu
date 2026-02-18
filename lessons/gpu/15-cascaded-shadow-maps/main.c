@@ -211,6 +211,8 @@
 #define BOX_GROUND_Y 0.5f
 #define BOX_STACK_Y 1.5f
 #define BOX_RING_RADIUS 5.0f
+#define BOX_GROUND_ROT_OFFSET 0.3f /* per-box rotation increment (radians) */
+#define BOX_STACK_ROT_OFFSET 0.5f  /* extra rotation for stacked boxes (radians) */
 
 /* ── Model paths ─────────────────────────────────────────────────────── */
 
@@ -256,6 +258,13 @@
 #define MODEL_AMBIENT_STR 0.15f
 #define MODEL_SPECULAR_STR 0.5f
 
+/* ── Shadow / light-VP computation constants ────────────────────────── */
+
+#define AABB_INIT_MIN  1e30f   /* large sentinel for AABB min initialization */
+#define AABB_INIT_MAX -1e30f   /* large negative sentinel for AABB max initialization */
+#define LIGHT_DISTANCE 50.0f   /* how far back to place the light from cascade center */
+#define SHADOW_Z_PADDING 50.0f /* extra Z range to capture casters behind the frustum */
+
 /* ── Uniform data ────────────────────────────────────────────────────── */
 
 /* Shadow vertex: just the light's MVP (64 bytes). */
@@ -279,15 +288,17 @@ typedef struct SceneFragUniforms {
   float base_color[4];
   float light_dir[4];
   float eye_pos[4];
-  float cascade_splits[4]; /* x=c0, y=c1, z=c2, w=unused */
+  /* View-space split depths for selecting which cascade to sample.
+   * x=cascade 0/1 boundary, y=1/2, z=2/far, w=unused. */
+  float cascade_splits[4];
   Uint32 has_texture;
-  float shininess;
-  float ambient;
-  float specular_str;
-  float shadow_texel_size;
-  float shadow_bias;
-  float _pad0;
-  float _pad1;
+  float shininess;        /* Blinn-Phong specular exponent (higher = tighter) */
+  float ambient;          /* ambient light strength [0..1] */
+  float specular_str;     /* specular highlight intensity [0..1] */
+  float shadow_texel_size; /* 1.0 / shadow_map_resolution — PCF offset step */
+  float shadow_bias;       /* depth bias to prevent shadow acne */
+  float _pad0;             /* explicit padding to 16-byte alignment */
+  float _pad1;             /* explicit padding to 16-byte alignment */
 } SceneFragUniforms;
 
 /* Grid vertex: VP matrix (64 bytes). */
@@ -301,20 +312,22 @@ typedef struct GridFragUniforms {
   float bg_color[4];
   float light_dir[4];
   float eye_pos[4];
+  /* Same cascade split depths as SceneFragUniforms */
   float cascade_splits[4];
-  float grid_spacing;
-  float line_width;
-  float fade_distance;
-  float ambient;
-  float shininess;
-  float specular_str;
-  float shadow_texel_size;
-  float shadow_bias;
+  float grid_spacing;       /* world-space distance between grid lines */
+  float line_width;         /* grid line thickness in world units */
+  float fade_distance;      /* distance at which grid fades to background */
+  float ambient;            /* ambient light strength [0..1] */
+  float shininess;          /* Blinn-Phong specular exponent */
+  float specular_str;       /* specular highlight intensity [0..1] */
+  float shadow_texel_size;  /* 1.0 / shadow_map_resolution — PCF offset step */
+  float shadow_bias;        /* depth bias to prevent shadow acne */
 } GridFragUniforms;
 
 /* Debug quad vertex: NDC bounds (16 bytes). */
 typedef struct DebugVertUniforms {
-  float quad_bounds[4]; /* left, bottom, right, top */
+  /* NDC rectangle for the debug overlay: left, bottom, right, top */
+  float quad_bounds[4];
 } DebugVertUniforms;
 
 /* ── GPU-side scene data ─────────────────────────────────────────────── */
@@ -984,7 +997,7 @@ static void generate_box_placements(app_state *state) {
     float angle = (float)i * (2.0f * FORGE_PI / (float)BOX_GROUND_COUNT);
     state->box_placements[idx].position =
         vec3_create(cosf(angle) * BOX_RING_RADIUS, BOX_GROUND_Y, sinf(angle) * BOX_RING_RADIUS);
-    state->box_placements[idx].y_rotation = angle + 0.3f * (float)i;
+    state->box_placements[idx].y_rotation = angle + BOX_GROUND_ROT_OFFSET * (float)i;
     idx++;
   }
 
@@ -996,7 +1009,7 @@ static void generate_box_placements(app_state *state) {
         BOX_STACK_Y,
         state->box_placements[base].position.z
     );
-    state->box_placements[idx].y_rotation = state->box_placements[base].y_rotation + 0.5f;
+    state->box_placements[idx].y_rotation = state->box_placements[base].y_rotation + BOX_STACK_ROT_OFFSET;
     idx++;
   }
 
@@ -1123,13 +1136,13 @@ static mat4 compute_cascade_light_vp(
   /* Build a light view matrix looking from above the center toward center.
    * The light direction points TOWARD the light, so we negate it to get
    * the direction the light travels (from light toward scene). */
-  vec3 light_pos = vec3_add(center, vec3_scale(light_dir, 50.0f));
+  vec3 light_pos = vec3_add(center, vec3_scale(light_dir, LIGHT_DISTANCE));
   mat4 light_view = mat4_look_at(light_pos, center, vec3_create(0.0f, 1.0f, 0.0f));
 
   /* Transform cascade corners to light view space and find AABB */
-  float min_x = 1e30f, max_x = -1e30f;
-  float min_y = 1e30f, max_y = -1e30f;
-  float min_z = 1e30f, max_z = -1e30f;
+  float min_x = AABB_INIT_MIN, max_x = AABB_INIT_MAX;
+  float min_y = AABB_INIT_MIN, max_y = AABB_INIT_MAX;
+  float min_z = AABB_INIT_MIN, max_z = AABB_INIT_MAX;
   {
     int i;
     for (i = 0; i < 8; i++) {
@@ -1155,7 +1168,7 @@ static mat4 compute_cascade_light_vp(
   /* Expand the Z range to capture shadow casters behind the frustum.
    * Without this, objects outside the cascade slice but between the
    * light and the frustum would not cast shadows into the frustum. */
-  min_z -= 50.0f;
+  min_z -= SHADOW_Z_PADDING;
 
   /* Build orthographic projection from the tight AABB */
   mat4 light_proj = mat4_orthographic(min_x, max_x, min_y, max_y, -max_z, -min_z);
@@ -1769,16 +1782,22 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     scene_pipe.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
     scene_pipe.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
 
+    /* Depth testing ensures correct front-to-back ordering in the 3D scene.
+     * LESS_OR_EQUAL allows coplanar surfaces (e.g. the grid on the ground
+     * plane) to render without z-fighting. */
     scene_pipe.depth_stencil_state.enable_depth_test = true;
     scene_pipe.depth_stencil_state.enable_depth_write = true;
     scene_pipe.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
 
     SDL_zero(scene_color);
+    /* Color format must match the swapchain to avoid conversion overhead. */
     scene_color.format = swapchain_format;
 
     scene_pipe.target_info.color_target_descriptions = &scene_color;
     scene_pipe.target_info.num_color_targets = 1;
     scene_pipe.target_info.has_depth_stencil_target = true;
+    /* D32_FLOAT gives full 32-bit precision for depth — important for
+     * shadow map comparison and large view distances. */
     scene_pipe.target_info.depth_stencil_format = DEPTH_FORMAT;
 
     state->scene_pipeline = SDL_CreateGPUGraphicsPipeline(device, &scene_pipe);
