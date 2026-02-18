@@ -56,7 +56,9 @@ quality and performance for most scenes.
 
 The split distances use Lengyel's logarithmic-linear blend:
 
-$$d_i = \lambda \cdot n \left(\frac{f}{n}\right)^{i/N} + (1 - \lambda) \cdot \left(n + \frac{i}{N}(f - n)\right)$$
+$$
+d_i = \lambda \cdot n \left(\frac{f}{n}\right)^{i/N} + (1 - \lambda) \cdot \left(n + \frac{i}{N}(f - n)\right)
+$$
 
 Where $n$ = near plane, $f$ = far plane, $N$ = number of cascades, and
 $\lambda$ controls the blend (0.5 is a good default).  Pure logarithmic
@@ -108,23 +110,112 @@ for how `mat4_orthographic` maps a box to clip space).
 
 ### PCF (Percentage Closer Filtering)
 
-Instead of a binary lit/shadowed test, PCF samples a 3x3 grid of
-neighboring shadow map texels and averages the results.  This produces
-soft shadow edges that look natural:
+A single depth comparison produces hard, aliased shadow edges — each
+fragment is either fully lit (1.0) or fully shadowed (0.0) with no
+in-between.  PCF softens this by sampling multiple points in the shadow
+map around the fragment's projected position and averaging the results.
 
-```text
-Sample grid (3x3):
+This lesson uses a 3x3 kernel: 9 sample points arranged in a grid, each
+offset by one texel from its neighbor.  The offsets range from (-1, -1)
+to (+1, +1), centered on the fragment's shadow UV coordinate.  At each
+sample position, the shader reads the shadow map depth and compares it
+against the fragment's depth (minus a small bias to prevent shadow acne).
+If the stored depth is greater than or equal to the fragment's depth, that
+sample counts as lit (1.0); otherwise it counts as shadowed (0.0).
 
-  [-1,-1] [0,-1] [1,-1]
-  [-1, 0] [0, 0] [1, 0]
-  [-1, 1] [0, 1] [1, 1]
+![PCF 3x3 kernel](assets/pcf_kernel.png)
 
-  shadow_factor = count_lit / 9
+The diagram shows a fragment at a shadow boundary.  Four of the nine
+samples pass the depth test (lit) and five fail (shadowed), giving a
+shadow factor of 4/9 = 0.444.  This intermediate value produces a smooth
+penumbra rather than a hard edge.
+
+#### The `[unroll]` attribute
+
+The nested loop in `sample_shadow_pcf` uses HLSL's `[unroll]` attribute:
+
+```hlsl
+[unroll]
+for (int y = -1; y <= 1; y++)
+{
+    [unroll]
+    for (int x = -1; x <= 1; x++)
+    {
+        float2 offset = float2((float)x, (float)y) * shadow_texel_size;
+        float map_depth = shadow_map.Sample(smp, shadow_uv + offset).r;
+        shadow += (map_depth >= current_depth - shadow_bias) ? 1.0 : 0.0;
+    }
+}
+return shadow / 9.0;
 ```
 
-Each sample compares its depth against the shadow map independently, then
-the results are averaged.  Fragments fully in light get 1.0, fully in shadow
-get 0.0, and at shadow edges get a smooth gradient.
+`[unroll]` instructs the shader compiler to replace the loop with 9
+straight-line texture samples at compile time.  This matters for two
+reasons:
+
+1. **GPU architecture** — GPUs execute fragments in lockstep warps/waves.
+   Dynamic loops with varying iteration counts can cause divergence,
+   where some threads wait idle while others finish extra iterations.
+   Unrolling eliminates the loop control flow entirely, so every thread
+   in the warp executes the same instruction sequence.
+
+2. **Texture sampling** — Some GPU architectures require texture
+   coordinates to be deterministic at compile time for optimal
+   scheduling.  Unrolled samples give the compiler full visibility into
+   the access pattern, enabling better instruction ordering and hiding
+   memory latency through interleaving.
+
+Because the loop bounds are compile-time constants (-1 to +1), the
+compiler could infer the unroll automatically in most cases.  The
+explicit `[unroll]` makes the intent clear and guarantees consistent
+behavior across different shader compilers and backends (SPIR-V via
+`dxc -spirv` and DXIL).
+
+### Shadow sampling in the fragment shader
+
+The fragment shader in `scene.frag.hlsl` ties together cascade selection and
+PCF into a single shadow lookup.  For each fragment, the process is:
+
+1. **Measure distance** — Compute the world-space distance from the fragment
+   to the camera (`length(world_pos - eye_pos)`).
+
+2. **Select cascade** — Compare the distance against the cascade split
+   thresholds.  The fragment uses the tightest cascade that contains it:
+   cascade 0 for the nearest range, cascade 1 for mid-range, cascade 2 for
+   the farthest.  Fragments beyond all cascades receive no shadow (fully lit).
+
+3. **Project to shadow map UV** — The vertex shader outputs the fragment's
+   position in each cascade's light clip space (`light_vp[i] * world_pos`).
+   The fragment shader performs the perspective divide and maps the result
+   from NDC ([-1, 1]) to UV coordinates ([0, 1]):
+
+   ```hlsl
+   float3 proj = light_pos.xyz / light_pos.w;  /* perspective divide        */
+   float2 shadow_uv = proj.xy * 0.5 + 0.5;     /* NDC [-1,1] -> UV [0,1]   */
+   shadow_uv.y = 1.0 - shadow_uv.y;             /* flip Y: NDC to texture   */
+   ```
+
+4. **Sample with PCF** — The `sample_shadow_pcf` function takes the shadow
+   map texture, the computed UV, and the fragment's depth (`proj.z`).  It
+   runs the 3x3 kernel described above, comparing each sample's stored depth
+   against the fragment's depth minus a small bias.  The averaged result is
+   the shadow factor.
+
+5. **Modulate lighting** — The shadow factor (0.0 to 1.0) multiplies both the
+   diffuse and specular terms of the Blinn-Phong model.  Ambient light is
+   not affected by shadows — this prevents shadowed areas from going
+   completely black.
+
+The `--show-shadow-map` flag renders cascade 0's depth buffer as a fullscreen
+grayscale overlay, showing what the light "sees":
+
+![Shadow map debug view — cascade 0](assets/shadow_map_debug.png)
+
+Bright areas are far from the light (depth close to 1.0) and dark silhouettes
+are the surfaces closest to the light.  This is the raw data that the fragment
+shader samples during the depth comparison — each texel stores a single
+32-bit float representing the nearest depth at that position from the light's
+perspective.
 
 ### Shadow artifacts and mitigation
 

@@ -4083,6 +4083,288 @@ def diagram_cascade_ortho_projections():
     _save(fig, "gpu/15-cascaded-shadow-maps", "cascade_ortho_projections.png")
 
 
+def diagram_pcf_kernel():
+    """PCF (Percentage Closer Filtering) 3x3 kernel visualization.
+
+    Shows a 3x3 grid of shadow map texels centered on the fragment's
+    projected position.  Each cell shows its offset, whether it passes
+    the depth test (lit) or fails (shadowed), and the final averaged
+    shadow factor.  Illustrates how the [unroll] loop iterates over
+    the 9 sample positions.
+    """
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(10, 4.2),
+        facecolor=STYLE["bg"],
+        gridspec_kw={"width_ratios": [1, 1], "wspace": 0.08},
+    )
+
+    ax_grid = axes[0]
+    ax_result = axes[1]
+
+    # --- Left panel: the 3x3 sample grid ---------------------------------
+    ax_grid.set_facecolor(STYLE["bg"])
+    ax_grid.set_xlim(-2.0, 2.0)
+    ax_grid.set_ylim(-2.3, 2.3)
+    ax_grid.set_aspect("equal")
+    ax_grid.axis("off")
+
+    # Depth test results for this example: an edge case where the shadow
+    # boundary cuts diagonally across the kernel
+    #   1 = lit (map_depth >= fragment_depth - bias)
+    #   0 = shadowed
+    results = [
+        [1, 1, 0],  # top row    (y = -1)
+        [1, 1, 0],  # middle row (y =  0)
+        [0, 0, 0],  # bottom row (y = +1)
+    ]
+
+    lit_color = STYLE["accent3"]  # green
+    shadow_color = STYLE["accent2"]  # orange
+    cell_size = 1.1
+
+    for row_idx, row in enumerate(results):
+        for col_idx, lit in enumerate(row):
+            # Offsets: x from -1 to +1, y from -1 to +1
+            ox = col_idx - 1
+            oy = row_idx - 1
+
+            cx = ox * cell_size
+            cy = -oy * cell_size  # flip so y=-1 is top
+
+            color = lit_color if lit else shadow_color
+            fill_alpha = 0.45 if lit else 0.30
+
+            # Cell background
+            rect = Rectangle(
+                (cx - cell_size / 2, cy - cell_size / 2),
+                cell_size,
+                cell_size,
+                facecolor=color,
+                edgecolor=STYLE["text_dim"],
+                alpha=fill_alpha,
+                linewidth=1.2,
+            )
+            ax_grid.add_patch(rect)
+
+            # Cell border (drawn separately for full opacity)
+            border = Rectangle(
+                (cx - cell_size / 2, cy - cell_size / 2),
+                cell_size,
+                cell_size,
+                facecolor="none",
+                edgecolor=STYLE["text_dim"],
+                linewidth=1.0,
+            )
+            ax_grid.add_patch(border)
+
+            # Offset label
+            label = f"({ox:+d},{oy:+d})"
+            ax_grid.text(
+                cx,
+                cy + 0.15,
+                label,
+                ha="center",
+                va="center",
+                fontsize=8,
+                fontfamily="monospace",
+                color=STYLE["text"],
+                path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
+            )
+
+            # Lit/shadow indicator
+            indicator = "lit" if lit else "shadow"
+            ax_grid.text(
+                cx,
+                cy - 0.22,
+                indicator,
+                ha="center",
+                va="center",
+                fontsize=7,
+                fontfamily="monospace",
+                color=color,
+                fontweight="bold",
+                path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
+            )
+
+    # Center crosshair marking the fragment's projected UV
+    ax_grid.plot(
+        0, 0, "+", color=STYLE["warn"], markersize=14, markeredgewidth=2.0, zorder=10
+    )
+
+    # Annotation for the center
+    ax_grid.text(
+        0,
+        -2.05,
+        "fragment\u2019s shadow UV",
+        ha="center",
+        va="center",
+        fontsize=8,
+        color=STYLE["warn"],
+        path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
+    )
+
+    ax_grid.set_title(
+        "3\u00d73 Sample Grid",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        pad=10,
+    )
+
+    # --- Right panel: averaging result ------------------------------------
+    ax_result.set_facecolor(STYLE["bg"])
+    ax_result.set_xlim(-2.0, 2.0)
+    ax_result.set_ylim(-2.3, 2.3)
+    ax_result.set_aspect("equal")
+    ax_result.axis("off")
+
+    lit_count = sum(cell for row in results for cell in row)
+    shadow_count = 9 - lit_count
+    factor = lit_count / 9.0
+
+    # Draw a bar/equation summary
+    y_top = 1.5
+
+    ax_result.text(
+        0,
+        y_top,
+        "Depth test per sample:",
+        ha="center",
+        va="center",
+        fontsize=10,
+        color=STYLE["text"],
+        fontweight="bold",
+    )
+
+    ax_result.text(
+        0,
+        y_top - 0.55,
+        "map_depth \u2265 frag_depth \u2212 bias  \u2192  1 (lit)\n"
+        "map_depth < frag_depth \u2212 bias  \u2192  0 (shadow)",
+        ha="center",
+        va="center",
+        fontsize=8,
+        fontfamily="monospace",
+        color=STYLE["text_dim"],
+        linespacing=1.6,
+    )
+
+    # Tally
+    ax_result.text(
+        0,
+        y_top - 1.55,
+        f"{lit_count} lit  +  {shadow_count} shadowed  =  9 samples",
+        ha="center",
+        va="center",
+        fontsize=10,
+        color=STYLE["text"],
+    )
+
+    # Result
+    ax_result.text(
+        0,
+        y_top - 2.25,
+        f"shadow_factor = {lit_count} / 9 = {factor:.3f}",
+        ha="center",
+        va="center",
+        fontsize=13,
+        fontfamily="monospace",
+        fontweight="bold",
+        color=STYLE["accent1"],
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # Gradient bar showing the result visually
+    bar_w = 2.8
+    bar_h = 0.35
+    bar_y = y_top - 3.1
+
+    # Background bar (full shadow)
+    bg_bar = Rectangle(
+        (-bar_w / 2, bar_y - bar_h / 2),
+        bar_w,
+        bar_h,
+        facecolor=shadow_color,
+        alpha=0.3,
+        edgecolor=STYLE["text_dim"],
+        linewidth=1.0,
+    )
+    ax_result.add_patch(bg_bar)
+
+    # Lit portion
+    lit_bar = Rectangle(
+        (-bar_w / 2, bar_y - bar_h / 2),
+        bar_w * factor,
+        bar_h,
+        facecolor=lit_color,
+        alpha=0.6,
+        edgecolor="none",
+    )
+    ax_result.add_patch(lit_bar)
+
+    # Border
+    border_bar = Rectangle(
+        (-bar_w / 2, bar_y - bar_h / 2),
+        bar_w,
+        bar_h,
+        facecolor="none",
+        edgecolor=STYLE["text_dim"],
+        linewidth=1.0,
+    )
+    ax_result.add_patch(border_bar)
+
+    ax_result.text(
+        -bar_w / 2 - 0.1,
+        bar_y,
+        "0",
+        ha="right",
+        va="center",
+        fontsize=8,
+        color=STYLE["text_dim"],
+    )
+    ax_result.text(
+        bar_w / 2 + 0.1,
+        bar_y,
+        "1",
+        ha="left",
+        va="center",
+        fontsize=8,
+        color=STYLE["text_dim"],
+    )
+
+    # Marker at the factor position
+    marker_x = -bar_w / 2 + bar_w * factor
+    ax_result.plot(
+        marker_x,
+        bar_y + bar_h / 2 + 0.08,
+        "v",
+        color=STYLE["accent1"],
+        markersize=8,
+    )
+
+    ax_result.set_title(
+        "Averaging",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        pad=10,
+    )
+
+    # Overall title
+    fig.suptitle(
+        "PCF (Percentage Closer Filtering) \u2014 3\u00d73 Kernel",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        y=0.98,
+    )
+
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    _save(fig, "gpu/15-cascaded-shadow-maps", "pcf_kernel.png")
+
+
 def diagram_peter_panning():
     """Peter panning: shadow detachment caused by excessive depth bias.
 
@@ -4371,6 +4653,7 @@ DIAGRAMS = {
     "gpu/15": [
         ("cascaded_shadow_maps.png", diagram_cascaded_shadow_maps),
         ("cascade_ortho_projections.png", diagram_cascade_ortho_projections),
+        ("pcf_kernel.png", diagram_pcf_kernel),
         ("peter_panning.png", diagram_peter_panning),
     ],
 }
