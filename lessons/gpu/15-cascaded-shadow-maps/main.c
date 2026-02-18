@@ -2431,9 +2431,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     }
 
 #ifdef FORGE_CAPTURE
-    if (state->capture.mode != FORGE_CAPTURE_NONE) {
-      SDL_GPUTexture *sc = swapchain;
-      if (forge_capture_finish_frame(&state->capture, cmd, sc)) {
+    if (state->capture.mode != FORGE_CAPTURE_NONE && swapchain) {
+      if (forge_capture_finish_frame(&state->capture, cmd, swapchain)) {
         if (forge_capture_should_quit(&state->capture)) {
           return SDL_APP_SUCCESS;
         }
