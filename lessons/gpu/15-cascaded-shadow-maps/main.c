@@ -1134,8 +1134,8 @@ static mat4 compute_cascade_light_vp(
   }
 
   /* Build a light view matrix looking from above the center toward center.
-   * The light direction points TOWARD the light, so we negate it to get
-   * the direction the light travels (from light toward scene). */
+   * light_dir points toward the light, so placing the camera at
+   * center + light_dir * LIGHT_DISTANCE looks back down at the scene. */
   vec3 light_pos = vec3_add(center, vec3_scale(light_dir, LIGHT_DISTANCE));
   mat4 light_view = mat4_look_at(light_pos, center, vec3_create(0.0f, 1.0f, 0.0f));
 
@@ -1879,16 +1879,22 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     grid_pipe.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
     grid_pipe.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
 
+    /* Depth test + write so the grid occludes and is occluded by scene
+     * geometry.  LESS_OR_EQUAL (not LESS) lets the grid coexist with
+     * fragments at the same depth — avoids z-fighting at floor level. */
     grid_pipe.depth_stencil_state.enable_depth_test = true;
     grid_pipe.depth_stencil_state.enable_depth_write = true;
     grid_pipe.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
 
     SDL_zero(grid_color);
+    /* Must match the swapchain format so the grid renders into the same
+     * color target as the scene pass (queried after sRGB configuration). */
     grid_color.format = swapchain_format;
 
     grid_pipe.target_info.color_target_descriptions = &grid_color;
     grid_pipe.target_info.num_color_targets = 1;
     grid_pipe.target_info.has_depth_stencil_target = true;
+    /* Share the scene's depth buffer so grid depth-tests against models. */
     grid_pipe.target_info.depth_stencil_format = DEPTH_FORMAT;
 
     state->grid_pipeline = SDL_CreateGPUGraphicsPipeline(device, &grid_pipe);
