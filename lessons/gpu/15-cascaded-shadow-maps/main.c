@@ -111,6 +111,10 @@
 #define SHADOW_DEPTH_BIAS 1
 #define SHADOW_SLOPE_BIAS 1.5f
 
+/* A frustum has 8 corners: 4 on the near plane, 4 on the far plane. */
+#define NUM_FRUSTUM_CORNERS 8
+#define NUM_NEAR_CORNERS    4
+
 /* Lambda controls the logarithmic vs linear blend for cascade splits.
  * 0.0 = purely linear, 1.0 = purely logarithmic.
  * 0.5 is a good practical balance (Lengyel's recommendation). */
@@ -1086,7 +1090,7 @@ static mat4 compute_cascade_light_vp(
     vec3 light_dir
 ) {
   /* NDC corners of the full frustum.  Z range is [0, 1] (0-to-1 depth). */
-  static const vec4 ndc_corners[8] = {
+  static const vec4 ndc_corners[NUM_FRUSTUM_CORNERS] = {
     { -1.0f, -1.0f, 0.0f, 1.0f }, /* near bottom-left  */
     { 1.0f, -1.0f, 0.0f, 1.0f },  /* near bottom-right */
     { 1.0f, 1.0f, 0.0f, 1.0f },   /* near top-right    */
@@ -1097,11 +1101,11 @@ static mat4 compute_cascade_light_vp(
     { -1.0f, 1.0f, 1.0f, 1.0f },  /* far top-left      */
   };
 
-  /* Unproject all 8 NDC corners to world space */
-  vec3 world_corners[8];
+  /* Unproject all NDC corners to world space */
+  vec3 world_corners[NUM_FRUSTUM_CORNERS];
   {
     int i;
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < NUM_FRUSTUM_CORNERS; i++) {
       vec4 wp = mat4_multiply_vec4(inv_cam_vp, ndc_corners[i]);
       world_corners[i] = vec3_perspective_divide(wp);
     }
@@ -1113,13 +1117,13 @@ static mat4 compute_cascade_light_vp(
   float t_near = (split_near - cam_near) / (cam_far - cam_near);
   float t_far = (split_far - cam_near) / (cam_far - cam_near);
 
-  vec3 cascade_corners[8];
+  vec3 cascade_corners[NUM_FRUSTUM_CORNERS];
   {
     int i;
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < NUM_NEAR_CORNERS; i++) {
       /* Lerp between near plane corner and far plane corner */
-      cascade_corners[i] = vec3_lerp(world_corners[i], world_corners[i + 4], t_near);
-      cascade_corners[i + 4] = vec3_lerp(world_corners[i], world_corners[i + 4], t_far);
+      cascade_corners[i] = vec3_lerp(world_corners[i], world_corners[i + NUM_NEAR_CORNERS], t_near);
+      cascade_corners[i + NUM_NEAR_CORNERS] = vec3_lerp(world_corners[i], world_corners[i + NUM_NEAR_CORNERS], t_far);
     }
   }
 
@@ -1127,10 +1131,10 @@ static mat4 compute_cascade_light_vp(
   vec3 center = vec3_create(0.0f, 0.0f, 0.0f);
   {
     int i;
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < NUM_FRUSTUM_CORNERS; i++) {
       center = vec3_add(center, cascade_corners[i]);
     }
-    center = vec3_scale(center, 1.0f / 8.0f);
+    center = vec3_scale(center, 1.0f / (float)NUM_FRUSTUM_CORNERS);
   }
 
   /* Build a light view matrix looking from above the center toward center.
@@ -2181,6 +2185,11 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     Uint32 cur_h = (Uint32)h;
 
     if (cur_w != state->depth_width || cur_h != state->depth_height) {
+      /* Skip resize when the window is minimized (zero dimensions).
+       * Keep the existing depth texture until a valid size is available. */
+      if (cur_w == 0 || cur_h == 0) {
+        return SDL_APP_CONTINUE;
+      }
       SDL_ReleaseGPUTexture(state->device, state->depth_texture);
       state->depth_texture = create_depth_texture(state->device, cur_w, cur_h);
       if (!state->depth_texture) {
