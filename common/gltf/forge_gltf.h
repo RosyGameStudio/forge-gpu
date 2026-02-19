@@ -47,6 +47,9 @@
 #define FORGE_GLTF_MAX_IMAGES     128
 #define FORGE_GLTF_MAX_BUFFERS    16
 
+/* glTF 2.0 spec default for alphaCutoff when alphaMode is MASK. */
+#define FORGE_GLTF_DEFAULT_ALPHA_CUTOFF 0.5f
+
 /* glTF component type constants (from the spec). */
 #define FORGE_GLTF_BYTE           5120
 #define FORGE_GLTF_UNSIGNED_BYTE  5121
@@ -537,7 +540,7 @@ static bool forge_gltf__parse_materials(const cJSON *root,
         m->texture_path[0] = '\0';
         m->has_texture = false;
         m->alpha_mode = FORGE_GLTF_ALPHA_OPAQUE;
-        m->alpha_cutoff = 0.5f;
+        m->alpha_cutoff = FORGE_GLTF_DEFAULT_ALPHA_CUTOFF;
         m->double_sided = false;
         copy_name(m->name, sizeof(m->name), mat);
 

@@ -200,10 +200,16 @@ typedef struct FragUniforms {
 typedef struct GridFragUniforms {
     float line_color[4];    /* 16 bytes */
     float bg_color[4];      /* 16 bytes */
+    float light_dir[4];     /* 16 bytes — world-space light direction  */
+    float eye_pos[4];       /* 16 bytes — world-space camera position  */
     float grid_spacing;     /*  4 bytes */
     float line_width;       /*  4 bytes */
     float fade_distance;    /*  4 bytes */
-    float _pad;             /*  4 bytes — total: 48 bytes */
+    float ambient;          /*  4 bytes — ambient intensity [0..1]     */
+    float shininess;        /*  4 bytes — specular exponent            */
+    float specular_str;     /*  4 bytes — specular intensity [0..1]    */
+    float _pad0;            /*  4 bytes */
+    float _pad1;            /*  4 bytes — total: 96 bytes */
 } GridFragUniforms;
 
 /* ── GPU-side per-primitive data ─────────────────────────────────────── */
@@ -400,6 +406,9 @@ static SDL_GPUBuffer *upload_gpu_buffer(
 
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUBuffer(device, buffer);
+        return NULL;
     }
 
     SDL_ReleaseGPUTransferBuffer(device, transfer);
@@ -511,6 +520,9 @@ static SDL_GPUTexture *load_texture(SDL_GPUDevice *device, const char *path) {
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer (texture) failed: %s",
                 SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return NULL;
     }
     SDL_ReleaseGPUTransferBuffer(device, transfer);
 
@@ -587,6 +599,9 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device) {
 
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer (white tex): %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, tb);
+        SDL_ReleaseGPUTexture(device, tex);
+        return NULL;
     }
     SDL_ReleaseGPUTransferBuffer(device, tb);
     return tex;
@@ -615,7 +630,7 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state) {
          * sort distance than the node center — a 3D box's front face is
          * closer to the camera than its center, so it correctly sorts to
          * draw after interior objects like flat α planes. */
-        {
+        if (prim->vertex_count > 0 && prim->vertices) {
             Uint32 v;
             gpu->aabb_min = prim->vertices[0].position;
             gpu->aabb_max = prim->vertices[0].position;
@@ -628,6 +643,9 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state) {
                 if (p.y > gpu->aabb_max.y) gpu->aabb_max.y = p.y;
                 if (p.z > gpu->aabb_max.z) gpu->aabb_max.z = p.z;
             }
+        } else {
+            gpu->aabb_min = vec3_create(0.0f, 0.0f, 0.0f);
+            gpu->aabb_max = vec3_create(0.0f, 0.0f, 0.0f);
         }
 
         /* Vertex buffer */
@@ -638,6 +656,7 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state) {
             prim->vertices, vb_size);
         if (!gpu->vertex_buffer) {
             SDL_Log("Failed to upload vertex buffer for primitive %d", i);
+            state->gpu_primitive_count = i;
             return false;
         }
 
@@ -648,10 +667,12 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state) {
             prim->indices, ib_size);
         if (!gpu->index_buffer) {
             SDL_Log("Failed to upload index buffer for primitive %d", i);
+            state->gpu_primitive_count = i;
             return false;
         }
+
+        state->gpu_primitive_count = i + 1;
     }
-    state->gpu_primitive_count = scene->primitive_count;
 
     /* ── Load textures with deduplication ───────────────────────────── */
     /* Multiple materials can reference the same image file.  Cache by
@@ -910,6 +931,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
                 SDL_GPU_PRESENTMODE_VSYNC)) {
             SDL_Log("SDL_SetGPUSwapchainParameters failed: %s",
                     SDL_GetError());
+            SDL_DestroyWindow(window);
+            SDL_DestroyGPUDevice(device);
+            return SDL_APP_FAILURE;
         }
     }
 
@@ -1564,7 +1588,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         /* Vertex uniform: VP matrix (no model — grid is at origin) */
         SDL_PushGPUVertexUniformData(cmd, 0, &vp, sizeof(vp));
 
-        /* Fragment uniform: grid appearance parameters */
+        /* Fragment uniform: grid appearance + lighting parameters */
         GridFragUniforms gfu;
         gfu.line_color[0] = GRID_LINE_R;
         gfu.line_color[1] = GRID_LINE_G;
@@ -1574,10 +1598,26 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         gfu.bg_color[1]   = GRID_BG_G;
         gfu.bg_color[2]   = GRID_BG_B;
         gfu.bg_color[3]   = GRID_BG_A;
+        {
+            vec3 light = vec3_normalize(
+                vec3_create(LIGHT_DIR_X, LIGHT_DIR_Y, LIGHT_DIR_Z));
+            gfu.light_dir[0] = light.x;
+            gfu.light_dir[1] = light.y;
+            gfu.light_dir[2] = light.z;
+            gfu.light_dir[3] = 0.0f;
+        }
+        gfu.eye_pos[0]     = state->cam_position.x;
+        gfu.eye_pos[1]     = state->cam_position.y;
+        gfu.eye_pos[2]     = state->cam_position.z;
+        gfu.eye_pos[3]     = 0.0f;
         gfu.grid_spacing   = GRID_SPACING;
         gfu.line_width     = GRID_LINE_WIDTH;
         gfu.fade_distance  = GRID_FADE_DIST;
-        gfu._pad           = 0.0f;
+        gfu.ambient        = AMBIENT_INTENSITY;
+        gfu.shininess      = SHININESS;
+        gfu.specular_str   = SPECULAR_STRENGTH;
+        gfu._pad0          = 0.0f;
+        gfu._pad1          = 0.0f;
         SDL_PushGPUFragmentUniformData(cmd, 0, &gfu, sizeof(gfu));
 
         SDL_GPUBufferBinding gvb;

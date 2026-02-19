@@ -4620,9 +4620,7 @@ def diagram_aabb_sorting():
     two objects share the same center (a flat alpha-symbol plane inside a glass
     box), and how AABB nearest-point distance produces the correct draw order.
     """
-    fig, (ax_bad, ax_good) = plt.subplots(
-        1, 2, figsize=(12, 6), facecolor=STYLE["bg"]
-    )
+    fig, (ax_bad, ax_good) = plt.subplots(1, 2, figsize=(12, 6), facecolor=STYLE["bg"])
 
     for ax in (ax_bad, ax_good):
         _setup_axes(ax, xlim=(-4.5, 6.5), ylim=(-3.5, 3.5), grid=False)
@@ -4649,16 +4647,20 @@ def diagram_aabb_sorting():
     cam = np.array([5.0, 0.0])
 
     # Nearest point on box AABB to camera
-    box_nearest = np.array([
-        np.clip(cam[0], box_min[0], box_max[0]),
-        np.clip(cam[1], box_min[1], box_max[1]),
-    ])
+    box_nearest = np.array(
+        [
+            np.clip(cam[0], box_min[0], box_max[0]),
+            np.clip(cam[1], box_min[1], box_max[1]),
+        ]
+    )
 
     # Nearest point on plane AABB to camera
-    plane_nearest = np.array([
-        np.clip(cam[0], plane_min[0], plane_max[0]),
-        np.clip(cam[1], plane_min[1], plane_max[1]),
-    ])
+    plane_nearest = np.array(
+        [
+            np.clip(cam[0], plane_min[0], plane_max[0]),
+            np.clip(cam[1], plane_min[1], plane_max[1]),
+        ]
+    )
 
     def draw_scene(ax, mode):
         """Draw the scene in either 'center' or 'aabb' mode."""
@@ -4729,9 +4731,7 @@ def diagram_aabb_sorting():
         )
 
         # Camera
-        ax.plot(
-            cam[0], cam[1], "s", color=STYLE["warn"], markersize=10, zorder=10
-        )
+        ax.plot(cam[0], cam[1], "s", color=STYLE["warn"], markersize=10, zorder=10)
         ax.text(
             cam[0],
             cam[1] - 0.55,
@@ -4774,9 +4774,7 @@ def diagram_aabb_sorting():
                 fontsize=10,
                 ha="center",
                 fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
             ax.text(
@@ -4787,9 +4785,7 @@ def diagram_aabb_sorting():
                 fontsize=10,
                 ha="center",
                 fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
 
@@ -4802,9 +4798,7 @@ def diagram_aabb_sorting():
                 fontsize=11,
                 fontweight="bold",
                 ha="center",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
 
@@ -4837,9 +4831,7 @@ def diagram_aabb_sorting():
                 fontsize=10,
                 ha="center",
                 fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
 
@@ -4870,9 +4862,7 @@ def diagram_aabb_sorting():
                 fontsize=10,
                 ha="center",
                 fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
 
@@ -4884,9 +4874,7 @@ def diagram_aabb_sorting():
                 color=STYLE["accent2"],
                 fontsize=10,
                 ha="center",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
             ax.text(
@@ -4896,9 +4884,7 @@ def diagram_aabb_sorting():
                 color=STYLE["accent1"],
                 fontsize=10,
                 ha="center",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
 
@@ -4979,9 +4965,7 @@ def diagram_blend_modes():
             "name": "Additive",
             "subtitle": "SRC_ALPHA / ONE — depth write OFF",
             "formula": "result = src·α + dst",
-            "overlap_rgb": np.clip(
-                src_rgb * src_alpha + dst_rgb * dst_alpha, 0, 1
-            ),
+            "overlap_rgb": np.clip(src_rgb * src_alpha + dst_rgb * dst_alpha, 0, 1),
             "overlap_alpha": 1.0,
             "show_discard": False,
             "color": STYLE["accent2"],
@@ -4997,7 +4981,9 @@ def diagram_blend_modes():
 
         # --- Draw dst rectangle (background, left side) ---
         dst_rect = Rectangle(
-            (0.5, 1.0), 5.0, 4.0,
+            (0.5, 1.0),
+            5.0,
+            4.0,
             linewidth=1.5,
             edgecolor=(*dst_rgb, 0.8),
             facecolor=(*dst_rgb, dst_alpha),
@@ -5005,9 +4991,12 @@ def diagram_blend_modes():
         )
         ax.add_patch(dst_rect)
         ax.text(
-            1.5, 5.4, "dst",
+            1.5,
+            5.4,
+            "dst",
             color=(*dst_rgb, 1.0),
-            fontsize=11, fontweight="bold",
+            fontsize=11,
+            fontweight="bold",
             path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             zorder=10,
         )
@@ -5018,7 +5007,9 @@ def diagram_blend_modes():
 
             # Top half of src: alpha > cutoff → rendered fully opaque
             pass_rect = Rectangle(
-                (4.0, 3.0), 5.5, 2.0,
+                (4.0, 3.0),
+                5.5,
+                2.0,
                 linewidth=1.5,
                 edgecolor=(*src_rgb, 0.8),
                 facecolor=(*src_rgb, 1.0),
@@ -5029,7 +5020,9 @@ def diagram_blend_modes():
             # Bottom half of src: alpha < cutoff → discarded
             # Draw with dashed border and no fill to show it's gone
             discard_rect = Rectangle(
-                (4.0, 1.0), 5.5, 2.0,
+                (4.0, 1.0),
+                5.5,
+                2.0,
                 linewidth=1.5,
                 edgecolor=(*src_rgb, 0.4),
                 facecolor="none",
@@ -5040,7 +5033,9 @@ def diagram_blend_modes():
 
             # Overlap region — top half: src wins (opaque)
             overlap_pass = Rectangle(
-                (4.0, 3.0), 1.5, 2.0,
+                (4.0, 3.0),
+                1.5,
+                2.0,
                 linewidth=0,
                 facecolor=(*src_rgb, 1.0),
                 zorder=5,
@@ -5049,7 +5044,9 @@ def diagram_blend_modes():
 
             # Overlap region — bottom half: dst shows through (discarded)
             overlap_discard = Rectangle(
-                (4.0, 1.0), 1.5, 2.0,
+                (4.0, 1.0),
+                1.5,
+                2.0,
                 linewidth=0,
                 facecolor=(*dst_rgb, dst_alpha),
                 zorder=5,
@@ -5058,77 +5055,89 @@ def diagram_blend_modes():
 
             # Labels
             ax.text(
-                6.8, 3.8, "α ≥ 0.5",
-                color=STYLE["accent3"], fontsize=9, ha="center",
+                6.8,
+                3.8,
+                "α ≥ 0.5",
+                color=STYLE["accent3"],
+                fontsize=9,
+                ha="center",
                 fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
             ax.text(
-                6.8, 3.3, "PASS",
-                color=STYLE["accent3"], fontsize=8, ha="center",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                6.8,
+                3.3,
+                "PASS",
+                color=STYLE["accent3"],
+                fontsize=8,
+                ha="center",
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
             ax.text(
-                6.8, 1.8, "α < 0.5",
-                color=STYLE["accent2"], fontsize=9, ha="center",
+                6.8,
+                1.8,
+                "α < 0.5",
+                color=STYLE["accent2"],
+                fontsize=9,
+                ha="center",
                 fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
             ax.text(
-                6.8, 1.3, "DISCARD",
-                color=STYLE["accent2"], fontsize=8, ha="center",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                6.8,
+                1.3,
+                "DISCARD",
+                color=STYLE["accent2"],
+                fontsize=8,
+                ha="center",
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
 
             # src label
             ax.text(
-                8.5, 5.4, "src",
+                8.5,
+                5.4,
+                "src",
                 color=(*src_rgb, 1.0),
-                fontsize=11, fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                fontsize=11,
+                fontweight="bold",
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
         else:
             # Non-discard modes: draw src rectangle overlapping dst
             src_rect = Rectangle(
-                (4.0, 1.0), 5.5, 4.0,
+                (4.0, 1.0),
+                5.5,
+                4.0,
                 linewidth=1.5,
                 edgecolor=(*src_rgb, 0.8),
-                facecolor=(*src_rgb, src_alpha if mode["name"] != "Opaque"
-                           else 1.0),
+                facecolor=(*src_rgb, src_alpha if mode["name"] != "Opaque" else 1.0),
                 zorder=3,
             )
             ax.add_patch(src_rect)
 
             # src label
             ax.text(
-                8.0, 5.4,
+                8.0,
+                5.4,
                 f"src (α={src_alpha})" if mode["name"] != "Opaque" else "src",
                 color=(*src_rgb, 1.0),
-                fontsize=11, fontweight="bold",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                fontsize=11,
+                fontweight="bold",
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
 
             # Overlap region with computed blend result
             overlap_rect = Rectangle(
-                (4.0, 1.0), 1.5, 4.0,
+                (4.0, 1.0),
+                1.5,
+                4.0,
                 linewidth=0,
                 facecolor=(*mode["overlap_rgb"], mode["overlap_alpha"]),
                 zorder=5,
@@ -5137,8 +5146,12 @@ def diagram_blend_modes():
 
         # --- Formula label ---
         ax.text(
-            5.25, -0.5, mode["formula"],
-            color=STYLE["text_dim"], fontsize=9, ha="center",
+            5.25,
+            -0.5,
+            mode["formula"],
+            color=STYLE["text_dim"],
+            fontsize=9,
+            ha="center",
             family="monospace",
             path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             zorder=10,
@@ -5147,7 +5160,9 @@ def diagram_blend_modes():
         # --- Overlap bracket label ---
         if not mode["show_discard"]:
             ax.annotate(
-                "", xy=(4.0, 0.7), xytext=(5.5, 0.7),
+                "",
+                xy=(4.0, 0.7),
+                xytext=(5.5, 0.7),
                 arrowprops={
                     "arrowstyle": "<->",
                     "color": STYLE["warn"],
@@ -5156,11 +5171,13 @@ def diagram_blend_modes():
                 zorder=10,
             )
             ax.text(
-                4.75, 0.2, "overlap",
-                color=STYLE["warn"], fontsize=8, ha="center",
-                path_effects=[
-                    pe.withStroke(linewidth=3, foreground=STYLE["bg"])
-                ],
+                4.75,
+                0.2,
+                "overlap",
+                color=STYLE["warn"],
+                fontsize=8,
+                ha="center",
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 zorder=10,
             )
 
@@ -5168,14 +5185,19 @@ def diagram_blend_modes():
         ax.set_title(
             mode["name"],
             color=mode["color"],
-            fontsize=13, fontweight="bold",
+            fontsize=13,
+            fontweight="bold",
             pad=8,
         )
 
         # --- Subtitle ---
         ax.text(
-            5.25, 6.2, mode["subtitle"],
-            color=STYLE["text_dim"], fontsize=7.5, ha="center",
+            5.25,
+            6.2,
+            mode["subtitle"],
+            color=STYLE["text_dim"],
+            fontsize=7.5,
+            ha="center",
             style="italic",
             path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
             zorder=10,
@@ -5184,7 +5206,8 @@ def diagram_blend_modes():
     fig.suptitle(
         "Four Blend Modes Compared",
         color=STYLE["text"],
-        fontsize=15, fontweight="bold",
+        fontsize=15,
+        fontweight="bold",
         y=1.01,
     )
 

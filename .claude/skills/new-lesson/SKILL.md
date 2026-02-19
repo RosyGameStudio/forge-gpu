@@ -250,7 +250,13 @@ Use mermaid for sequential flows; keep simple ASCII diagrams as-is.
 For **formulas**, use inline `$...$` and display `$$...$$` math notation:
 
 - Inline: `$\text{MVP} = P \times V \times M$`
-- Display: `$$x_{\text{screen}} = \frac{x \cdot n}{-z}$$`
+- Display math blocks must be split across three lines (CI enforces this):
+
+```text
+$$
+x_{\text{screen}} = \frac{x \cdot n}{-z}
+$$
+```
 
 Keep worked examples (step-by-step with numbers) in ` ```text ` blocks.
 

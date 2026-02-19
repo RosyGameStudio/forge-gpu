@@ -32,7 +32,9 @@ When a fragment shader outputs a color, the GPU can either replace the
 framebuffer value (opaque) or combine the new color with what's already there
 (blending). The combination follows this equation:
 
-$$\text{result} = \text{src} \times \text{srcFactor} \;\mathbin{\mathrm{op}}\; \text{dst} \times \text{dstFactor}$$
+$$
+\text{result} = \text{src} \times \text{srcFactor} \;\mathbin{\mathrm{op}}\; \text{dst} \times \text{dstFactor}
+$$
 
 Where:
 
@@ -117,7 +119,9 @@ In glTF, this is the `"alphaMode": "BLEND"` mode.
 Additive blending adds the fragment's color to the framebuffer. Overlapping
 areas become brighter, never darker:
 
-$$\text{result} = \text{src} \times \text{srcAlpha} + \text{dst} \times 1$$
+$$
+\text{result} = \text{src} \times \text{srcAlpha} + \text{dst} \times 1
+$$
 
 Because addition is commutative ($A + B = B + A$), draw order does not
 matter. This makes additive blending practical for particle systems where
