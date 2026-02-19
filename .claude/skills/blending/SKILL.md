@@ -149,6 +149,247 @@ switch (gpu_materials[prim->material_index].alpha_mode) {
 model with `forge_gltf_load()` and use its transforms, materials, and textures
 to drive the scene.
 
+## Code template
+
+A minimal SDL3 GPU program that sets up four pipelines (opaque, alpha test,
+standard blend, additive blend) and draws geometry in the correct order.
+Copy into an existing SDL GPU project and adapt to your scene.
+
+```c
+/* ── 1. Create pipelines (in SDL_AppInit) ─────────────────────────── */
+
+SDL_GPUTextureFormat swapchain_format =
+    SDL_GetGPUSwapchainTextureFormat(device, window);
+
+/* Shared vertex layout (position + normal + uv) */
+SDL_GPUVertexBufferDescription vb_desc;
+SDL_zero(vb_desc);
+vb_desc.slot = 0;
+vb_desc.pitch = sizeof(MyVertex);
+vb_desc.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+vb_desc.instance_step_rate = 0;
+
+/* --- 1a. Opaque pipeline: no blend, depth write ON --- */
+{
+    SDL_GPUColorTargetDescription ctd;
+    SDL_zero(ctd);
+    ctd.format = swapchain_format;
+
+    SDL_GPUGraphicsPipelineCreateInfo pipe;
+    SDL_zero(pipe);
+    pipe.vertex_shader = scene_vs;
+    pipe.fragment_shader = scene_fs;
+    pipe.vertex_input_state.vertex_buffer_descriptions = &vb_desc;
+    pipe.vertex_input_state.num_vertex_buffers = 1;
+    pipe.vertex_input_state.vertex_attributes = attrs;
+    pipe.vertex_input_state.num_vertex_attributes = attr_count;
+    pipe.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pipe.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pipe.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
+    pipe.depth_stencil_state.enable_depth_test = true;
+    pipe.depth_stencil_state.enable_depth_write = true;
+    pipe.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+    pipe.target_info.color_target_descriptions = &ctd;
+    pipe.target_info.num_color_targets = 1;
+    pipe.target_info.has_depth_stencil_target = true;
+    pipe.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+
+    opaque_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe);
+}
+
+/* --- 1b. Alpha test pipeline: no blend, depth write ON, clip() shader --- */
+{
+    SDL_GPUColorTargetDescription ctd;
+    SDL_zero(ctd);
+    ctd.format = swapchain_format;
+
+    SDL_GPUGraphicsPipelineCreateInfo pipe;
+    SDL_zero(pipe);
+    pipe.vertex_shader = scene_vs;
+    pipe.fragment_shader = alpha_test_fs;  /* uses clip() */
+    pipe.vertex_input_state.vertex_buffer_descriptions = &vb_desc;
+    pipe.vertex_input_state.num_vertex_buffers = 1;
+    pipe.vertex_input_state.vertex_attributes = attrs;
+    pipe.vertex_input_state.num_vertex_attributes = attr_count;
+    pipe.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pipe.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pipe.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE; /* often double-sided */
+    pipe.depth_stencil_state.enable_depth_test = true;
+    pipe.depth_stencil_state.enable_depth_write = true;      /* survivors are opaque */
+    pipe.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+    pipe.target_info.color_target_descriptions = &ctd;
+    pipe.target_info.num_color_targets = 1;
+    pipe.target_info.has_depth_stencil_target = true;
+    pipe.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+
+    alpha_test_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe);
+}
+
+/* --- 1c. Standard alpha blend pipeline: blend ON, depth write OFF --- */
+{
+    SDL_GPUColorTargetDescription ctd;
+    SDL_zero(ctd);
+    ctd.format = swapchain_format;
+    ctd.blend_state.enable_blend = true;
+    /* Color: src * srcAlpha + dst * (1 - srcAlpha) */
+    ctd.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+    ctd.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    ctd.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+    /* Alpha: src * 1 + dst * (1 - srcAlpha) */
+    ctd.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    ctd.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    ctd.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    ctd.blend_state.color_write_mask =
+        SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G |
+        SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
+
+    SDL_GPUGraphicsPipelineCreateInfo pipe;
+    SDL_zero(pipe);
+    pipe.vertex_shader = scene_vs;
+    pipe.fragment_shader = scene_fs;      /* same shader as opaque */
+    pipe.vertex_input_state.vertex_buffer_descriptions = &vb_desc;
+    pipe.vertex_input_state.num_vertex_buffers = 1;
+    pipe.vertex_input_state.vertex_attributes = attrs;
+    pipe.vertex_input_state.num_vertex_attributes = attr_count;
+    pipe.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pipe.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pipe.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE; /* both sides visible */
+    pipe.depth_stencil_state.enable_depth_test = true;
+    pipe.depth_stencil_state.enable_depth_write = false;     /* CRITICAL: OFF */
+    pipe.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+    pipe.target_info.color_target_descriptions = &ctd;
+    pipe.target_info.num_color_targets = 1;
+    pipe.target_info.has_depth_stencil_target = true;
+    pipe.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+
+    blend_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe);
+}
+
+/* --- 1d. Additive blend pipeline: ONE dst factor, depth write OFF --- */
+{
+    SDL_GPUColorTargetDescription ctd;
+    SDL_zero(ctd);
+    ctd.format = swapchain_format;
+    ctd.blend_state.enable_blend = true;
+    /* Color: src * srcAlpha + dst * ONE (additive) */
+    ctd.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+    ctd.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    ctd.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+    /* Alpha: preserve destination */
+    ctd.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ZERO;
+    ctd.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    ctd.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    ctd.blend_state.color_write_mask =
+        SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G |
+        SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
+
+    SDL_GPUGraphicsPipelineCreateInfo pipe;
+    SDL_zero(pipe);
+    pipe.vertex_shader = scene_vs;
+    pipe.fragment_shader = scene_fs;
+    pipe.vertex_input_state.vertex_buffer_descriptions = &vb_desc;
+    pipe.vertex_input_state.num_vertex_buffers = 1;
+    pipe.vertex_input_state.vertex_attributes = attrs;
+    pipe.vertex_input_state.num_vertex_attributes = attr_count;
+    pipe.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pipe.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pipe.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    pipe.depth_stencil_state.enable_depth_test = true;
+    pipe.depth_stencil_state.enable_depth_write = false;     /* OFF for all blended */
+    pipe.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+    pipe.target_info.color_target_descriptions = &ctd;
+    pipe.target_info.num_color_targets = 1;
+    pipe.target_info.has_depth_stencil_target = true;
+    pipe.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+
+    additive_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe);
+}
+
+/* Release shaders — pipelines keep their own copy */
+SDL_ReleaseGPUShader(device, alpha_test_fs);
+SDL_ReleaseGPUShader(device, scene_fs);
+SDL_ReleaseGPUShader(device, scene_vs);
+```
+
+### Alpha test fragment shader (HLSL)
+
+```hlsl
+/* alpha_test.frag.hlsl — discard fragments below alpha cutoff */
+
+Texture2D    diffuse_tex : register(t0, space2);
+SamplerState diffuse_smp : register(s0, space2);
+
+cbuffer FragUniforms : register(b0, space3) {
+    float4 base_color;
+    float  alpha_cutoff;
+    float  has_texture;
+};
+
+struct PSInput {
+    float4 position : SV_Position;
+    float2 uv       : TEXCOORD2;
+};
+
+float4 main(PSInput input) : SV_Target {
+    float4 texel = has_texture > 0.5
+        ? diffuse_tex.Sample(diffuse_smp, input.uv)
+        : float4(1, 1, 1, 1);
+    float4 color = texel * base_color;
+    clip(color.a - alpha_cutoff);  /* discard if alpha < cutoff */
+    return color;
+}
+```
+
+### Draw loop (in SDL_AppIterate)
+
+```c
+/* ── 2. Draw in strict order: opaque → alpha test → blend → additive ── */
+
+SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(
+    cmd, &color_target, 1, &depth_target);
+
+/* --- 2a. Opaque geometry (any order) --- */
+SDL_BindGPUGraphicsPipeline(pass, opaque_pipeline);
+for (int i = 0; i < opaque_count; i++) {
+    draw_mesh(pass, cmd, &opaque_meshes[i], &vp);
+}
+
+/* --- 2b. Alpha-tested geometry (any order) --- */
+SDL_BindGPUGraphicsPipeline(pass, alpha_test_pipeline);
+for (int i = 0; i < mask_count; i++) {
+    draw_mesh(pass, cmd, &mask_meshes[i], &vp);
+}
+
+/* --- 2c. Alpha-blended geometry (sorted back-to-front) --- */
+/* Sort by nearest AABB distance to camera (farthest first) */
+for (int i = 0; i < blend_count; i++) {
+    vec3 w_min, w_max;
+    transform_aabb(&blend_meshes[i].world_transform,
+                   blend_meshes[i].aabb_min, blend_meshes[i].aabb_max,
+                   &w_min, &w_max);
+    float nx = forge_clampf(cam_pos.x, w_min.x, w_max.x);
+    float ny = forge_clampf(cam_pos.y, w_min.y, w_max.y);
+    float nz = forge_clampf(cam_pos.z, w_min.z, w_max.z);
+    blend_meshes[i].sort_dist = vec3_length(
+        vec3_sub(vec3_create(nx, ny, nz), cam_pos));
+}
+SDL_qsort(blend_meshes, blend_count, sizeof(BlendDraw),
+           compare_back_to_front);
+
+SDL_BindGPUGraphicsPipeline(pass, blend_pipeline);
+for (int i = 0; i < blend_count; i++) {
+    draw_mesh(pass, cmd, &blend_meshes[i], &vp);
+}
+
+/* --- 2d. Additive geometry (any order — commutative) --- */
+SDL_BindGPUGraphicsPipeline(pass, additive_pipeline);
+for (int i = 0; i < additive_count; i++) {
+    draw_mesh(pass, cmd, &additive_meshes[i], &vp);
+}
+
+SDL_EndGPURenderPass(pass);
+```
+
 ## Common mistakes
 
 1. **Forgetting to disable depth write** for blended pipelines — transparent surfaces block everything behind them
