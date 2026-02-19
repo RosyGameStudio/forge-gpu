@@ -47,9 +47,14 @@ Infrastructure that supports all lessons:
 - [ ] **Lesson 23 — Point Lights & Shadows** — Multiple point light sources; omnidirectional shadow mapping with cube map depth textures; shadow bias and Peter Panning; attenuation falloff
 - [ ] **Lesson 24 — Gobo Spotlight** — Projected-texture (cookie/gobo) spotlight; spotlight cone with inner/outer angles and smooth falloff; projecting a texture pattern through the light; shadow map for the spotlight frustum; theatrical/cinematic lighting applications
 
-### Noise & Procedural (depends on Math Lessons 11–13)
+### Noise & Procedural
 
-- [ ] **Lesson 25 — Shader Noise** — Applying noise in fragment shaders; GPU-friendly hash functions for white noise; Perlin/simplex noise for smooth randomness; blue noise dithering for banding reduction; octave stacking (fBm) for natural patterns; practical uses — procedural textures, terrain variation, dissolve effects
+> **Prerequisite:** Math Lessons 11–13 must be completed before starting this
+> section. Lesson 25 relies on hash functions (Math Lesson 11), gradient noise
+> (Math Lesson 12), and blue noise dithering (Math Lesson 13). Lesson 26 builds
+> on the noise techniques from Lesson 25.
+
+- [ ] **Lesson 25 — Shader Noise** — Applying noise in fragment shaders; GPU-friendly hash functions for white noise (see [Math Lesson 11 — Hash Functions & White Noise](#planned-math-lessons)); Perlin/simplex noise for smooth randomness (see [Math Lesson 12 — Gradient Noise](#planned-math-lessons)); blue noise dithering for banding reduction (see [Math Lesson 13 — Blue Noise & Low-Discrepancy Sequences](#planned-math-lessons)); octave stacking (fBm) for natural patterns; practical uses — procedural textures, terrain variation, dissolve effects
 - [ ] **Lesson 26 — Procedural Sky (Hillaire)** — Single-scattering atmospheric model based on Sébastien Hillaire's approach; Rayleigh and Mie scattering; sun disc rendering; time-of-day color variation; LUT-based or per-pixel evaluation; integrating as a skybox replacement
 
 ### Screen-Space Effects
@@ -99,6 +104,10 @@ Infrastructure that supports all lessons:
 - [x] **Math Lesson 10 — Anisotropy vs Isotropy** — Direction-dependent vs direction-independent behavior; isotropic sampling (equal in all directions) vs anisotropic filtering (stretches samples along the axis of greatest compression); anisotropic noise (Perlin/simplex stretched along a direction, e.g. wood grain, brushed metal); anisotropic friction in rigid body physics (ice rink, grooved surfaces, tire grip); eigenvalues of the screen-space Jacobian and how they drive the GPU's anisotropic sampler; practical demo comparing isotropic vs anisotropic texture filtering on a tilted plane
 
 ### Planned Math Lessons
+
+> **Scheduling:** Math Lessons 11–13 are prerequisites for GPU Lesson 25
+> (Shader Noise) and must be implemented before the Noise & Procedural section
+> begins.
 
 - [ ] **Math Lesson 11 — Hash Functions & White Noise** — Integer hash functions for GPU use (Wang, PCG, xxHash-style); mapping hash output to uniform floats; why shader noise avoids `rand()` and relies on deterministic hashing; the "magic numbers" in common hash functions and where they come from; visualizing white noise patterns; seeding with position, time, and frame index
 - [ ] **Math Lesson 12 — Gradient Noise (Perlin & Simplex)** — Lattice-based noise: random gradients at grid points, dot product with distance vector, smooth interpolation; Ken Perlin's original noise and improved noise (2002); simplex noise — fewer samples, better isotropy, skewed grid; octave stacking (fBm) for multi-scale detail; lacunarity, persistence, and their visual effects; domain warping for organic shapes
