@@ -667,6 +667,8 @@ static bool upload_scene_to_gpu(SDL_GPUDevice *device, app_state *state) {
             prim->indices, ib_size);
         if (!gpu->index_buffer) {
             SDL_Log("Failed to upload index buffer for primitive %d", i);
+            SDL_ReleaseGPUBuffer(device, gpu->vertex_buffer);
+            gpu->vertex_buffer = NULL;
             state->gpu_primitive_count = i;
             return false;
         }
@@ -769,11 +771,11 @@ static void transform_aabb(const mat4 *m, vec3 lmin, vec3 lmax,
 
 static float nearest_aabb_dist(vec3 pt, vec3 wmin, vec3 wmax)
 {
-    float nx = pt.x < wmin.x ? wmin.x : (pt.x > wmax.x ? wmax.x : pt.x);
-    float ny = pt.y < wmin.y ? wmin.y : (pt.y > wmax.y ? wmax.y : pt.y);
-    float nz = pt.z < wmin.z ? wmin.z : (pt.z > wmax.z ? wmax.z : pt.z);
-    vec3 diff = vec3_sub(vec3_create(nx, ny, nz), pt);
-    return vec3_length(diff);
+    float nx = forge_clampf(pt.x, wmin.x, wmax.x);
+    float ny = forge_clampf(pt.y, wmin.y, wmax.y);
+    float nz = forge_clampf(pt.z, wmin.z, wmax.z);
+    vec3 nearest = vec3_create(nx, ny, nz);
+    return vec3_length(vec3_sub(nearest, pt));
 }
 
 /* ── Back-to-front sort comparison ───────────────────────────────────── */
@@ -954,6 +956,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     /* ── 7. Load the glTF model ─────────────────────────────────────── */
     {
         const char *base = SDL_GetBasePath();
+        if (!base) {
+            SDL_Log("SDL_GetBasePath failed: %s", SDL_GetError());
+            SDL_free(state);
+            SDL_DestroyWindow(window);
+            SDL_DestroyGPUDevice(device);
+            return SDL_APP_FAILURE;
+        }
         char gltf_path[PATH_BUFFER_SIZE];
         SDL_snprintf(gltf_path, sizeof(gltf_path), "%s%s", base, GLTF_PATH);
 
@@ -1684,8 +1693,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         BlendDraw draws[MAX_BLEND_DRAWS];
         int draw_count = 0;
 
+        bool draw_limit_hit = false;
         int ni;
-        for (ni = 0; ni < state->scene.node_count; ni++) {
+        for (ni = 0; ni < state->scene.node_count && !draw_limit_hit; ni++) {
             const ForgeGltfNode *node = &state->scene.nodes[ni];
             if (node->mesh_index < 0) continue;
 
@@ -1696,7 +1706,13 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
                 int gi = mesh->first_primitive + pi;
                 if (prim_alpha_mode(state, gi) != FORGE_GLTF_ALPHA_BLEND)
                     continue;
-                if (draw_count >= MAX_BLEND_DRAWS) break;
+                if (draw_count >= MAX_BLEND_DRAWS) {
+                    SDL_Log("Warning: transparent draw limit reached "
+                            "(%d / %d), remaining primitives skipped",
+                            draw_count, MAX_BLEND_DRAWS);
+                    draw_limit_hit = true;
+                    break;
+                }
 
                 /* Compute world-space AABB and sort by nearest-point
                  * distance.  Using the AABB's nearest face instead of

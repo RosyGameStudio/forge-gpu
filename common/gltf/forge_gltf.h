@@ -50,6 +50,11 @@
 /* glTF 2.0 spec default for alphaCutoff when alphaMode is MASK. */
 #define FORGE_GLTF_DEFAULT_ALPHA_CUTOFF 0.5f
 
+/* Approximate alpha for KHR_materials_transmission surfaces.
+ * Full transmission requires refraction and screen-space techniques;
+ * we approximate it as standard alpha blending at this opacity. */
+#define FORGE_GLTF_TRANSMISSION_ALPHA 0.5f
+
 /* glTF component type constants (from the spec). */
 #define FORGE_GLTF_BYTE           5120
 #define FORGE_GLTF_UNSIGNED_BYTE  5121
@@ -595,7 +600,7 @@ static bool forge_gltf__parse_materials(const cJSON *root,
                     exts, "KHR_materials_transmission")) {
                 if (m->alpha_mode == FORGE_GLTF_ALPHA_OPAQUE) {
                     m->alpha_mode = FORGE_GLTF_ALPHA_BLEND;
-                    m->base_color[3] = 0.5f;
+                    m->base_color[3] = FORGE_GLTF_TRANSMISSION_ALPHA;
                 }
             }
         }

@@ -33,7 +33,7 @@ framebuffer value (opaque) or combine the new color with what's already there
 (blending). The combination follows this equation:
 
 $$
-\text{result} = \text{src} \times \text{srcFactor} \;\mathbin{\mathrm{op}}\; \text{dst} \times \text{dstFactor}
+\text{result} = \text{src} \times \text{srcFactor} \mathbin{\mathrm{op}} \text{dst} \times \text{dstFactor}
 $$
 
 Where:
@@ -167,10 +167,11 @@ To compute the nearest point on an axis-aligned bounding box (AABB):
 ```c
 /* Clamp the camera position to the AABB — the clamped point is
  * the nearest point on the box surface to the camera. */
-float nx = clamp(cam.x, wmin.x, wmax.x);
-float ny = clamp(cam.y, wmin.y, wmax.y);
-float nz = clamp(cam.z, wmin.z, wmax.z);
-float dist = length(vec3(nx, ny, nz) - cam);
+float nx = forge_clampf(cam.x, wmin.x, wmax.x);
+float ny = forge_clampf(cam.y, wmin.y, wmax.y);
+float nz = forge_clampf(cam.z, wmin.z, wmax.z);
+vec3 nearest = vec3_create(nx, ny, nz);
+float dist = vec3_length(vec3_sub(nearest, cam));
 ```
 
 The mesh-local AABB is computed once during upload, then transformed to
