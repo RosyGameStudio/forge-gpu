@@ -826,7 +826,7 @@ static void draw_primitive(
         fu.base_color[1] = 1.0f;
         fu.base_color[2] = 1.0f;
         fu.base_color[3] = 1.0f;
-        fu.alpha_cutoff = 0.5f;
+        fu.alpha_cutoff = FORGE_GLTF_DEFAULT_ALPHA_CUTOFF;
         fu.has_texture = 0.0f;
     }
 
@@ -1583,6 +1583,11 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(
         cmd, &color_target, 1, &depth_target);
+    if (!pass) {
+        SDL_Log("SDL_BeginGPURenderPass failed: %s", SDL_GetError());
+        SDL_CancelGPUCommandBuffer(cmd);
+        return SDL_APP_FAILURE;
+    }
 
     SDL_SetGPUViewport(pass, &(SDL_GPUViewport){
         0, 0, (float)sw_w, (float)sw_h, 0.0f, 1.0f });

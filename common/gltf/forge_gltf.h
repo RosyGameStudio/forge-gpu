@@ -560,8 +560,11 @@ static bool forge_gltf__parse_materials(const cJSON *root,
 
         /* ── Alpha cutoff (only meaningful for MASK, default 0.5) ──── */
         const cJSON *ac = cJSON_GetObjectItemCaseSensitive(mat, "alphaCutoff");
-        if (cJSON_IsNumber(ac))
+        if (cJSON_IsNumber(ac)) {
             m->alpha_cutoff = (float)ac->valuedouble;
+            if (m->alpha_cutoff < 0.0f) m->alpha_cutoff = 0.0f;
+            if (m->alpha_cutoff > 1.0f) m->alpha_cutoff = 1.0f;
+        }
 
         /* ── Double-sided flag ───────────────────────────────────────── */
         const cJSON *ds = cJSON_GetObjectItemCaseSensitive(mat, "doubleSided");

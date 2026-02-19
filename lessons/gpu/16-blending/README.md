@@ -249,7 +249,7 @@ blending to your SDL GPU project. Copy the skill into your own project's
    instead of blending with it.
 
 2. **Switch to center-distance sorting.** Replace the AABB nearest-point
-   distance with a simple `vec3_length(center - cam_position)` using the node
+   distance with `vec3_length(vec3_sub(center, cam_position))` using the node
    translation. Observe how the center column of the BLEND row breaks — the
    α symbol appears in front of the glass box instead of inside it.
 
