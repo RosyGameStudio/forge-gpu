@@ -97,7 +97,7 @@ accuracy tests, and practical comparisons.
   and encoded values. sRGB uses a piecewise function, not a simple power law.
 - **Luminance** — A single number describing how bright a color appears to a
   human observer, weighted by the eye's spectral sensitivity
-  ($Y = 0.2126R + 0.7152G + 0.0722B$).
+  ( $Y = 0.2126R + 0.7152G + 0.0722B$ ).
 - **Chromaticity** — Color independent of brightness. The CIE xy diagram plots
   every visible color as a 2D point.
 - **Gamut** — The subset of visible colors that a particular device can
@@ -171,8 +171,8 @@ human observers perceive color. The Y value in the CIE XYZ color space
 is defined to equal luminance, which is why the second row of the
 sRGB-to-XYZ matrix contains exactly these coefficients.
 
-Green alone ($Y = 0.715$) is brighter than red and blue combined
-($0.213 + 0.072 = 0.285$). This is why green-channel noise is the most
+Green alone ( $Y = 0.715$ ) is brighter than red and blue combined
+( $0.213 + 0.072 = 0.285$ ). This is why green-channel noise is the most
 visible, and why luminance-preserving color operations weight green so heavily.
 
 ![Gamma perception — sRGB allocates more precision to dark values](assets/gamma_perception.png)
@@ -314,7 +314,7 @@ also called "nits"). **Tone mapping** compresses the infinite range of HDR
 
 ![Tone mapping curves comparing Reinhard, ACES, and linear clamp](assets/tone_mapping_curves.png)
 
-**Linear clamp** ($\min(x, 1)$) simply clips everything above 1.0 — all
+**Linear clamp** — $\min(x, 1)$ — simply clips everything above 1.0 — all
 highlights become pure white with no detail.
 
 **Reinhard** maps $[0, \infty) \to [0, 1)$:
@@ -354,7 +354,7 @@ $$
 \text{output} = \text{input} \times 2^{EV}
 $$
 
-Each stop doubles ($+1$ EV) or halves ($-1$ EV) the light intensity. This
+Each stop doubles ( $+1$ EV) or halves ( $-1$ EV) the light intensity. This
 matches how photographers and cinematographers think about brightness — in
 relative ratios, not absolute values.
 
