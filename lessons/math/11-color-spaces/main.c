@@ -73,8 +73,10 @@ static void demo_gamma_correction(void)
 /* ── 2. Why Linear Space Matters ─────────────────────────────────────── */
 
 /* Blending two colors: if you average in sRGB, you get the wrong result.
- * The midpoint between black and white should be ~18.4%% reflectance
- * (linear 0.5 = sRGB ~0.735), not sRGB 0.5 (which is linear ~0.214). */
+ * The linear midpoint between black and white is 0.5 (50% light intensity),
+ * which encodes to sRGB ~0.735.  sRGB 0.5 decodes to only ~0.214 linear
+ * (about 21% of white light).  Note: 18% reflectance ("middle gray" in
+ * photography) is a separate perceptual concept, not the linear midpoint. */
 static void demo_linear_space_matters(void)
 {
     print_header("2. WHY LINEAR SPACE MATTERS: Blending Comparison");
