@@ -7,7 +7,7 @@
  *   3. PCG hash — permuted congruential generator output permutation
  *   4. xxHash32 finalizer — xor-multiply-shift avalanche
  *   5. Avalanche effect — one-bit input change flips ~16 output bits
- *   6. Magic numbers — where hash constants come from
+ *   6. Key constants — where hash constants come from
  *   7. Hash-to-float — mapping uint32 to uniform [0, 1)
  *   8. Distribution quality — bucket uniformity test
  *   9. Multi-dimensional seeding — combining position coordinates
@@ -233,11 +233,11 @@ static void demo_avalanche(void)
     printf("  (%d bits differ)\n", popcount32(a ^ b));
 }
 
-/* ── 6. Magic Numbers ────────────────────────────────────────────────── */
+/* ── 6. Key Constants ────────────────────────────────────────────────── */
 
-static void demo_magic_numbers(void)
+static void demo_key_constants(void)
 {
-    print_header("6. MAGIC NUMBERS: Where Hash Constants Come From");
+    print_header("6. KEY CONSTANTS: Where Hash Constants Come From");
 
     printf("\n  Hash function constants are not arbitrary. Each type\n");
     printf("  of constant serves a specific mathematical purpose.\n");
@@ -340,6 +340,10 @@ static void demo_distribution(void)
         int bw = (int)(fw * 10.0f);
         int bp = (int)(fp * 10.0f);
         int bx = (int)(fx * 10.0f);
+
+        /* Clamp to bucket 9: forge_hash_to_float returns [0, 1), but
+         * floating-point rounding can produce exactly 1.0f, which would
+         * give bucket index 10 — one past the end of our 10-bucket array. */
         if (bw > 9) bw = 9;
         if (bp > 9) bp = 9;
         if (bx > 9) bx = 9;
@@ -470,7 +474,7 @@ int main(int argc, char *argv[])
     demo_pcg_hash();
     demo_xxhash32();
     demo_avalanche();
-    demo_magic_numbers();
+    demo_key_constants();
     demo_hash_to_float();
     demo_distribution();
     demo_seeding();

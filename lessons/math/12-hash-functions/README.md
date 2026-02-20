@@ -7,11 +7,63 @@ Integer hashing for deterministic, reproducible randomness in GPU shaders.
 - Why GPU shaders use hash functions instead of `rand()`
 - How integer hash functions work (bitwise mixing to achieve the avalanche effect)
 - Three common hash functions: Wang hash, PCG, and xxHash32 finalizer
-- Where the "magic numbers" in hash functions come from
+- Where the key constants in hash functions come from
 - How to convert hash output to uniform floats in [0, 1)
 - How to seed hashes with position, time, and frame index for multi-dimensional
   noise
 - What white noise is and how hashing generates it
+
+## Result
+
+The demo program walks through 10 sections covering hash function behavior,
+quality analysis, and practical application patterns.
+
+**Example output (abbreviated):**
+
+```text
+=============================================================
+  Math Lesson 12 -- Hash Functions & White Noise
+=============================================================
+
+1. WHY HASHING: Deterministic Randomness for GPUs
+--------------------------------------------------------------
+
+  rand() uses shared mutable state — not usable on GPUs.
+  Hash functions take an input and return a fixed output:
+    hash(0) = 0xd86b048b  (same every time)
+    hash(1) = 0xb1fd0798
+    hash(2) = 0x3bfb0e68
+  No state. No dependencies. Every thread computes independently.
+
+5. AVALANCHE: One-Bit Input Change Flips ~16 Output Bits
+--------------------------------------------------------------
+
+  Wang hash avalanche analysis (4096 samples):
+    Average bits changed: 15.98 / 32  (ideal = 16.00)
+
+8. DISTRIBUTION: Uniformity of Hash-to-Float Conversion
+--------------------------------------------------------------
+
+  Bucket       Expected   Wang       PCG        xxHash32
+  ------       --------   ----       ---        --------
+  [0.0, 0.1)   10000      10015      9932       9935
+  [0.1, 0.2)   10000      9963       10094      10045
+  ...
+
+10. WHITE NOISE: 2D Hash Visualization
+--------------------------------------------------------------
+
+  .,:;=+*#%@   (dark -> bright)
+
+  Hashing every (x, y) coordinate with forge_hash2d produces
+  a 60x30 ASCII "image" of white noise — the building block
+  for structured noise like Perlin, blue noise, and dithering.
+```
+
+![White noise comparison](assets/white_noise_comparison.png)
+
+Each section builds on the previous, from basic determinism through avalanche
+quality to practical multi-dimensional seeding and visualization.
 
 ## Key concepts
 
@@ -155,7 +207,7 @@ shift-xor-multiply, every output bit depends on every input bit. The first shift
 (15) is close to half of 32, giving maximum initial mixing. The second (13) and
 final (16) complete the avalanche.
 
-### Where the magic numbers come from
+### Where the key constants come from
 
 Hash functions rely on specific constants. These are not arbitrary — each serves
 a mathematical purpose.

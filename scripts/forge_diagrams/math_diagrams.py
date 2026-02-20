@@ -2269,13 +2269,8 @@ def _hash_pcg(inp):
     s = np.asarray(inp, dtype=np.uint32)
     s = s * np.uint32(747796405) + np.uint32(2891336453)
     shift = (s >> np.uint32(28)) + np.uint32(4)
-    # Element-wise variable shift
-    flat = s.ravel()
-    sh = shift.ravel()
-    word = np.empty_like(flat)
-    for i in range(flat.size):
-        word[i] = (flat[i] >> sh[i]) ^ flat[i]
-    word = word.reshape(s.shape)
+    # Element-wise variable shift using NumPy's right_shift ufunc
+    word = np.right_shift(s, shift) ^ s
     word = word * np.uint32(277803737)
     return (word >> np.uint32(22)) ^ word
 
