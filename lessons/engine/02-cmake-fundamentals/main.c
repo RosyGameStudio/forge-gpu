@@ -45,6 +45,22 @@
  * path and could not find the header.  The fix: tell CMake where to look. */
 #include "math/forge_math.h"
 
+/* ── SDL version encoding ────────────────────────────────────────────────
+ * SDL_GetVersion() returns a single integer encoding major.minor.patch as:
+ *   version = major * 1000000 + minor * 1000 + patch
+ * These constants decode it back into its three components. */
+#define SDL_VERSION_MAJOR_DIV  1000000
+#define SDL_VERSION_MINOR_DIV  1000
+#define SDL_VERSION_PART_MOD   1000
+
+/* ── 4x4 matrix diagonal indices (column-major) ─────────────────────────
+ * A mat4 stores 16 floats in column-major order.  The diagonal elements
+ * (row == column) sit at indices 0, 5, 10, 15. */
+#define MAT4_DIAG_0   0
+#define MAT4_DIAG_1   5
+#define MAT4_DIAG_2  10
+#define MAT4_DIAG_3  15
+
 /* ── Section 1: Verify SDL linking ──────────────────────────────────────── */
 
 static void demo_sdl_linked(void)
@@ -61,9 +77,9 @@ static void demo_sdl_linked(void)
      * The fix: add SDL3::SDL3 to your target_link_libraries call. */
 
     int version = SDL_GetVersion();
-    int major = version / 1000000;
-    int minor = (version / 1000) % 1000;
-    int patch = version % 1000;
+    int major = version / SDL_VERSION_MAJOR_DIV;
+    int minor = (version / SDL_VERSION_MINOR_DIV) % SDL_VERSION_PART_MOD;
+    int patch = version % SDL_VERSION_PART_MOD;
     SDL_Log("  SDL version: %d.%d.%d", major, minor, patch);
 
     /* SDL_GetNumVideoDrivers is another SDL function — calling it proves
@@ -143,7 +159,8 @@ static void demo_include_dirs(void)
      * transform in a 3D pipeline. */
     mat4 identity = mat4_identity();
     SDL_Log("  mat4 identity diagonal: (%.0f, %.0f, %.0f, %.0f)",
-            identity.m[0], identity.m[5], identity.m[10], identity.m[15]);
+            identity.m[MAT4_DIAG_0], identity.m[MAT4_DIAG_1],
+            identity.m[MAT4_DIAG_2], identity.m[MAT4_DIAG_3]);
 
     SDL_Log("  -> target_include_directories(... ${FORGE_COMMON_DIR}) is working");
     SDL_Log(" ");

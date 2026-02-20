@@ -13,6 +13,11 @@
 
 #include <SDL3/SDL.h>
 
+/* SDL version encoding — see main.c for the full explanation. */
+#define SDL_VERSION_MAJOR_DIV  1000000
+#define SDL_VERSION_MINOR_DIV  1000
+#define SDL_VERSION_PART_MOD   1000
+
 const char *get_greeting(void)
 {
     /* SDL_GetVersion() returns the runtime SDL version as an integer.
@@ -21,9 +26,9 @@ const char *get_greeting(void)
      * an "undefined reference to SDL_GetVersion" linker error. */
     static char buffer[128];
     int version = SDL_GetVersion();
-    int major = version / 1000000;
-    int minor = (version / 1000) % 1000;
-    int patch = version % 1000;
+    int major = version / SDL_VERSION_MAJOR_DIV;
+    int minor = (version / SDL_VERSION_MINOR_DIV) % SDL_VERSION_PART_MOD;
+    int patch = version % SDL_VERSION_PART_MOD;
 
     SDL_snprintf(buffer, sizeof(buffer),
                  "Hello from a linked module! (SDL %d.%d.%d)",
