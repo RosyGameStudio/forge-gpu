@@ -13,6 +13,7 @@ APIs for output and memory management.
 - Arrays (zero-indexed, no bounds checking) and C strings (null-terminated `char` arrays)
 - Pointers: address-of (`&`), dereference (`*`), pointer arithmetic, and `NULL`
 - Structs: grouping related data with `typedef struct` and accessing members with `.` and `->`
+- Alignment and padding: why the compiler inserts invisible bytes inside structs, how `offsetof` reveals the true layout, and how member order affects memory usage
 - Dynamic memory with `SDL_malloc`, `SDL_calloc`, `SDL_free`, and `SDL_memcpy` — and why we prefer SDL's memory functions over the C standard library versions
 - Undefined behavior: what it means, why the compiler's assumptions make it dangerous, and how to defend against it
 
@@ -132,7 +133,37 @@ INFO:     [2] pos=(0.5, -0.5) color=(0.0, 0.0, 1.0)
 INFO:
 INFO:   Arrow operator: vp->x = 1.0 (same as (*vp).x)
 INFO:
-INFO: --- 8. Dynamic Memory ---
+INFO: --- 8. Alignment and Padding ---
+INFO:   Same fields, different order:
+INFO:     sizeof(EntityPadded)  = 12 bytes  (char, int, char)
+INFO:     sizeof(EntityCompact) = 8 bytes  (int, char, char)
+INFO:     Payload is 6 bytes either way — the rest is padding
+INFO:
+INFO:   offsetof reveals padding in EntityPadded:
+INFO:     active at offset 0
+INFO:     health at offset 4  (not 1 — 3 bytes of padding after active)
+INFO:     level  at offset 8
+INFO:
+INFO:   offsetof in EntityCompact:
+INFO:     health at offset 0
+INFO:     active at offset 4
+INFO:     level  at offset 5  (no padding between two chars)
+INFO:
+INFO:   Vertex (all floats — no padding):
+INFO:     sizeof(Vertex) = 20 bytes (5 floats x 4 = 20, no waste)
+INFO:     x at offset 0
+INFO:     y at offset 4
+INFO:     r at offset 8
+INFO:
+INFO:   Array of 100 entities:
+INFO:     EntityPadded[100]  = 1200 bytes
+INFO:     EntityCompact[100] = 800 bytes
+INFO:     Savings: 400 bytes (33% smaller)
+INFO:
+INFO:   Rule: order struct members from largest to smallest
+INFO:   This minimizes padding and keeps GPU data tightly packed
+INFO:
+INFO: --- 9. Dynamic Memory ---
 INFO:   Allocated 5 floats (20 bytes) on the heap
 INFO:     scores[0] = 10.0
 INFO:     scores[1] = 20.0
@@ -156,7 +187,7 @@ INFO:     Stack: automatic, fast, limited size, dies with scope
 INFO:     Heap:  manual (malloc/free), large, lives until freed
 INFO:     GPU lessons use heap memory for vertex and index data
 INFO:
-INFO: --- 9. Undefined Behavior ---
+INFO: --- 10. Undefined Behavior ---
 INFO:   Signed integer overflow:
 INFO:     INT_MAX = 2147483647
 INFO:     INT_MAX + 1 is UNDEFINED for signed int
@@ -202,6 +233,7 @@ INFO: === End of Lesson 01 ===
 - **Null-terminated strings** — C strings are `char` arrays ending with `'\0'`; `SDL_strlen` counts characters up to (but not including) the terminator
 - **Pointers** — Variables that hold memory addresses; the `&` operator takes an address, `*` dereferences it, and adding to a pointer advances by `sizeof(element)` bytes
 - **Structs** — Group related data into a single type with named members; use `.` for direct access and `->` when accessing through a pointer
+- **Alignment and padding** — The compiler inserts invisible bytes inside structs so each member lands at a naturally-aligned address; `offsetof` gives the true byte offset of any member, which is essential for describing vertex layouts to the GPU
 - **Heap allocation** — `SDL_malloc` allocates memory that persists until you call `SDL_free`; every allocation must be freed to avoid memory leaks
 - **Undefined behavior** — When code violates the C standard's rules (signed overflow, null dereference, use-after-free), the compiler is free to do anything — including removing your safety checks; defend with initialization, bounds checks, and sanitizers
 
@@ -419,6 +451,72 @@ vp->x = 1.0f;        /* pointer access (same as (*vp).x) */
 
 An array of structs is exactly how vertex buffers are organized — the GPU reads
 a contiguous block of packed `Vertex` structs.
+
+### Alignment and padding
+
+Every type in C has a **natural alignment** — the address it should start at for
+the CPU to access it most efficiently. Typically, a type's alignment equals its
+size: a 4-byte `int` wants a 4-byte-aligned address, an 8-byte `double` wants
+an 8-byte-aligned address.
+
+When you put different-sized types inside a struct, the compiler inserts
+invisible **padding bytes** between members to satisfy each member's alignment
+requirement:
+
+```c
+typedef struct {
+    char  active;   /* 1 byte                                     */
+                    /* 3 bytes padding — int needs 4-byte address  */
+    int   health;   /* 4 bytes                                     */
+    char  level;    /* 1 byte                                      */
+                    /* 3 bytes trailing padding                     */
+} EntityPadded;     /* sizeof = 12  (6 payload + 6 padding)        */
+```
+
+The same fields in a different order produce less padding:
+
+```c
+typedef struct {
+    int   health;   /* 4 bytes                                     */
+    char  active;   /* 1 byte                                      */
+    char  level;    /* 1 byte                                      */
+                    /* 2 bytes trailing padding                     */
+} EntityCompact;    /* sizeof = 8   (6 payload + 2 padding)        */
+```
+
+Both structs hold the same data, but `EntityCompact` is 4 bytes smaller. In an
+array of 1000 entities, that saves 4000 bytes — and for vertex buffers with tens
+of thousands of entries, the difference is even more significant.
+
+**The `offsetof` macro** returns the byte offset of a struct member from the
+start of the struct. It accounts for padding automatically, making it the safe
+way to compute member positions:
+
+```c
+#include <stddef.h>  /* or just include SDL.h, which provides offsetof */
+
+offsetof(EntityPadded, active);   /* 0 */
+offsetof(EntityPadded, health);   /* 4 — not 1, because of padding */
+offsetof(EntityPadded, level);    /* 8 */
+```
+
+In GPU programming, `offsetof` is essential. When you describe a vertex layout
+to the GPU, you specify the byte offset of each attribute (position, color,
+normal). Manual counting is error-prone because of padding — `offsetof` always
+gives the correct value:
+
+```c
+/* From GPU Lesson 02 — vertex attribute descriptions */
+SDL_GPUVertexAttribute attrs[] = {
+    { .offset = offsetof(Vertex, x) },  /* position */
+    { .offset = offsetof(Vertex, r) },  /* color    */
+};
+```
+
+**Practical rule:** Order struct members from largest to smallest. This
+minimizes the padding the compiler needs to insert. When all members are the
+same type (like the `Vertex` struct with five floats), there is no internal
+padding at all.
 
 ### Dynamic memory: SDL_malloc and SDL_free
 

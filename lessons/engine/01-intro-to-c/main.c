@@ -3,8 +3,8 @@
  *
  * A tour of C fundamentals through the lens of graphics programming.
  * Covers types, functions, control flow, arrays, strings, pointers,
- * structs, and dynamic memory — using SDL's cross-platform APIs where
- * they improve portability.
+ * structs, alignment, and dynamic memory — using SDL's cross-platform
+ * APIs where they improve portability.
  *
  * Why SDL for a C lesson?
  *   SDL provides cross-platform replacements for common C standard
@@ -22,6 +22,7 @@
  *   - Arrays and C strings
  *   - Pointers (address-of, dereference, pointer arithmetic)
  *   - Structs (grouping related data)
+ *   - Alignment and padding (offsetof, struct layout)
  *   - Dynamic memory (SDL_malloc, SDL_free)
  *   - sizeof and memory awareness
  *   - Undefined behavior (what it means, why it matters, how to avoid it)
@@ -31,6 +32,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <stddef.h>
 /* ── Section 1: Functions ─────────────────────────────────────────────── */
 /*
  * In C, every function must be declared before it is called.  A forward
@@ -50,6 +52,7 @@ static void demo_functions(void);
 static void demo_arrays_and_strings(void);
 static void demo_pointers(void);
 static void demo_structs(void);
+static void demo_alignment(void);
 static void demo_memory(void);
 static void demo_undefined_behavior(void);
 
@@ -99,6 +102,7 @@ int main(int argc, char *argv[])
     demo_arrays_and_strings();
     demo_pointers();
     demo_structs();
+    demo_alignment();
     demo_memory();
     demo_undefined_behavior();
 
@@ -471,11 +475,116 @@ static void demo_structs(void)
     SDL_Log(" ");
 }
 
-/* ── Section 9: Dynamic Memory ────────────────────────────────────────── */
+/* ── Section 9: Alignment and Padding ──────────────────────────────────── */
+
+/* The CPU reads memory most efficiently when data sits at an address
+ * that is a multiple of the data's size.  A 4-byte int is fastest at
+ * an address divisible by 4; an 8-byte double, at an address divisible
+ * by 8.  This requirement is called the type's *alignment*.
+ *
+ * The compiler enforces alignment automatically inside structs by
+ * inserting invisible *padding bytes* between members.  sizeof reports
+ * the total size including padding, and the struct's overall size is
+ * rounded up to a multiple of its strictest member's alignment so that
+ * arrays of the struct stay aligned.
+ *
+ * These two structs hold the same three fields in different order.
+ * The order changes how much padding the compiler inserts. */
+
+typedef struct {
+    char  active;   /* 1 byte                                            */
+                    /* 3 bytes padding — int needs a 4-byte-aligned addr */
+    int   health;   /* 4 bytes                                           */
+    char  level;    /* 1 byte                                            */
+                    /* 3 bytes padding — struct rounds to 4-byte multiple */
+} EntityPadded;     /* total: 12 bytes  (6 payload + 6 padding)          */
+
+typedef struct {
+    int   health;   /* 4 bytes                                           */
+    char  active;   /* 1 byte                                            */
+    char  level;    /* 1 byte                                            */
+                    /* 2 bytes padding — struct rounds to 4-byte multiple */
+} EntityCompact;    /* total: 8 bytes   (6 payload + 2 padding)          */
+
+#define ENTITY_ARRAY_LEN 100
+
+static void demo_alignment(void)
+{
+    SDL_Log("--- 8. Alignment and Padding ---");
+
+    /* -- Padding changes struct size -- */
+    /* Both structs hold the same data (char + int + char = 6 bytes of
+     * payload), but the compiler inserts different amounts of padding
+     * depending on member order. */
+    SDL_Log("  Same fields, different order:");
+    SDL_Log("    sizeof(EntityPadded)  = %d bytes  (char, int, char)",
+            (int)sizeof(EntityPadded));
+    SDL_Log("    sizeof(EntityCompact) = %d bytes  (int, char, char)",
+            (int)sizeof(EntityCompact));
+    SDL_Log("    Payload is 6 bytes either way — the rest is padding");
+
+    /* -- offsetof reveals where members live -- */
+    /* offsetof(Type, member) returns the byte offset of a member from
+     * the start of the struct.  It accounts for padding, so it always
+     * gives the true offset.
+     *
+     * This macro is critical in GPU programming: when you describe a
+     * vertex layout to the GPU, you specify the byte offset of each
+     * attribute (position, color, normal).  offsetof gives you the
+     * correct value without manual counting. */
+    SDL_Log(" ");
+    SDL_Log("  offsetof reveals padding in EntityPadded:");
+    SDL_Log("    active at offset %d", (int)offsetof(EntityPadded, active));
+    SDL_Log("    health at offset %d  (not 1 — 3 bytes of padding after active)",
+            (int)offsetof(EntityPadded, health));
+    SDL_Log("    level  at offset %d", (int)offsetof(EntityPadded, level));
+
+    SDL_Log(" ");
+    SDL_Log("  offsetof in EntityCompact:");
+    SDL_Log("    health at offset %d", (int)offsetof(EntityCompact, health));
+    SDL_Log("    active at offset %d", (int)offsetof(EntityCompact, active));
+    SDL_Log("    level  at offset %d  (no padding between two chars)",
+            (int)offsetof(EntityCompact, level));
+
+    /* -- The Vertex struct has no internal padding -- */
+    /* All five members are float (4 bytes, 4-byte alignment).  Since
+     * every member has the same alignment, no padding is needed between
+     * them.  This is the ideal case for GPU vertex data — the struct
+     * layout in memory exactly matches what the shader expects. */
+    SDL_Log(" ");
+    SDL_Log("  Vertex (all floats — no padding):");
+    SDL_Log("    sizeof(Vertex) = %d bytes (5 floats x 4 = 20, no waste)",
+            (int)sizeof(Vertex));
+    SDL_Log("    x at offset %d", (int)offsetof(Vertex, x));
+    SDL_Log("    y at offset %d", (int)offsetof(Vertex, y));
+    SDL_Log("    r at offset %d", (int)offsetof(Vertex, r));
+
+    /* -- Why it matters: arrays multiply the waste -- */
+    /* An array of 100 padded structs wastes 100 x 4 = 400 bytes
+     * compared to the compact version.  For vertex buffers with
+     * thousands of entries, layout matters. */
+    SDL_Log(" ");
+    int padded_total  = ENTITY_ARRAY_LEN * (int)sizeof(EntityPadded);
+    int compact_total = ENTITY_ARRAY_LEN * (int)sizeof(EntityCompact);
+    SDL_Log("  Array of %d entities:", ENTITY_ARRAY_LEN);
+    SDL_Log("    EntityPadded[%d]  = %d bytes", ENTITY_ARRAY_LEN, padded_total);
+    SDL_Log("    EntityCompact[%d] = %d bytes", ENTITY_ARRAY_LEN, compact_total);
+    SDL_Log("    Savings: %d bytes (%.0f%% smaller)",
+            padded_total - compact_total,
+            100.0f * (float)(padded_total - compact_total) / (float)padded_total);
+
+    /* -- Practical rule -- */
+    SDL_Log(" ");
+    SDL_Log("  Rule: order struct members from largest to smallest");
+    SDL_Log("  This minimizes padding and keeps GPU data tightly packed");
+    SDL_Log(" ");
+}
+
+/* ── Section 10: Dynamic Memory ───────────────────────────────────────── */
 
 static void demo_memory(void)
 {
-    SDL_Log("--- 8. Dynamic Memory ---");
+    SDL_Log("--- 9. Dynamic Memory ---");
 
     /* Variables declared inside a function live on the stack.  The
      * stack is fast but limited in size, and stack variables disappear
@@ -573,11 +682,11 @@ static void demo_memory(void)
     SDL_Log(" ");
 }
 
-/* ── Section 10: Undefined Behavior ───────────────────────────────────── */
+/* ── Section 11: Undefined Behavior ───────────────────────────────────── */
 
 static void demo_undefined_behavior(void)
 {
-    SDL_Log("--- 9. Undefined Behavior ---");
+    SDL_Log("--- 10. Undefined Behavior ---");
 
     /* Undefined behavior (UB) means the C standard places no requirements
      * on what the program does.  It might crash, return garbage, appear
