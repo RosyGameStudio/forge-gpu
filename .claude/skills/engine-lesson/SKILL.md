@@ -14,6 +14,9 @@ make graphics applications work.
 - A learner is struggling with C language features (pointers, memory, structs)
 - A GPU lesson requires build/toolchain knowledge that isn't covered yet
 - You want to explain debugging techniques or common error patterns
+- You want to teach how to add or extend engine features — resource managers,
+  asset pipelines, configuration systems, logging, input abstraction, or other
+  infrastructure that supports a graphics application
 
 **Smart behavior:**
 
@@ -302,12 +305,15 @@ Engine lessons cover the infrastructure of building graphics applications:
 - **C language** — Memory, pointers, structs, data layout, header patterns
 - **Debugging** — Error messages, debuggers, common bugs, diagnostic tools
 - **Project structure** — File organization, shared libraries, asset loading
+- **Engine features** — Resource managers, asset pipelines, configuration
+  systems, logging, input abstraction, and other infrastructure that a
+  graphics application or game engine needs beyond rendering
 
 Engine lessons do **not** cover:
 
-- GPU rendering (that's GPU lessons)
+- GPU rendering techniques (that's GPU lessons)
 - Mathematical concepts (that's math lessons)
-- SDL GPU API calls (that's GPU lessons)
+- SDL GPU API calls for drawing (that's GPU lessons)
 
 ### Tone
 
