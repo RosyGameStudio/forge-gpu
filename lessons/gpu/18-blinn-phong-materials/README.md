@@ -85,9 +85,9 @@ for (obj_i = 0; obj_i < NUM_OBJECTS; obj_i++) {
     const SceneObject *obj = &scene_objects[obj_i];
     const Material *mat = obj->material;
 
-    /* Build model matrix for this object's position */
-    mat4 translate = mat4_translate(obj->position);
-    mat4 model = mat4_multiply(translate, node->world_transform);
+    /* Build model matrix for this object's position
+     * (the full code also composes with the glTF node transform) */
+    mat4 model = mat4_translate(obj->position);
 
     /* Push material colors to the fragment shader */
     FragUniforms fu;
