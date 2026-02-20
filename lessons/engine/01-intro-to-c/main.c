@@ -24,6 +24,7 @@
  *   - Structs (grouping related data)
  *   - Dynamic memory (SDL_malloc, SDL_free)
  *   - sizeof and memory awareness
+ *   - Undefined behavior (what it means, why it matters, how to avoid it)
  *
  * SPDX-License-Identifier: Zlib
  */
@@ -50,6 +51,7 @@ static void demo_arrays_and_strings(void);
 static void demo_pointers(void);
 static void demo_structs(void);
 static void demo_memory(void);
+static void demo_undefined_behavior(void);
 
 /* ── Helper function ──────────────────────────────────────────────────── */
 /* A simple function that takes two floats and returns their average.
@@ -98,6 +100,7 @@ int main(int argc, char *argv[])
     demo_pointers();
     demo_structs();
     demo_memory();
+    demo_undefined_behavior();
 
     SDL_Log("=== End of Lesson 01 ===");
 
@@ -560,5 +563,108 @@ static void demo_memory(void)
     SDL_Log("    Stack: automatic, fast, limited size, dies with scope");
     SDL_Log("    Heap:  manual (malloc/free), large, lives until freed");
     SDL_Log("    GPU lessons use heap memory for vertex and index data");
+    SDL_Log(" ");
+}
+
+/* ── Section 10: Undefined Behavior ───────────────────────────────────── */
+
+static void demo_undefined_behavior(void)
+{
+    SDL_Log("--- 9. Undefined Behavior ---");
+
+    /* Undefined behavior (UB) means the C standard places no requirements
+     * on what the program does.  It might crash, return garbage, appear
+     * to work — or, most dangerously, let the compiler optimize away
+     * your safety checks entirely.
+     *
+     * UB is NOT "implementation-defined" (where each platform picks a
+     * behavior and documents it).  UB means *anything can happen*, and
+     * the compiler is allowed to assume it never occurs.  This assumption
+     * is what makes UB so treacherous: the compiler can remove code paths
+     * that would only execute if UB had occurred. */
+
+    /* -- Example 1: Signed integer overflow -- */
+    /* Adding 1 to INT_MAX is undefined behavior for signed integers.
+     * The compiler assumes this never happens and may optimize based on
+     * that assumption.  For example, a loop condition like (i + 1 > i)
+     * can be optimized to "always true" because signed overflow "can't
+     * happen."
+     *
+     * Unsigned integers are different: they wrap around with modular
+     * arithmetic, and that wrapping IS defined by the standard. */
+    int big = SDL_MAX_SINT32;  /* 2,147,483,647 */
+    SDL_Log("  Signed integer overflow:");
+    SDL_Log("    INT_MAX = %d", big);
+    SDL_Log("    INT_MAX + 1 is UNDEFINED for signed int");
+
+    Uint32 u = SDL_MAX_UINT32;
+    Uint32 wrapped = u + 1;  /* defined: wraps to 0 */
+    SDL_Log("    UINT_MAX + 1 = %u (unsigned wrap is defined)", wrapped);
+
+    /* -- Example 2: Integer division by zero -- */
+    /* Dividing an integer by zero is undefined behavior.  Floating-point
+     * division by zero produces infinity (IEEE 754 defines this), but
+     * integer division has no such safety net.  Always validate the
+     * divisor before dividing. */
+    SDL_Log(" ");
+    SDL_Log("  Integer division by zero:");
+    int divisor = 0;
+    if (divisor != 0) {
+        SDL_Log("    10 / %d = %d", divisor, 10 / divisor);
+    } else {
+        SDL_Log("    Skipped: divisor is 0 (would be UB)");
+    }
+
+    /* -- Example 3: Use-after-free -- */
+    /* After SDL_free(ptr), the memory at that address is no longer yours.
+     * Reading or writing it is undefined behavior — it might return the
+     * old value, garbage, or crash.  Worse, the allocator may have given
+     * that memory to something else, so writing through a freed pointer
+     * can silently corrupt unrelated data.
+     *
+     * The safe pattern: set the pointer to NULL immediately after free.
+     * Then a NULL check will catch any accidental reuse. */
+    SDL_Log(" ");
+    SDL_Log("  Use-after-free:");
+    int *data = (int *)SDL_malloc(sizeof(int));
+    if (data) {
+        *data = 42;
+        SDL_Log("    *data = %d (before free)", *data);
+        SDL_free(data);
+        data = NULL;  /* prevents accidental use-after-free */
+        SDL_Log("    After free: data = %p (set to NULL for safety)",
+                (void *)data);
+    }
+
+    /* -- Example 4: Uninitialized variables -- */
+    /* Using a variable before assigning a value is undefined behavior.
+     * The variable holds whatever bits were left on the stack — but the
+     * compiler may also optimize as if the read never occurs, producing
+     * surprising results that change between debug and release builds.
+     *
+     * Safe pattern: always initialize at the point of declaration. */
+    SDL_Log(" ");
+    SDL_Log("  Uninitialized variables:");
+    int safe_var = 0;  /* always initialize */
+    SDL_Log("    int safe_var = 0; -> %d (predictable)", safe_var);
+    SDL_Log("    int x;  (no initializer) -> UB to read, could be anything");
+
+    /* -- Summary: why UB matters and how to defend against it -- */
+    SDL_Log(" ");
+    SDL_Log("  Why undefined behavior is dangerous:");
+    SDL_Log("    1. The compiler assumes UB never happens");
+    SDL_Log("    2. It may REMOVE your safety checks based on that assumption");
+    SDL_Log("    3. Code may work in debug builds but break in release");
+    SDL_Log("    4. Symptoms often appear far from the actual bug");
+
+    SDL_Log(" ");
+    SDL_Log("  Defenses:");
+    SDL_Log("    - Initialize every variable at declaration");
+    SDL_Log("    - Check array bounds before indexing");
+    SDL_Log("    - Check for NULL before dereferencing pointers");
+    SDL_Log("    - Check divisors before dividing");
+    SDL_Log("    - Set pointers to NULL after freeing");
+    SDL_Log("    - Compile with warnings: -Wall -Wextra -Wpedantic");
+    SDL_Log("    - Use sanitizers: -fsanitize=address,undefined");
     SDL_Log(" ");
 }

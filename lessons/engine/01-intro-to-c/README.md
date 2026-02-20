@@ -14,6 +14,7 @@ APIs for output and memory management.
 - Pointers: address-of (`&`), dereference (`*`), pointer arithmetic, and `NULL`
 - Structs: grouping related data with `typedef struct` and accessing members with `.` and `->`
 - Dynamic memory with `SDL_malloc`, `SDL_calloc`, `SDL_free`, and `SDL_memcpy` — and why we prefer SDL's memory functions over the C standard library versions
+- Undefined behavior: what it means, why the compiler's assumptions make it dangerous, and how to defend against it
 
 ## Why this matters
 
@@ -155,6 +156,38 @@ INFO:     Stack: automatic, fast, limited size, dies with scope
 INFO:     Heap:  manual (malloc/free), large, lives until freed
 INFO:     GPU lessons use heap memory for vertex and index data
 INFO:
+INFO: --- 9. Undefined Behavior ---
+INFO:   Signed integer overflow:
+INFO:     INT_MAX = 2147483647
+INFO:     INT_MAX + 1 is UNDEFINED for signed int
+INFO:     UINT_MAX + 1 = 0 (unsigned wrap is defined)
+INFO:
+INFO:   Integer division by zero:
+INFO:     Skipped: divisor is 0 (would be UB)
+INFO:
+INFO:   Use-after-free:
+INFO:     *data = 42 (before free)
+INFO:     After free: data = (nil) (set to NULL for safety)
+INFO:
+INFO:   Uninitialized variables:
+INFO:     int safe_var = 0; -> 0 (predictable)
+INFO:     int x;  (no initializer) -> UB to read, could be anything
+INFO:
+INFO:   Why undefined behavior is dangerous:
+INFO:     1. The compiler assumes UB never happens
+INFO:     2. It may REMOVE your safety checks based on that assumption
+INFO:     3. Code may work in debug builds but break in release
+INFO:     4. Symptoms often appear far from the actual bug
+INFO:
+INFO:   Defenses:
+INFO:     - Initialize every variable at declaration
+INFO:     - Check array bounds before indexing
+INFO:     - Check for NULL before dereferencing pointers
+INFO:     - Check divisors before dividing
+INFO:     - Set pointers to NULL after freeing
+INFO:     - Compile with warnings: -Wall -Wextra -Wpedantic
+INFO:     - Use sanitizers: -fsanitize=address,undefined
+INFO:
 INFO: === End of Lesson 01 ===
 ```
 
@@ -170,6 +203,7 @@ INFO: === End of Lesson 01 ===
 - **Pointers** — Variables that hold memory addresses; the `&` operator takes an address, `*` dereferences it, and adding to a pointer advances by `sizeof(element)` bytes
 - **Structs** — Group related data into a single type with named members; use `.` for direct access and `->` when accessing through a pointer
 - **Heap allocation** — `SDL_malloc` allocates memory that persists until you call `SDL_free`; every allocation must be freed to avoid memory leaks
+- **Undefined behavior** — When code violates the C standard's rules (signed overflow, null dereference, use-after-free), the compiler is free to do anything — including removing your safety checks; defend with initialization, bounds checks, and sanitizers
 
 ## The details
 
@@ -425,6 +459,50 @@ Additional SDL memory functions:
 
 **Rule:** Every `SDL_malloc` or `SDL_calloc` must have a matching `SDL_free`.
 After freeing, set the pointer to NULL to prevent use-after-free bugs.
+
+### Undefined behavior
+
+**Undefined behavior (UB)** means the C standard places no requirements on what
+the program does. It might crash, produce garbage, appear to work — or, most
+dangerously, cause the compiler to optimize away your safety checks entirely.
+
+This is the single most important concept to understand about C. In languages
+like Python or Java, a bug usually produces a predictable error. In C, a bug
+that triggers UB can do *anything*, and the symptoms may appear far from the
+actual cause.
+
+**Why the compiler cares:** Modern compilers assume UB never occurs. This lets
+them make powerful optimizations — but it also means that if your code *does*
+trigger UB, the compiler may transform your program in ways that seem impossible.
+A classic example: the compiler may remove a NULL check because it "proved" the
+pointer cannot be NULL (based on an earlier dereference that was itself the bug).
+
+**Common sources of UB in C:**
+
+| Undefined behavior         | What goes wrong                                    | Defense                             |
+|----------------------------|----------------------------------------------------|-------------------------------------|
+| Signed integer overflow    | `INT_MAX + 1` — compiler assumes this never happens | Use unsigned types for wrap-around; check before arithmetic |
+| Integer division by zero   | Program may crash or produce garbage               | Check the divisor before dividing   |
+| Out-of-bounds array access | Reads/writes memory that is not yours              | Validate indices against array size |
+| Null pointer dereference   | Segfault, or compiler removes your NULL checks     | Always check before dereferencing   |
+| Use-after-free             | Freed memory may be reused; silent data corruption | Set pointers to NULL after freeing  |
+| Uninitialized variables    | Contains leftover stack data; may vary per build   | Initialize at declaration           |
+
+**Compiler warnings and sanitizers** are your best defense:
+
+```bash
+# Warnings catch many UB-prone patterns at compile time
+gcc -Wall -Wextra -Wpedantic main.c
+
+# Sanitizers catch UB at runtime (slower, but finds bugs tests miss)
+gcc -fsanitize=address,undefined -g main.c -o main
+./main  # crashes immediately at the first UB with a clear report
+```
+
+AddressSanitizer catches out-of-bounds access, use-after-free, and memory leaks.
+UndefinedBehaviorSanitizer catches signed overflow, null dereference, shift
+errors, and more. Use both during development — they have saved countless hours
+of debugging in graphics codebases where memory bugs are common.
 
 ## Common errors
 
