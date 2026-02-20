@@ -14,7 +14,7 @@ make graphics applications work.
 - A learner is struggling with C language features (pointers, memory, structs)
 - A GPU lesson requires build/toolchain knowledge that isn't covered yet
 - You want to explain debugging techniques or common error patterns
-- You want to teach how to add or extend engine features — resource managers,
+- A lesson should cover adding or extending engine features — resource managers,
   asset pipelines, configuration systems, logging, input abstraction, or other
   infrastructure that supports a graphics application
 
@@ -84,6 +84,9 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
+    /* SDL_Init(0) initializes no subsystems — just core SDL state and error
+     * handling.  This gives us SDL_Log and SDL_GetError without pulling in
+     * video, audio, etc.  Pass SDL_INIT_VIDEO when you need a window. */
     if (!SDL_Init(0)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return 1;
@@ -258,8 +261,16 @@ Verify the example runs and produces expected output.
 
 ### 9. Verify key topics are fully explained
 
-**Before finalizing, launch a verification agent** (Task agent) that audits
-every key topic in the README for completeness.
+**Before finalizing, launch a verification agent** using the Task tool
+(`subagent_type: "general-purpose"`). Give the agent the paths to the lesson's
+`README.md` and `main.c` and ask it to audit every key topic for completeness.
+The agent reads both files and returns a pass/fail report — no script or
+external tool is required.
+
+**Inputs to the agent:**
+
+- `lessons/engine/NN-topic-name/README.md`
+- `lessons/engine/NN-topic-name/main.c`
 
 **For each key topic / "What you'll learn" bullet, the agent must check:**
 
@@ -279,7 +290,7 @@ every key topic in the README for completeness.
 - A "Common errors" entry shows an error message but doesn't explain the
   root cause clearly enough to fix it
 
-**The lesson is not complete until every key topic passes all three checks.**
+**The lesson is incomplete until every key topic passes all three checks.**
 
 ### 10. Run markdown linting
 
@@ -346,7 +357,10 @@ Follow the same conventions as all forge-gpu code:
 - C99, matching SDL's style
 - `PascalCase` for typedefs, `lowercase_snake_case` for locals
 - `UPPER_SNAKE_CASE` for `#define` constants
-- No magic numbers — `#define` or `enum` everything
+- No magic numbers in production/library code — `#define` or `enum` everything.
+  In lesson files, inline numeric literals are acceptable when one-off
+  demonstration values improve readability (e.g. array sizes, sample
+  coordinates, test inputs)
 - Extensive comments explaining *why* and *purpose*
 
 ## Diagrams and Formulas
