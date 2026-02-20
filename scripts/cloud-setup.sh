@@ -29,7 +29,7 @@ if ! command -v cmake &>/dev/null; then
     echo "Attempting install via apt..."
     sudo apt-get update -qq && sudo apt-get install -y -qq cmake
 fi
-CMAKE_VERSION=$(cmake --version | head -1 | grep -oP '\d+\.\d+\.\d+')
+CMAKE_VERSION=$(cmake --version | head -1 | sed 's/[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/')
 echo "CMake: $CMAKE_VERSION"
 
 # C compiler — prefer gcc, fall back to clang
@@ -55,11 +55,12 @@ echo "Python packages installed."
 # ── 3. GitHub CLI ───────────────────────────────────────────────────────────
 echo ""
 echo "--- Installing GitHub CLI ---"
+GH_VERSION="2.74.0"
 if ! command -v gh &>/dev/null; then
-    curl -sSL https://github.com/cli/cli/releases/download/v2.74.0/gh_2.74.0_linux_amd64.tar.gz -o /tmp/gh.tar.gz
+    curl -sSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -o /tmp/gh.tar.gz
     tar -xzf /tmp/gh.tar.gz -C /tmp
-    sudo cp /tmp/gh_2.74.0_linux_amd64/bin/gh /usr/local/bin/gh
-    rm -rf /tmp/gh.tar.gz /tmp/gh_2.74.0_linux_amd64
+    sudo cp "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh
+    rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"
 fi
 echo "gh: $(gh --version | head -1)"
 if [ -n "${GH_TOKEN:-}" ]; then
@@ -82,7 +83,22 @@ if [ ! -d "$SDL3_PREFIX/lib" ]; then
         sudo mkdir -p "$SDL3_PREFIX"
         sudo tar -xzf /tmp/sdl3.tar.gz -C "$SDL3_PREFIX"
         rm /tmp/sdl3.tar.gz
-        echo "SDL3 installed to $SDL3_PREFIX"
+        # Verify the expected layout; retry with --strip-components=1 if the
+        # archive has a top-level directory wrapping the files.
+        if [ ! -d "$SDL3_PREFIX/lib" ]; then
+            echo "SDL3 layout unexpected — retrying with --strip-components=1"
+            sudo rm -rf "$SDL3_PREFIX"
+            sudo mkdir -p "$SDL3_PREFIX"
+            curl -fsSL "$SDL3_URL" -o /tmp/sdl3.tar.gz
+            sudo tar -xzf /tmp/sdl3.tar.gz -C "$SDL3_PREFIX" --strip-components=1
+            rm /tmp/sdl3.tar.gz
+        fi
+        if [ ! -d "$SDL3_PREFIX/lib" ]; then
+            echo "ERROR: SDL3 extraction failed — $SDL3_PREFIX/lib not found"
+            echo "FetchContent will build SDL3 from source during configure."
+        else
+            echo "SDL3 installed to $SDL3_PREFIX"
+        fi
     else
         echo "WARNING: Pre-built SDL3 download failed."
         echo "FetchContent will build SDL3 from source during configure."
@@ -99,11 +115,11 @@ fi
 # ── 5. CMake configure ─────────────────────────────────────────────────────
 echo ""
 echo "--- Configuring CMake build ---"
-CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
+CMAKE_ARGS=("-DCMAKE_BUILD_TYPE=Debug")
 if [ -d "$SDL3_PREFIX/lib" ]; then
-    CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_PREFIX_PATH=$SDL3_PREFIX"
+    CMAKE_ARGS+=("-DCMAKE_PREFIX_PATH=$SDL3_PREFIX")
 fi
-cmake -B build $CMAKE_ARGS
+cmake -B build "${CMAKE_ARGS[@]}"
 echo "CMake configure complete."
 
 # ── 6. Build math + engine lessons ─────────────────────────────────────────
@@ -151,11 +167,9 @@ echo "--- Building and running tests ---"
 cmake --build build --target test_math -j"$(nproc)" --quiet 2>&1 || true
 cmake --build build --target test_obj -j"$(nproc)" --quiet 2>&1 || true
 cmake --build build --target test_gltf -j"$(nproc)" --quiet 2>&1 || true
-cd build
-ctest -C Debug --output-on-failure 2>&1 || {
+ctest --test-dir build -C Debug --output-on-failure 2>&1 || {
     echo "WARNING: Some tests failed (non-fatal for setup)"
 }
-cd ..
 
 # ── 8. Summary ─────────────────────────────────────────────────────────────
 echo ""
