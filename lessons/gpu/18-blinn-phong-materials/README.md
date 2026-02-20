@@ -82,11 +82,12 @@ call, different material uniforms are pushed to the fragment shader:
 
 ```c
 for (obj_i = 0; obj_i < NUM_OBJECTS; obj_i++) {
-    const Material *mat = scene_objects[obj_i].material;
+    const SceneObject *obj = &scene_objects[obj_i];
+    const Material *mat = obj->material;
 
     /* Build model matrix for this object's position */
-    mat4 model = mat4_multiply(
-        mat4_translate(obj->position), node->world_transform);
+    mat4 translate = mat4_translate(obj->position);
+    mat4 model = mat4_multiply(translate, node->world_transform);
 
     /* Push material colors to the fragment shader */
     FragUniforms fu;

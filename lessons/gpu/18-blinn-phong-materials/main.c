@@ -1148,6 +1148,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 #ifndef FORGE_CAPTURE
     if (SDL_SetWindowRelativeMouseMode(window, true)) {
         state->mouse_captured = true;
+    } else {
+        SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
     }
 #endif
 
@@ -1243,6 +1245,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         if (!state->mouse_captured) {
             if (SDL_SetWindowRelativeMouseMode(state->window, true)) {
                 state->mouse_captured = true;
+            } else {
+                SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s",
+                        SDL_GetError());
             }
         }
         break;
