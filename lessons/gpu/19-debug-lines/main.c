@@ -316,6 +316,13 @@ static bool add_vertex(app_state *state, vec3 position, vec4 color,
 static void debug_line(app_state *state, vec3 start, vec3 end,
                         vec4 color, bool overlay)
 {
+    /* LINELIST requires vertex pairs — ensure two slots are available
+     * before adding either vertex, otherwise we'd leave an unpaired
+     * vertex that corrupts the draw call. */
+    Uint32 total = state->world_count + state->overlay_count;
+    if (total + 2 > MAX_DEBUG_VERTICES) {
+        return;
+    }
     add_vertex(state, start, color, overlay);
     add_vertex(state, end, color, overlay);
 }
@@ -968,9 +975,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     if (total_vertices > 0) {
         /* Compact overlay vertices: move them from the end of the array
-         * to sit right after the world vertices.  The overlay vertices
-         * were stored in reverse order (last added = lowest index),
-         * so we reverse them during the copy to maintain draw order. */
+         * to sit right after the world vertices.
+         *
+         * Overlay vertices were stored growing downward from the end:
+         * the first overlay added is at index MAX-1, the second at
+         * MAX-2, etc.  A forward copy from overlay_start preserves
+         * this order: the first-added overlay ends up at the start
+         * of the overlay region, which is the correct draw order. */
         if (state->overlay_count > 0) {
             Uint32 i;
             Uint32 overlay_start = MAX_DEBUG_VERTICES - state->overlay_count;
