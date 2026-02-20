@@ -3,11 +3,12 @@
 import os
 
 import matplotlib
-import matplotlib.patheffects as pe
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
 
 matplotlib.use("Agg")
+
+import matplotlib.patheffects as pe  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Paths and settings
