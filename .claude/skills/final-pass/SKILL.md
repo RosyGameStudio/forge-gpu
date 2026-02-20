@@ -30,8 +30,9 @@ other command execution — never run those directly from the main agent.
 ## 1. SDL GPU bool return checks (40+ PR comments historically)
 
 **This is the single most common PR finding.** Every SDL function that returns
-`bool` must be checked. Search the lesson's `main.c` for every SDL call and
-verify each one that returns `bool` has error handling.
+`bool` must be checked. Search **all** `.c` and `.h` files in the lesson
+directory (not just `main.c`) for every SDL call and verify each one that
+returns `bool` has error handling.
 
 **Functions that return bool (non-exhaustive):**
 
@@ -64,7 +65,8 @@ if (!SDL_SomeFunction(args)) {
 - [ ] Failure paths clean up resources allocated before the failure point
 
 **How to search:** Use Grep for patterns like `SDL_Submit`, `SDL_SetGPUSwapchain`,
-`SDL_Init(`, `SDL_Claim` in main.c and verify each has an `if (!...)` wrapper.
+`SDL_Init(`, `SDL_Claim` across all `.c` and `.h` files in the lesson directory
+and verify each has an `if (!...)` wrapper.
 
 ---
 
@@ -214,7 +216,7 @@ sections.
 
 ## 9. Markdown linting
 
-Run the linter and fix all issues.
+Run the linter and resolve all issues.
 
 ```bash
 npx markdownlint-cli2 "lessons/gpu/NN-name/**/*.md" "lessons/math/NN-name/**/*.md"
