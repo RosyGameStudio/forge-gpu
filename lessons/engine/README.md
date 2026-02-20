@@ -38,16 +38,34 @@ source code into a working program.
 
 <!-- Add lessons here as they are created -->
 
-## How Engine Lessons Work
+## What you'll learn
 
-Each lesson includes:
+- How CMake finds, links, and builds libraries — and what to do when it doesn't
+- C language features that matter for graphics: pointers, memory layout, structs
+- How to read and fix compiler, linker, and runtime errors
+- Project structure patterns that scale from one file to many modules
+- How to add engine features like resource managers, asset pipelines, and input
+  abstraction
 
-1. **Example project** — A small, focused program demonstrating the concept
-2. **README** — Detailed explanation with diagrams and examples
-3. **Common errors** — What goes wrong and how to fix it
-4. **Cross-references** — Links to GPU/math lessons where this knowledge applies
+## Result
 
-### Running a lesson
+After working through the engine lessons you will be able to set up, build,
+debug, and extend a C/CMake graphics project on any platform — and diagnose
+the errors that inevitably appear along the way.
+
+## Key concepts
+
+- **Targets and properties** — CMake's model for executables, libraries, and
+  their relationships
+- **Translation units** — How the compiler turns `.c` files into object files
+  and the linker combines them
+- **Memory ownership** — Stack vs heap, who allocates, who frees
+- **Error messages** — What the compiler/linker is actually telling you and how
+  to act on it
+- **Platform differences** — Where Windows, macOS, and Linux diverge in
+  practice
+
+## Building
 
 ```bash
 cmake -B build
@@ -64,6 +82,25 @@ build\lessons\engine\01-topic-name\Debug\01-topic-name.exe
 # Linux / macOS
 ./build/lessons/engine/01-topic-name/01-topic-name
 ```
+
+## Exercises
+
+1. Break a build on purpose — remove a `target_link_libraries` call and read
+   the linker error. Can you identify the missing symbol and the library it
+   belongs to?
+2. Add a new source file to an existing lesson and update `CMakeLists.txt` to
+   compile it. What happens if you forget?
+3. Use a debugger to set a breakpoint inside `SDL_AppInit`, inspect a variable,
+   and step through one frame of the main loop.
+
+## How Engine Lessons Work
+
+Each lesson includes:
+
+1. **Example project** — A small, focused program demonstrating the concept
+2. **README** — Detailed explanation with diagrams and examples
+3. **Common errors** — What goes wrong and how to fix it
+4. **Cross-references** — Links to GPU/math lessons where this knowledge applies
 
 ## Topics to Cover
 
