@@ -287,6 +287,13 @@ static void demo_functions(void)
 
 /* ── Section 6: Arrays and Strings ────────────────────────────────────── */
 
+/* Named constants for array sizes — no magic numbers.  Using #define
+ * makes the bounds explicit and ensures the declaration, loop, and any
+ * future bounds check all agree on the same value. */
+#define SCORE_COUNT  4
+#define BUFFER_SIZE 32
+#define DATA_COUNT   3
+
 static void demo_arrays_and_strings(void)
 {
     SDL_Log("--- 5. Arrays and Strings ---");
@@ -294,10 +301,10 @@ static void demo_arrays_and_strings(void)
     /* An array is a contiguous block of elements of the same type.
      * In graphics, arrays hold vertex positions, colors, indices —
      * all the data that eventually reaches the GPU. */
-    float scores[4] = {95.0f, 87.5f, 92.0f, 78.5f};
+    float scores[SCORE_COUNT] = {95.0f, 87.5f, 92.0f, 78.5f};
 
-    SDL_Log("  Array of 4 floats:");
-    for (int i = 0; i < 4; i++) {
+    SDL_Log("  Array of %d floats:", SCORE_COUNT);
+    for (int i = 0; i < SCORE_COUNT; i++) {
         SDL_Log("    scores[%d] = %.1f", i, scores[i]);
     }
 
@@ -335,7 +342,7 @@ static void demo_arrays_and_strings(void)
      *   SDL_snprintf — formatted print to a buffer (like snprintf)
      *
      * These are safer and more portable than the C standard versions. */
-    char buffer[32];
+    char buffer[BUFFER_SIZE];
     SDL_snprintf(buffer, sizeof(buffer), "Score: %.1f", scores[0]);
     SDL_Log("    SDL_snprintf -> \"%s\"", buffer);
     SDL_Log(" ");
@@ -381,10 +388,10 @@ static void demo_pointers(void)
      * arr[i] is equivalent to *(arr + i). */
     SDL_Log(" ");
     SDL_Log("  Pointer arithmetic:");
-    float data[3] = {1.0f, 2.0f, 3.0f};
+    float data[DATA_COUNT] = {1.0f, 2.0f, 3.0f};
     float *p = data;  /* array name decays to pointer to first element */
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < DATA_COUNT; i++) {
         SDL_Log("    *(p + %d) = %.1f  (address %p)", i, *(p + i), (void *)(p + i));
     }
     SDL_Log("  Each step advances by %d bytes (sizeof(float))", (int)sizeof(float));

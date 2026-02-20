@@ -635,6 +635,9 @@ In forge-gpu lessons:
   lesson
 - Every GPU lesson uses `SDL_Log` for error reporting and `SDL_malloc`/
   `SDL_free` for dynamic data
+- [Math Lesson 01 — Vectors](../../math/01-vectors/) uses `vec3` structs,
+  `sizeof`, and array layouts — the same struct and memory patterns introduced
+  here, applied to vector math
 
 ## Building
 
