@@ -377,7 +377,8 @@ static int type_component_count(const char *type)
 
 static const void *forge_gltf__get_accessor(
     const cJSON *root, const ForgeGltfScene *scene,
-    int accessor_idx, int *out_count, int *out_component_type)
+    int accessor_idx, int *out_count, int *out_component_type,
+    int *out_num_components)
 {
     const cJSON *accessors = cJSON_GetObjectItemCaseSensitive(root, "accessors");
     const cJSON *views = cJSON_GetObjectItemCaseSensitive(root, "bufferViews");
@@ -472,6 +473,7 @@ static const void *forge_gltf__get_accessor(
 
     if (out_count) *out_count = count;
     if (out_component_type) *out_component_type = comp->valueint;
+    if (out_num_components) *out_num_components = num_components;
 
     return scene->buffers[bi].data + bv_offset + (Uint32)acc_offset;
 }
@@ -731,7 +733,8 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
             int vert_count = 0;
             int comp_type = 0;
             const float *positions = (const float *)forge_gltf__get_accessor(
-                root, scene, pos_acc->valueint, &vert_count, &comp_type);
+                root, scene, pos_acc->valueint, &vert_count, &comp_type,
+                NULL);
             if (!positions || comp_type != FORGE_GLTF_FLOAT) continue;
 
             const float *normals = NULL;
@@ -741,7 +744,8 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
                 int norm_count = 0;
                 int norm_comp = 0;
                 const float *n = (const float *)forge_gltf__get_accessor(
-                    root, scene, norm_acc->valueint, &norm_count, &norm_comp);
+                    root, scene, norm_acc->valueint, &norm_count, &norm_comp,
+                    NULL);
                 if (n && norm_count == vert_count
                       && norm_comp == FORGE_GLTF_FLOAT) {
                     normals = n;
@@ -755,7 +759,8 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
                 int uv_count = 0;
                 int uv_comp = 0;
                 const float *u = (const float *)forge_gltf__get_accessor(
-                    root, scene, uv_acc->valueint, &uv_count, &uv_comp);
+                    root, scene, uv_acc->valueint, &uv_count, &uv_comp,
+                    NULL);
                 if (u && uv_count == vert_count
                       && uv_comp == FORGE_GLTF_FLOAT) {
                     uvs = u;
@@ -775,11 +780,13 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
             if (tangent_acc) {
                 int tang_count = 0;
                 int tang_comp = 0;
+                int tang_num = 0;
                 const float *t = (const float *)forge_gltf__get_accessor(
                     root, scene, tangent_acc->valueint,
-                    &tang_count, &tang_comp);
+                    &tang_count, &tang_comp, &tang_num);
                 if (t && tang_count == vert_count
-                      && tang_comp == FORGE_GLTF_FLOAT) {
+                      && tang_comp == FORGE_GLTF_FLOAT
+                      && tang_num == 4) {
                     tangent_data = t;
                 }
             }
@@ -832,7 +839,8 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
                 int idx_count = 0;
                 int idx_comp = 0;
                 const void *idx_data = forge_gltf__get_accessor(
-                    root, scene, idx_acc->valueint, &idx_count, &idx_comp);
+                    root, scene, idx_acc->valueint, &idx_count, &idx_comp,
+                    NULL);
 
                 if (idx_data && idx_count > 0) {
                     Uint32 elem_size = 0;

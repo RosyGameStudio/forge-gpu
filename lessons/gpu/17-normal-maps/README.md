@@ -186,7 +186,7 @@ nearly every 3D content tool:
 | Maya | Available via plugin / FBX export option |
 | Unreal Engine | Default tangent-space computation |
 | Unity | Default for normal map import |
-| glTF 2.0 | Specification requires MikkTSpace when tangents are omitted |
+| glTF 2.0 | Specification recommends MikkTSpace when tangents are omitted |
 
 When you see "MikkTSpace" as a checkbox or dropdown in these tools, it
 means: "use Mikkelsen's algorithm so that baking and rendering agree."

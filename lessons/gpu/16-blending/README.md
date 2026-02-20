@@ -210,7 +210,7 @@ for (i = 0; i < 3; i++) {
 For each output axis, the method sums the minimum and maximum contributions
 from each matrix column scaled by the AABB extents. A positive matrix entry
 maps `local_min` to the output minimum and `local_max` to the output
-maximum; a negative entry swaps them. This produces the exact same
+maximum; a negative entry swaps them. This produces the same
 world-space AABB as the corner approach, using 18 multiplies and 18
 comparisons instead of 8 full matrix–vector multiplies.
 
