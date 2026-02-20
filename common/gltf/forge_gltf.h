@@ -63,6 +63,9 @@
 #define FORGE_GLTF_UNSIGNED_INT   5125
 #define FORGE_GLTF_FLOAT          5126
 
+/* glTF tangent vectors are VEC4: xyz = direction, w = handedness */
+#define FORGE_GLTF_TANGENT_COMPONENTS 4
+
 /* Maximum path length for file references. */
 #define FORGE_GLTF_PATH_SIZE 512
 
@@ -786,11 +789,10 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
                     &tang_count, &tang_comp, &tang_num);
                 if (t && tang_count == vert_count
                       && tang_comp == FORGE_GLTF_FLOAT
-                      && tang_num == 4) {
+                      && tang_num == FORGE_GLTF_TANGENT_COMPONENTS) {
                     tangent_data = t;
                 }
             }
-            gp->has_tangents = (tangent_data != NULL);
 
             /* Interleave into ForgeGltfVertex array. */
             gp->vertices = (ForgeGltfVertex *)SDL_calloc(
@@ -822,12 +824,13 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
                 gp->tangents = (vec4 *)SDL_calloc(
                     (size_t)vert_count, sizeof(vec4));
                 if (gp->tangents) {
+                    gp->has_tangents = true;
                     int tv;
                     for (tv = 0; tv < vert_count; tv++) {
-                        gp->tangents[tv].x = tangent_data[tv * 4 + 0];
-                        gp->tangents[tv].y = tangent_data[tv * 4 + 1];
-                        gp->tangents[tv].z = tangent_data[tv * 4 + 2];
-                        gp->tangents[tv].w = tangent_data[tv * 4 + 3];
+                        gp->tangents[tv].x = tangent_data[tv * FORGE_GLTF_TANGENT_COMPONENTS + 0];
+                        gp->tangents[tv].y = tangent_data[tv * FORGE_GLTF_TANGENT_COMPONENTS + 1];
+                        gp->tangents[tv].z = tangent_data[tv * FORGE_GLTF_TANGENT_COMPONENTS + 2];
+                        gp->tangents[tv].w = tangent_data[tv * FORGE_GLTF_TANGENT_COMPONENTS + 3];
                     }
                 }
             }
