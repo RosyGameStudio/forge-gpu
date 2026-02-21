@@ -3549,30 +3549,40 @@ def diagram_dithering_comparison():
     dithered_r1 = np.floor((gradient + (r1_vals - 0.5) / levels) * levels) / levels
     dithered_r1 = np.clip(dithered_r1, 0, 1)
 
-    # Blue noise dithering — build a 64x64 tile via Mitchell's best candidate,
-    # then tile across the gradient dimensions
+    # Blue noise dithering — build a 64x64 tile via 2D Mitchell's best candidate,
+    # then tile across the gradient dimensions.
+    # Use _blue_noise_2d to generate 2D sample positions with toroidal distance,
+    # then build a rank map: each cell gets a threshold from insertion order.
     tile_size = 64
     tile_count = tile_size * tile_size
-    # Generate blue-noise distributed values in [0, 1) for a 64x64 tile
-    # Use best-candidate: place each new value as far as possible from existing ones
-    bn_tile_flat = [_hash_to_float_low24(_wang_hash(7))]
-    for i in range(1, tile_count):
-        best_val, best_dist = 0.0, -1.0
-        for c in range(10):  # 10 candidates per sample
-            h = _wang_hash((7 + (i * 10 + c) * 2654435761) & 0xFFFFFFFF)
-            candidate = _hash_to_float_low24(h)
-            # Toroidal minimum distance to all existing values
-            min_d = 1e30
-            for existing in bn_tile_flat:
-                d = abs(candidate - existing)
-                d = min(d, 1.0 - d)  # Wrap around [0, 1)
-                if d < min_d:
-                    min_d = d
-            if min_d > best_dist:
-                best_dist = min_d
-                best_val = candidate
-        bn_tile_flat.append(best_val)
-    bn_tile = np.array(bn_tile_flat).reshape(tile_size, tile_size)
+    bnx, bny = _blue_noise_2d(tile_count, 10, 7)
+    # Build rank map: map each 2D position to a grid cell, assign rank by
+    # insertion order (earlier samples get lower ranks → lower thresholds)
+    bn_tile = np.zeros((tile_size, tile_size))
+    occupied = np.full((tile_size, tile_size), -1, dtype=int)
+    for rank in range(tile_count):
+        col = int(bnx[rank] * tile_size) % tile_size
+        row = int(bny[rank] * tile_size) % tile_size
+        # Handle collisions: find nearest unoccupied cell
+        if occupied[row, col] >= 0:
+            found = False
+            for radius in range(1, tile_size):
+                for dr in range(-radius, radius + 1):
+                    for dc in range(-radius, radius + 1):
+                        if abs(dr) != radius and abs(dc) != radius:
+                            continue
+                        nr = (row + dr) % tile_size
+                        nc = (col + dc) % tile_size
+                        if occupied[nr, nc] < 0:
+                            row, col = nr, nc
+                            found = True
+                            break
+                    if found:
+                        break
+                if found:
+                    break
+        occupied[row, col] = rank
+        bn_tile[row, col] = rank / tile_count  # Normalize to [0, 1)
     rows, cols = gradient.shape
     blue_noise = np.tile(bn_tile, (rows // tile_size + 1, cols // tile_size + 1))[
         :rows, :cols
@@ -3861,12 +3871,29 @@ def _star_discrepancy(xs, ys):
     """Brute-force star discrepancy (Python version for diagrams)."""
     n = len(xs)
     max_disc = 0.0
+    # Test rectangles [0,u]×[0,v] at each sample point (inclusive comparisons)
     for i in range(n):
         u, v = xs[i], ys[i]
-        inside = np.sum((xs < u) & (ys < v))
+        inside = np.sum((xs <= u) & (ys <= v))
         disc = abs(inside / n - u * v)
         if disc > max_disc:
             max_disc = disc
+    # Test boundary rectangles with u=1 (full width)
+    for i in range(n):
+        inside = np.sum(ys <= ys[i])
+        disc = abs(inside / n - ys[i])
+        if disc > max_disc:
+            max_disc = disc
+    # Test boundary rectangles with v=1 (full height)
+    for i in range(n):
+        inside = np.sum(xs <= xs[i])
+        disc = abs(inside / n - xs[i])
+        if disc > max_disc:
+            max_disc = disc
+    # Test corner rectangle [0,1]×[0,1] — should be 0 but include for completeness
+    disc = abs(1.0 - 1.0)  # all n points inside, area = 1
+    if disc > max_disc:
+        max_disc = disc
     return max_disc
 
 
