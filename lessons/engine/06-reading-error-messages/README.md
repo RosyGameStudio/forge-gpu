@@ -383,7 +383,8 @@ GPU programs have additional failure modes beyond regular C crashes:
 - **Missing assets** — `SDL_LoadFile` returns NULL because an asset file is
   missing or the working directory is wrong
 - **Black screen** — The build succeeds and the program runs, but nothing is
-  visible. Common causes: vertices outside the clip volume (NDC range -1 to +1),
+  visible. Common causes: vertices outside the clip volume (normalized device
+  coordinates, or NDC, range -1 to +1),
   back-face culling discarding triangles, depth test failing, or the clear color
   matching the geometry color
 
@@ -562,6 +563,10 @@ Understanding error messages is relevant to every lesson in forge-gpu:
 - [Engine Lesson 05 — Header-Only Libraries](../05-header-only-libraries/)
   explains the one-definition rule violations that cause "multiple definition"
   linker errors
+- [Math Lesson 01 — Vectors](../../math/01-vectors/) is the first lesson that
+  uses the math library — a missing `#include "math/forge_math.h"` or a
+  misspelled function name like `vec3_normlize` produces the compiler errors
+  described in this lesson
 - [GPU Lesson 01 — Hello Window](../../gpu/01-hello-window/) establishes the
   SDL error checking pattern used in every GPU lesson
 - Every GPU lesson uses `SDL_GetError()` to report runtime failures — this
