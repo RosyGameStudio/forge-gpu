@@ -2614,6 +2614,22 @@ static void test_noise_fbm2d_more_octaves_not_identical(void)
     END_TEST();
 }
 
+static void test_noise_fbm2d_zero_octaves(void)
+{
+    TEST("fbm2d returns 0 when octaves <= 0");
+    ASSERT_FLOAT_EQ(forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED, 0, 2.0f, 0.5f), 0.0f);
+    ASSERT_FLOAT_EQ(forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED, -1, 2.0f, 0.5f), 0.0f);
+    END_TEST();
+}
+
+static void test_noise_fbm3d_zero_octaves(void)
+{
+    TEST("fbm3d returns 0 when octaves <= 0");
+    ASSERT_FLOAT_EQ(forge_noise_fbm3d(1.5f, 2.3f, 0.7f, TEST_NOISE_SEED, 0, 2.0f, 0.5f), 0.0f);
+    ASSERT_FLOAT_EQ(forge_noise_fbm3d(1.5f, 2.3f, 0.7f, TEST_NOISE_SEED, -1, 2.0f, 0.5f), 0.0f);
+    END_TEST();
+}
+
 /* --- Domain warping --- */
 
 static void test_noise_domain_warp2d_deterministic(void)
@@ -2899,6 +2915,8 @@ int main(int argc, char *argv[])
     test_noise_fbm3d_deterministic();
     test_noise_fbm3d_single_octave_matches_perlin();
     test_noise_fbm2d_more_octaves_not_identical();
+    test_noise_fbm2d_zero_octaves();
+    test_noise_fbm3d_zero_octaves();
     test_noise_domain_warp2d_deterministic();
     test_noise_domain_warp2d_zero_strength_is_fbm();
     test_noise_domain_warp2d_differs_from_plain();

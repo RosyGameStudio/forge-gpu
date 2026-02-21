@@ -2591,6 +2591,8 @@ def _simplex2d(x, y, seed):
 
 def _fbm2d(x, y, seed, octaves, lacunarity=2.0, persistence=0.5):
     """2D fractal Brownian motion (vectorised)."""
+    if octaves <= 0:
+        return np.zeros_like(x, dtype=np.float64)
     total = np.zeros_like(x, dtype=np.float64)
     amplitude = 1.0
     frequency = 1.0
