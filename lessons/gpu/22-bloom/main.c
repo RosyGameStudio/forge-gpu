@@ -2020,11 +2020,31 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     state->hdr_width = w;
     state->hdr_height = h;
 
-    /* Recreate bloom mip chain for new resolution. */
-    release_bloom_mip_chain(state);
+    /* Recreate bloom mip chain for new resolution.
+     * Save the old chain so we can restore it if creation fails. */
+    SDL_GPUTexture *old_bloom[BLOOM_MIP_COUNT];
+    Uint32 old_widths[BLOOM_MIP_COUNT];
+    Uint32 old_heights[BLOOM_MIP_COUNT];
+    for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+      old_bloom[i] = state->bloom_mips[i];
+      old_widths[i] = state->bloom_widths[i];
+      old_heights[i] = state->bloom_heights[i];
+      state->bloom_mips[i] = NULL;
+    }
     if (!create_bloom_mip_chain(state)) {
-      SDL_Log("Failed to recreate bloom mip chain on resize");
+      SDL_Log("Failed to recreate bloom mip chain on resize — keeping old chain");
+      for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+        state->bloom_mips[i] = old_bloom[i];
+        state->bloom_widths[i] = old_widths[i];
+        state->bloom_heights[i] = old_heights[i];
+      }
       return SDL_APP_CONTINUE;
+    }
+    /* New chain created successfully — release the old textures. */
+    for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+      if (old_bloom[i]) {
+        SDL_ReleaseGPUTexture(state->device, old_bloom[i]);
+      }
     }
   }
   if (w != state->depth_width || h != state->depth_height) {

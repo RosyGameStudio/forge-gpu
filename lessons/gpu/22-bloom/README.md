@@ -203,6 +203,9 @@ $$
 \text{attenuation} = \frac{1}{1 + 0.09d + 0.032d^2}
 $$
 
+where $d$ is the distance from the point light to the surface position in
+world space.
+
 The light orbits the scene as a visible emissive sphere, creating a
 natural motivation for bloom — the bright sphere drives the glow effect.
 

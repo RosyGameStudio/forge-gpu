@@ -125,6 +125,86 @@ for (int i = BLOOM_MIP_COUNT - 2; i >= 0; i--) {
 }
 ```
 
+## Key API calls
+
+Each bloom pass is a separate render pass. The key SDL GPU calls per pass:
+
+```c
+/* Begin a render pass targeting one bloom mip */
+SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &color_info, 1, NULL);
+SDL_BindGPUGraphicsPipeline(pass, pipeline);          /* downsample or upsample */
+SDL_BindGPUFragmentSamplers(pass, 0, &sampler_bind, 1); /* source texture + sampler */
+SDL_PushGPUFragmentUniformData(cmd, 0, &uniforms, sizeof(uniforms));
+SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);             /* fullscreen triangle */
+SDL_EndGPURenderPass(pass);
+```
+
+- **Downsample pass:** `color_info.load_op = SDL_GPU_LOADOP_CLEAR`
+- **Upsample pass:** `color_info.load_op = SDL_GPU_LOADOP_LOAD` (preserve
+  downsample data; the additive blend state on the pipeline accumulates)
+- **Tonemap pass:** Bind both `hdr_target` and `bloom_mips[0]` as fragment
+  samplers, combine before tone mapping
+
+## Code template
+
+Minimal copy-ready skeleton for the per-frame bloom passes:
+
+```c
+/* ── Downsample: extract bright areas and progressively blur ───────── */
+BloomDownsampleUniforms ds_u;
+for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+    /* Source is HDR target for first pass, previous mip for the rest */
+    SDL_GPUTexture *src = (i == 0) ? hdr_target : bloom_mips[i - 1];
+    Uint32 src_w = (i == 0) ? hdr_width : bloom_widths[i - 1];
+    Uint32 src_h = (i == 0) ? hdr_height : bloom_heights[i - 1];
+
+    ds_u.texel_size[0] = 1.0f / (float)src_w;
+    ds_u.texel_size[1] = 1.0f / (float)src_h;
+    ds_u.threshold = bloom_threshold;
+    ds_u.use_karis = (i == 0) ? 1.0f : 0.0f;
+
+    /* Render to bloom_mips[i], CLEAR load op */
+    SDL_GPUColorTargetInfo color_info;
+    SDL_zero(color_info);
+    color_info.texture = bloom_mips[i];
+    color_info.load_op = SDL_GPU_LOADOP_CLEAR;
+    color_info.store_op = SDL_GPU_STOREOP_STORE;
+
+    SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &color_info, 1, NULL);
+    SDL_BindGPUGraphicsPipeline(pass, downsample_pipeline);
+    SDL_GPUTextureSamplerBinding bind = { .texture = src, .sampler = bloom_sampler };
+    SDL_BindGPUFragmentSamplers(pass, 0, &bind, 1);
+    SDL_PushGPUFragmentUniformData(cmd, 0, &ds_u, sizeof(ds_u));
+    SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+    SDL_EndGPURenderPass(pass);
+}
+
+/* ── Upsample: progressively add back detail with additive blend ───── */
+BloomUpsampleUniforms us_u;
+for (int i = BLOOM_MIP_COUNT - 2; i >= 0; i--) {
+    /* Source is the smaller (i+1) mip */
+    us_u.texel_size[0] = 1.0f / (float)bloom_widths[i + 1];
+    us_u.texel_size[1] = 1.0f / (float)bloom_heights[i + 1];
+
+    /* Render to bloom_mips[i], LOAD to preserve downsample data */
+    SDL_GPUColorTargetInfo color_info;
+    SDL_zero(color_info);
+    color_info.texture = bloom_mips[i];
+    color_info.load_op = SDL_GPU_LOADOP_LOAD;   /* critical: preserve existing data */
+    color_info.store_op = SDL_GPU_STOREOP_STORE;
+
+    SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &color_info, 1, NULL);
+    SDL_BindGPUGraphicsPipeline(pass, upsample_pipeline);  /* has additive blend */
+    SDL_GPUTextureSamplerBinding bind = {
+        .texture = bloom_mips[i + 1], .sampler = bloom_sampler
+    };
+    SDL_BindGPUFragmentSamplers(pass, 0, &bind, 1);
+    SDL_PushGPUFragmentUniformData(cmd, 0, &us_u, sizeof(us_u));
+    SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+    SDL_EndGPURenderPass(pass);
+}
+```
+
 ## Common mistakes
 
 1. **CLEAR instead of LOAD on upsample** — The upsample pass MUST use
