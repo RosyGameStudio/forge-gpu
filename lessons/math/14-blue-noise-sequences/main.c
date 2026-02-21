@@ -288,11 +288,12 @@ static void demo_blue_noise(void)
     printf("  approximating a Poisson disk distribution.\n\n");
 
     /* Generate and display blue noise */
-    #define BN_COUNT 40
-    #define BN_GRID  40
+    #define BN_COUNT      40
+    #define BN_GRID       40
+    #define BN_CANDIDATES 20  /* candidates per point (higher = better quality) */
 
     float bn_x[BN_COUNT], bn_y[BN_COUNT];
-    forge_blue_noise_2d(bn_x, bn_y, BN_COUNT, 20, 42u);
+    forge_blue_noise_2d(bn_x, bn_y, BN_COUNT, BN_CANDIDATES, 42u);
 
     /* Also generate random for comparison */
     char bn_grid[BN_GRID][BN_GRID];
@@ -337,6 +338,7 @@ static void demo_blue_noise(void)
 
     #undef BN_COUNT
     #undef BN_GRID
+    #undef BN_CANDIDATES
 }
 
 /* ── 6. Discrepancy Comparison ───────────────────────────────────── */
@@ -492,7 +494,7 @@ static void demo_sampling(void)
     printf("  Drop N points in [0,1)^2, count how many satisfy x^2+y^2 < 1.\n\n");
 
     int sample_counts[] = {16, 64, 256, 1024};
-    float true_value = 3.14159265f / 4.0f;
+    float true_value = (float)M_PI / 4.0f;  /* pi/4 = area of quarter circle */
 
     printf("  %-8s  %-14s  %-14s  %-14s\n",
            "N", "Random error", "Halton error", "R2 error");
@@ -558,6 +560,8 @@ static void demo_stippling(void)
     #define STIP_W 60
     #define STIP_H 25
     #define STIP_CANDIDATES 4000
+    #define STIP_ASPECT_RATIO 2.0f   /* Compensate for non-square characters */
+    #define STIP_DENSITY      0.8f   /* Max acceptance probability (0-1) */
 
     char stipple[STIP_H][STIP_W];
     for (int y = 0; y < STIP_H; y++) {
@@ -583,7 +587,7 @@ static void demo_stippling(void)
 
         /* Compute darkness at this position (radial gradient) */
         float dx = (float)ix - cx;
-        float dy = ((float)iy - cy) * 2.0f;  /* Stretch for aspect ratio */
+        float dy = ((float)iy - cy) * STIP_ASPECT_RATIO;
         float r = sqrtf(dx * dx + dy * dy);
         float darkness = 1.0f - (r / max_r);
         if (darkness < 0.0f) darkness = 0.0f;
@@ -591,7 +595,7 @@ static void demo_stippling(void)
         /* Accept point with probability proportional to darkness */
         float threshold = forge_hash_to_float(
             forge_hash_wang((uint32_t)i ^ 0xBEEF));
-        if (threshold < darkness * 0.8f) {
+        if (threshold < darkness * STIP_DENSITY) {
             stipple[iy][ix] = '.';
         }
     }
@@ -613,6 +617,8 @@ static void demo_stippling(void)
     #undef STIP_W
     #undef STIP_H
     #undef STIP_CANDIDATES
+    #undef STIP_ASPECT_RATIO
+    #undef STIP_DENSITY
 }
 
 /* ── 10. Sequence Comparison Summary ─────────────────────────────── */
