@@ -207,7 +207,7 @@ python scripts/compile_shaders.py 20
 cmake --build build --target 20-linear-fog
 
 # Run
-./build/lessons/gpu/20-linear-fog/Debug/20-linear-fog
+python scripts/run.py 20
 ```
 
 ## Controls

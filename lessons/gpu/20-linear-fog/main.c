@@ -1765,6 +1765,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_EndGPURenderPass(pass);
 
 #ifdef FORGE_CAPTURE
+    /* forge_capture_finish_frame submits the command buffer internally
+     * when it returns true (it uses SDL_SubmitGPUCommandBufferAndAcquireFence).
+     * The caller must NOT call SDL_SubmitGPUCommandBuffer again — return
+     * early in both the "quit after capture" and "continue" cases. */
     if (state->capture.mode != FORGE_CAPTURE_NONE && swapchain_tex) {
         if (forge_capture_finish_frame(&state->capture, cmd, swapchain_tex)) {
             if (forge_capture_should_quit(&state->capture)) {
