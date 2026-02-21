@@ -54,6 +54,7 @@ add_subdirectory(lessons/math/13-gradient-noise)
 # ── Engine Lessons ──────────────────────────────────────────────────────────
 add_subdirectory(lessons/engine/01-intro-to-c)
 add_subdirectory(lessons/engine/02-cmake-fundamentals)
+add_subdirectory(lessons/engine/04-pointers-and-memory)
 
 # ── GPU Lessons ─────────────────────────────────────────────────────────────
 add_subdirectory(lessons/gpu/01-hello-window)
