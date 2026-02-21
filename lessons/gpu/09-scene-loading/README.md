@@ -144,7 +144,9 @@ reflects how models are authored.
 ## The glTF parser library
 
 The parser lives in `common/gltf/forge_gltf.h` — a header-only library
-following the same pattern as `common/obj/forge_obj.h`.
+following the same pattern as `common/obj/forge_obj.h`. See
+[Engine Lesson 05](../../engine/05-header-only-libraries/) for how header-only
+libraries work (`static inline`, include guards, the one-definition rule).
 
 ### CPU-side parsing, GPU-side upload
 
