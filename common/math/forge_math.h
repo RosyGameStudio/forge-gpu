@@ -4073,6 +4073,8 @@ static inline float forge_noise_fbm2d(float x, float y, uint32_t seed,
                                        int octaves, float lacunarity,
                                        float persistence)
 {
+    if (octaves <= 0) { return 0.0f; }
+
     float sum = 0.0f;
     float amplitude = 1.0f;
     float frequency = 1.0f;
@@ -4106,6 +4108,8 @@ static inline float forge_noise_fbm3d(float x, float y, float z, uint32_t seed,
                                        int octaves, float lacunarity,
                                        float persistence)
 {
+    if (octaves <= 0) { return 0.0f; }
+
     float sum = 0.0f;
     float amplitude = 1.0f;
     float frequency = 1.0f;

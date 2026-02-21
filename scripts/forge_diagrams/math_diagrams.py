@@ -2913,11 +2913,7 @@ def diagram_fade_curves():
     )
 
     # Mark the endpoints
-    for _curve, color in [
-        (t, STYLE["text_dim"]),
-        (smoothstep, STYLE["accent2"]),
-        (quintic, STYLE["accent1"]),
-    ]:
+    for color in [STYLE["text_dim"], STYLE["accent2"], STYLE["accent1"]]:
         ax.plot(0, 0, "o", color=color, markersize=5, zorder=5)
         ax.plot(1, 1, "o", color=color, markersize=5, zorder=5)
 

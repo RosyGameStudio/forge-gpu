@@ -366,7 +366,7 @@ fBm alone. The method is straightforward:
 1. Sample fBm at $(x, y)$ with seed $s$ to get a horizontal offset $w_x$
 2. Sample fBm at $(x, y)$ with seed $s+1$ to get a vertical offset $w_y$
 3. Sample fBm at the warped position
-   $(x + k \cdot w_x, \; y + k \cdot w_y)$ with seed $s+2$
+   $(x + k \cdot w_x, y + k \cdot w_y)$ with seed $s+2$
 
 The parameter $k$ (warp strength) controls how much distortion to apply.
 Values around 1.0–4.0 produce interesting results; higher values create

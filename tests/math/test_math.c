@@ -2419,17 +2419,23 @@ static void test_noise_perlin2d_zero_at_integers(void)
 
 /* --- Perlin noise range --- */
 
-#define NOISE_RANGE_SAMPLES 10000
-#define NOISE_RANGE_EPSILON 0.01f
+#define NOISE_RANGE_SAMPLES   10000
+#define NOISE_RANGE_EPSILON   0.01f
+#define TEST_NOISE_SEED       42u     /* default seed for noise tests */
+#define TEST_STEP_X           0.073f  /* x step for sampling loops */
+#define TEST_STEP_Y           0.031f  /* y step for sampling loops */
+#define TEST_STEP_Z           0.017f  /* z step for 3D sampling loops */
+#define TEST_WARP_STRENGTH    2.5f    /* domain warp strength for tests */
+#define TEST_CONTINUITY_STEP  0.001f  /* small step to verify continuity */
 
 static void test_noise_perlin2d_range(void)
 {
     TEST("perlin2d stays within [-1, 1]");
     float min_val = 999.0f, max_val = -999.0f;
     for (int i = 0; i < NOISE_RANGE_SAMPLES; i++) {
-        float x = (float)i * 0.073f;
-        float y = (float)i * 0.031f;
-        float val = forge_noise_perlin2d(x, y, 42u);
+        float x = (float)i * TEST_STEP_X;
+        float y = (float)i * TEST_STEP_Y;
+        float val = forge_noise_perlin2d(x, y, TEST_NOISE_SEED);
         if (val < min_val) min_val = val;
         if (val > max_val) max_val = val;
     }
@@ -2449,10 +2455,10 @@ static void test_noise_perlin3d_range(void)
     TEST("perlin3d stays within [-1, 1]");
     float min_val = 999.0f, max_val = -999.0f;
     for (int i = 0; i < NOISE_RANGE_SAMPLES; i++) {
-        float x = (float)i * 0.073f;
-        float y = (float)i * 0.031f;
-        float z = (float)i * 0.017f;
-        float val = forge_noise_perlin3d(x, y, z, 42u);
+        float x = (float)i * TEST_STEP_X;
+        float y = (float)i * TEST_STEP_Y;
+        float z = (float)i * TEST_STEP_Z;
+        float val = forge_noise_perlin3d(x, y, z, TEST_NOISE_SEED);
         if (val < min_val) min_val = val;
         if (val > max_val) max_val = val;
     }
@@ -2474,7 +2480,7 @@ static void test_noise_perlin2d_seed_independence(void)
     TEST("perlin2d produces different values for different seeds");
     float v0 = forge_noise_perlin2d(3.7f, 2.1f, 0u);
     float v1 = forge_noise_perlin2d(3.7f, 2.1f, 1u);
-    float v2 = forge_noise_perlin2d(3.7f, 2.1f, 42u);
+    float v2 = forge_noise_perlin2d(3.7f, 2.1f, TEST_NOISE_SEED);
     /* At least two of these should differ */
     if (float_eq(v0, v1) && float_eq(v1, v2)) {
         SDL_LogError(SDL_LOG_CATEGORY_TEST,
@@ -2491,9 +2497,9 @@ static void test_noise_perlin2d_seed_independence(void)
 static void test_noise_perlin2d_continuity(void)
 {
     TEST("perlin2d is continuous (small input change → small output change)");
-    float base = forge_noise_perlin2d(3.7f, 2.1f, 42u);
-    float step = 0.001f;
-    float nudged = forge_noise_perlin2d(3.7f + step, 2.1f, 42u);
+    float base = forge_noise_perlin2d(3.7f, 2.1f, TEST_NOISE_SEED);
+    float step = TEST_CONTINUITY_STEP;
+    float nudged = forge_noise_perlin2d(3.7f + step, 2.1f, TEST_NOISE_SEED);
     float diff = SDL_fabsf(nudged - base);
     /* With step=0.001, the difference should be very small */
     if (diff > 0.05f) {
@@ -2511,8 +2517,8 @@ static void test_noise_perlin2d_continuity(void)
 static void test_noise_simplex2d_deterministic(void)
 {
     TEST("simplex2d is deterministic");
-    float a = forge_noise_simplex2d(3.7f, 2.1f, 42u);
-    float b = forge_noise_simplex2d(3.7f, 2.1f, 42u);
+    float a = forge_noise_simplex2d(3.7f, 2.1f, TEST_NOISE_SEED);
+    float b = forge_noise_simplex2d(3.7f, 2.1f, TEST_NOISE_SEED);
     ASSERT_FLOAT_EQ(a, b);
     END_TEST();
 }
@@ -2522,9 +2528,9 @@ static void test_noise_simplex2d_range(void)
     TEST("simplex2d stays within [-1, 1]");
     float min_val = 999.0f, max_val = -999.0f;
     for (int i = 0; i < NOISE_RANGE_SAMPLES; i++) {
-        float x = (float)i * 0.073f;
-        float y = (float)i * 0.031f;
-        float val = forge_noise_simplex2d(x, y, 42u);
+        float x = (float)i * TEST_STEP_X;
+        float y = (float)i * TEST_STEP_Y;
+        float val = forge_noise_simplex2d(x, y, TEST_NOISE_SEED);
         if (val < min_val) min_val = val;
         if (val > max_val) max_val = val;
     }
@@ -2544,7 +2550,7 @@ static void test_noise_simplex2d_seed_independence(void)
     TEST("simplex2d produces different values for different seeds");
     float v0 = forge_noise_simplex2d(3.7f, 2.1f, 0u);
     float v1 = forge_noise_simplex2d(3.7f, 2.1f, 1u);
-    float v2 = forge_noise_simplex2d(3.7f, 2.1f, 42u);
+    float v2 = forge_noise_simplex2d(3.7f, 2.1f, TEST_NOISE_SEED);
     if (float_eq(v0, v1) && float_eq(v1, v2)) {
         SDL_LogError(SDL_LOG_CATEGORY_TEST,
                      "    FAIL: All seeds gave same value: %.6f",
@@ -2560,8 +2566,8 @@ static void test_noise_simplex2d_seed_independence(void)
 static void test_noise_fbm2d_deterministic(void)
 {
     TEST("fbm2d is deterministic");
-    float a = forge_noise_fbm2d(3.7f, 2.1f, 42u, 4, 2.0f, 0.5f);
-    float b = forge_noise_fbm2d(3.7f, 2.1f, 42u, 4, 2.0f, 0.5f);
+    float a = forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED, 4, 2.0f, 0.5f);
+    float b = forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED, 4, 2.0f, 0.5f);
     ASSERT_FLOAT_EQ(a, b);
     END_TEST();
 }
@@ -2569,8 +2575,8 @@ static void test_noise_fbm2d_deterministic(void)
 static void test_noise_fbm2d_single_octave_matches_perlin(void)
 {
     TEST("fbm2d with 1 octave matches perlin2d");
-    float fbm = forge_noise_fbm2d(3.7f, 2.1f, 42u, 1, 2.0f, 0.5f);
-    float perlin = forge_noise_perlin2d(3.7f, 2.1f, 42u);
+    float fbm = forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED, 1, 2.0f, 0.5f);
+    float perlin = forge_noise_perlin2d(3.7f, 2.1f, TEST_NOISE_SEED);
     ASSERT_FLOAT_EQ(fbm, perlin);
     END_TEST();
 }
@@ -2578,8 +2584,8 @@ static void test_noise_fbm2d_single_octave_matches_perlin(void)
 static void test_noise_fbm3d_deterministic(void)
 {
     TEST("fbm3d is deterministic");
-    float a = forge_noise_fbm3d(1.5f, 2.3f, 0.7f, 42u, 4, 2.0f, 0.5f);
-    float b = forge_noise_fbm3d(1.5f, 2.3f, 0.7f, 42u, 4, 2.0f, 0.5f);
+    float a = forge_noise_fbm3d(1.5f, 2.3f, 0.7f, TEST_NOISE_SEED, 4, 2.0f, 0.5f);
+    float b = forge_noise_fbm3d(1.5f, 2.3f, 0.7f, TEST_NOISE_SEED, 4, 2.0f, 0.5f);
     ASSERT_FLOAT_EQ(a, b);
     END_TEST();
 }
@@ -2587,8 +2593,8 @@ static void test_noise_fbm3d_deterministic(void)
 static void test_noise_fbm3d_single_octave_matches_perlin(void)
 {
     TEST("fbm3d with 1 octave matches perlin3d");
-    float fbm = forge_noise_fbm3d(1.5f, 2.3f, 0.7f, 42u, 1, 2.0f, 0.5f);
-    float perlin = forge_noise_perlin3d(1.5f, 2.3f, 0.7f, 42u);
+    float fbm = forge_noise_fbm3d(1.5f, 2.3f, 0.7f, TEST_NOISE_SEED, 1, 2.0f, 0.5f);
+    float perlin = forge_noise_perlin3d(1.5f, 2.3f, 0.7f, TEST_NOISE_SEED);
     ASSERT_FLOAT_EQ(fbm, perlin);
     END_TEST();
 }
@@ -2596,8 +2602,8 @@ static void test_noise_fbm3d_single_octave_matches_perlin(void)
 static void test_noise_fbm2d_more_octaves_not_identical(void)
 {
     TEST("fbm2d with more octaves differs from fewer");
-    float oct1 = forge_noise_fbm2d(3.7f, 2.1f, 42u, 1, 2.0f, 0.5f);
-    float oct4 = forge_noise_fbm2d(3.7f, 2.1f, 42u, 4, 2.0f, 0.5f);
+    float oct1 = forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED, 1, 2.0f, 0.5f);
+    float oct4 = forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED, 4, 2.0f, 0.5f);
     if (float_eq(oct1, oct4)) {
         SDL_LogError(SDL_LOG_CATEGORY_TEST,
                      "    FAIL: 1 octave = 4 octaves (%.6f)",
@@ -2613,8 +2619,8 @@ static void test_noise_fbm2d_more_octaves_not_identical(void)
 static void test_noise_domain_warp2d_deterministic(void)
 {
     TEST("domain_warp2d is deterministic");
-    float a = forge_noise_domain_warp2d(3.7f, 2.1f, 42u, 2.5f);
-    float b = forge_noise_domain_warp2d(3.7f, 2.1f, 42u, 2.5f);
+    float a = forge_noise_domain_warp2d(3.7f, 2.1f, TEST_NOISE_SEED, TEST_WARP_STRENGTH);
+    float b = forge_noise_domain_warp2d(3.7f, 2.1f, TEST_NOISE_SEED, TEST_WARP_STRENGTH);
     ASSERT_FLOAT_EQ(a, b);
     END_TEST();
 }
@@ -2624,8 +2630,8 @@ static void test_noise_domain_warp2d_zero_strength_is_fbm(void)
     TEST("domain_warp2d with strength=0 equals fbm2d");
     /* With zero warp strength, the warped position is the original position,
      * and the final sample uses seed+2. So it should equal fbm2d with seed+2. */
-    float warped = forge_noise_domain_warp2d(3.7f, 2.1f, 42u, 0.0f);
-    float plain  = forge_noise_fbm2d(3.7f, 2.1f, 44u, 4, 2.0f, 0.5f);
+    float warped = forge_noise_domain_warp2d(3.7f, 2.1f, TEST_NOISE_SEED, 0.0f);
+    float plain  = forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED + 2, 4, 2.0f, 0.5f);
     ASSERT_FLOAT_EQ(warped, plain);
     END_TEST();
 }
@@ -2633,8 +2639,8 @@ static void test_noise_domain_warp2d_zero_strength_is_fbm(void)
 static void test_noise_domain_warp2d_differs_from_plain(void)
 {
     TEST("domain_warp2d with strength>0 differs from plain fbm");
-    float warped = forge_noise_domain_warp2d(3.7f, 2.1f, 42u, 2.5f);
-    float plain  = forge_noise_fbm2d(3.7f, 2.1f, 42u, 4, 2.0f, 0.5f);
+    float warped = forge_noise_domain_warp2d(3.7f, 2.1f, TEST_NOISE_SEED, TEST_WARP_STRENGTH);
+    float plain  = forge_noise_fbm2d(3.7f, 2.1f, TEST_NOISE_SEED, 4, 2.0f, 0.5f);
     if (float_eq(warped, plain)) {
         SDL_LogError(SDL_LOG_CATEGORY_TEST,
                      "    FAIL: Warped = plain fbm (%.6f)",
@@ -2655,9 +2661,9 @@ static void test_noise_perlin2d_mean_near_zero(void)
     TEST("perlin2d mean is near 0 (unbiased)");
     double sum = 0.0;
     for (int i = 0; i < NOISE_STAT_SAMPLES; i++) {
-        float x = (float)i * 0.073f;
-        float y = (float)i * 0.031f;
-        sum += (double)forge_noise_perlin2d(x, y, 42u);
+        float x = (float)i * TEST_STEP_X;
+        float y = (float)i * TEST_STEP_Y;
+        sum += (double)forge_noise_perlin2d(x, y, TEST_NOISE_SEED);
     }
     float mean = (float)(sum / (double)NOISE_STAT_SAMPLES);
     if (SDL_fabsf(mean) > NOISE_STAT_EPSILON) {
@@ -2675,9 +2681,9 @@ static void test_noise_simplex2d_mean_near_zero(void)
     TEST("simplex2d mean is near 0 (unbiased)");
     double sum = 0.0;
     for (int i = 0; i < NOISE_STAT_SAMPLES; i++) {
-        float x = (float)i * 0.073f;
-        float y = (float)i * 0.031f;
-        sum += (double)forge_noise_simplex2d(x, y, 42u);
+        float x = (float)i * TEST_STEP_X;
+        float y = (float)i * TEST_STEP_Y;
+        sum += (double)forge_noise_simplex2d(x, y, TEST_NOISE_SEED);
     }
     float mean = (float)(sum / (double)NOISE_STAT_SAMPLES);
     if (SDL_fabsf(mean) > NOISE_STAT_EPSILON) {
