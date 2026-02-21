@@ -2726,12 +2726,12 @@ def diagram_gradient_noise_concept():
         ax.axvline(i, color=STYLE["grid"], lw=0.6, alpha=0.5)
 
     # Define gradient directions at each grid point (seeded deterministically)
-    np.random.seed(42)
+    rng = np.random.default_rng(42)
     gradients_4 = [(1, 1), (-1, 1), (1, -1), (-1, -1)]
     grid_grads = {}
     for gx in range(4):
         for gy in range(4):
-            idx = np.random.randint(0, 4)
+            idx = rng.integers(0, 4)
             grid_grads[(gx, gy)] = gradients_4[idx]
 
     # Draw gradient arrows at all grid points (dimmed)
