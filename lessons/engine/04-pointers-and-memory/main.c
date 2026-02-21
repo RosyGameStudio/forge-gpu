@@ -556,16 +556,27 @@ static void demo_vertex_buffer_upload(void)
         size_t start = (size_t)v * sizeof(Vertex);
         SDL_Log("  Vertex %d (offset %u):", v, (unsigned)start);
 
-        /* Show position bytes. */
-        SDL_Log("    position [%u..%u]: px=%.1f, py=%.1f",
-                (unsigned)(start + offsetof(Vertex, px)),
-                (unsigned)(start + offsetof(Vertex, py) + sizeof(float) - 1),
+        /* Show position bytes — read raw bytes through our byte pointer,
+         * then show the interpreted float values from gpu_verts for comparison. */
+        size_t px_off = start + offsetof(Vertex, px);
+        size_t py_off = start + offsetof(Vertex, py);
+        SDL_Log("    position [%u..%u]: bytes %02x %02x %02x %02x | %02x %02x %02x %02x  => px=%.1f, py=%.1f",
+                (unsigned)px_off,
+                (unsigned)(py_off + sizeof(float) - 1),
+                bytes[px_off], bytes[px_off+1], bytes[px_off+2], bytes[px_off+3],
+                bytes[py_off], bytes[py_off+1], bytes[py_off+2], bytes[py_off+3],
                 gpu_verts[v].px, gpu_verts[v].py);
 
-        /* Show color bytes. */
-        SDL_Log("    color    [%u..%u]: r=%.1f, g=%.1f, b=%.1f",
-                (unsigned)(start + offsetof(Vertex, r)),
-                (unsigned)(start + offsetof(Vertex, b) + sizeof(float) - 1),
+        /* Show color bytes — same pattern: raw bytes then interpreted values. */
+        size_t r_off = start + offsetof(Vertex, r);
+        size_t g_off = start + offsetof(Vertex, g);
+        size_t b_off = start + offsetof(Vertex, b);
+        SDL_Log("    color    [%u..%u]: bytes %02x %02x %02x %02x | %02x %02x %02x %02x | %02x %02x %02x %02x  => r=%.1f, g=%.1f, b=%.1f",
+                (unsigned)r_off,
+                (unsigned)(b_off + sizeof(float) - 1),
+                bytes[r_off], bytes[r_off+1], bytes[r_off+2], bytes[r_off+3],
+                bytes[g_off], bytes[g_off+1], bytes[g_off+2], bytes[g_off+3],
+                bytes[b_off], bytes[b_off+1], bytes[b_off+2], bytes[b_off+3],
                 gpu_verts[v].r, gpu_verts[v].g, gpu_verts[v].b);
     }
 
