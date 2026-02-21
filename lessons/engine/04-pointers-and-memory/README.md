@@ -32,8 +32,8 @@ the GPU:
 5. Unmap and submit
 
 Steps 3-4 are pure pointer and memory operations. If you don't understand
-`sizeof`, `offsetof`, pointer casting, and `memcpy`, those lines look like
-magic. After this lesson, they will be straightforward.
+`sizeof`, `offsetof`, pointer casting, and `memcpy`, those lines remain
+opaque. After this lesson, they will be straightforward.
 
 Understanding memory also helps you avoid the bugs that waste the most
 debugging time: use-after-free, memory leaks, buffer overflows, and wrong
