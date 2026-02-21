@@ -67,6 +67,7 @@ add_subdirectory(lessons/math/14-blue-noise-sequences)
 # ── Engine Lessons ──────────────────────────────────────────────────────────
 add_subdirectory(lessons/engine/01-intro-to-c)
 add_subdirectory(lessons/engine/02-cmake-fundamentals)
+add_subdirectory(lessons/engine/03-fetchcontent-dependencies)
 add_subdirectory(lessons/engine/04-pointers-and-memory)
 add_subdirectory(lessons/engine/05-header-only-libraries)
 
