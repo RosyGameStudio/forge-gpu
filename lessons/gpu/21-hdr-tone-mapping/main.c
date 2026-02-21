@@ -1500,7 +1500,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         SDL_ReleaseGPUShader(device, vert);
       if (frag)
         SDL_ReleaseGPUShader(device, frag);
-    } else {
+      goto init_fail;
+    }
+
+    {
       /* Same vertex layout as ForgeGltfVertex — shadow shader only
        * uses position but all 3 attributes must match. */
       SDL_GPUVertexBufferDescription vb_desc;
@@ -1558,7 +1561,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
       if (!state->shadow_pipeline) {
         SDL_Log("Failed to create shadow pipeline: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
+        goto init_fail;
       }
     }
   }
@@ -1596,10 +1599,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         SDL_ReleaseGPUShader(device, vert);
       if (frag)
         SDL_ReleaseGPUShader(device, frag);
-      SDL_free(state);
-      SDL_DestroyWindow(window);
-      SDL_DestroyGPUDevice(device);
-      return SDL_APP_FAILURE;
+      goto init_fail;
     }
 
     /* Vertex layout matching ForgeGltfVertex: pos(3) + norm(3) + uv(2). */
@@ -1648,6 +1648,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     state->scene_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe_info);
     if (!state->scene_pipeline) {
       SDL_Log("Failed to create scene pipeline: %s", SDL_GetError());
+      goto init_fail;
     }
 
     SDL_ReleaseGPUShader(device, vert);
@@ -1686,7 +1687,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         SDL_ReleaseGPUShader(device, vert);
       if (frag)
         SDL_ReleaseGPUShader(device, frag);
-    } else {
+      goto init_fail;
+    }
+
+    {
       SDL_GPUVertexBufferDescription vb_desc;
       SDL_zero(vb_desc);
       vb_desc.slot = 0;
@@ -1725,6 +1729,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
       state->grid_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe_info);
       if (!state->grid_pipeline) {
         SDL_Log("Failed to create grid pipeline: %s", SDL_GetError());
+        goto init_fail;
       }
 
       SDL_ReleaseGPUShader(device, vert);
@@ -1764,7 +1769,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         SDL_ReleaseGPUShader(device, vert);
       if (frag)
         SDL_ReleaseGPUShader(device, frag);
-    } else {
+      goto init_fail;
+    }
+
+    {
       /* No vertex input — SV_VertexID generates everything. */
       SDL_GPUColorTargetDescription color_desc;
       SDL_zero(color_desc);
@@ -1785,6 +1793,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
       state->tonemap_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe_info);
       if (!state->tonemap_pipeline) {
         SDL_Log("Failed to create tonemap pipeline: %s", SDL_GetError());
+        goto init_fail;
       }
 
       SDL_ReleaseGPUShader(device, vert);
