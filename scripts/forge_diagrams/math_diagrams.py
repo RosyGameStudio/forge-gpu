@@ -3419,22 +3419,22 @@ def _wang_hash(key):
     return key
 
 
-def _hash_to_float(h):
-    """Map hash to [0, 1)."""
+def _hash_to_float_low24(h):
+    """Map low 24 bits of a scalar hash to [0, 1)."""
     return (h & 0x00FFFFFF) / 16777216.0
 
 
 def _blue_noise_2d(count, candidates, seed):
     """Mitchell's best candidate blue noise."""
-    xs = [_hash_to_float(_wang_hash(seed))]
-    ys = [_hash_to_float(_wang_hash(seed ^ 0x9E3779B9))]
+    xs = [_hash_to_float_low24(_wang_hash(seed))]
+    ys = [_hash_to_float_low24(_wang_hash(seed ^ 0x9E3779B9))]
 
     for i in range(1, count):
         best_x, best_y, best_dist = 0, 0, -1
         for c in range(candidates):
             h1 = _wang_hash((seed + (i * candidates + c) * 2654435761) & 0xFFFFFFFF)
             h2 = _wang_hash(h1)
-            cx, cy = _hash_to_float(h1), _hash_to_float(h2)
+            cx, cy = _hash_to_float_low24(h1), _hash_to_float_low24(h2)
 
             min_dist = 1e30
             for j in range(len(xs)):
@@ -3549,14 +3549,46 @@ def diagram_dithering_comparison():
     dithered_r1 = np.floor((gradient + (r1_vals - 0.5) / levels) * levels) / levels
     dithered_r1 = np.clip(dithered_r1, 0, 1)
 
+    # Blue noise dithering — build a 64x64 tile via Mitchell's best candidate,
+    # then tile across the gradient dimensions
+    tile_size = 64
+    tile_count = tile_size * tile_size
+    # Generate blue-noise distributed values in [0, 1) for a 64x64 tile
+    # Use best-candidate: place each new value as far as possible from existing ones
+    bn_tile_flat = [_hash_to_float_low24(_wang_hash(7))]
+    for i in range(1, tile_count):
+        best_val, best_dist = 0.0, -1.0
+        for c in range(10):  # 10 candidates per sample
+            h = _wang_hash((7 + (i * 10 + c) * 2654435761) & 0xFFFFFFFF)
+            candidate = _hash_to_float_low24(h)
+            # Toroidal minimum distance to all existing values
+            min_d = 1e30
+            for existing in bn_tile_flat:
+                d = abs(candidate - existing)
+                d = min(d, 1.0 - d)  # Wrap around [0, 1)
+                if d < min_d:
+                    min_d = d
+            if min_d > best_dist:
+                best_dist = min_d
+                best_val = candidate
+        bn_tile_flat.append(best_val)
+    bn_tile = np.array(bn_tile_flat).reshape(tile_size, tile_size)
+    rows, cols = gradient.shape
+    blue_noise = np.tile(bn_tile, (rows // tile_size + 1, cols // tile_size + 1))[
+        :rows, :cols
+    ]
+    dithered_blue = np.floor((gradient + (blue_noise - 0.5) / levels) * levels) / levels
+    dithered_blue = np.clip(dithered_blue, 0, 1)
+
     panels = [
         ("Original gradient", gradient),
         ("Quantized (banding)", banded),
         ("White noise dithered", dithered_white),
         ("R1 (golden ratio) dithered", dithered_r1),
+        ("Blue noise dithered", dithered_blue),
     ]
 
-    fig, axes = plt.subplots(4, 1, figsize=(12, 5), facecolor=STYLE["bg"])
+    fig, axes = plt.subplots(5, 1, figsize=(12, 6.25), facecolor=STYLE["bg"])
 
     for ax, (title, data) in zip(axes, panels):
         ax.set_facecolor(STYLE["bg"])
