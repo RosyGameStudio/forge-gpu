@@ -12,10 +12,10 @@ from ._common import STYLE, save
 # ---------------------------------------------------------------------------
 def diagram_stack_vs_heap():
     """Stack vs heap memory layout with address ranges and growth directions."""
-    fig, ax = plt.subplots(figsize=(10, 7), facecolor=STYLE["bg"])
+    fig, ax = plt.subplots(figsize=(10, 8), facecolor=STYLE["bg"])
     ax.set_facecolor(STYLE["bg"])
-    ax.set_xlim(-0.5, 10.5)
-    ax.set_ylim(-0.5, 10.5)
+    ax.set_xlim(-0.5, 11.5)
+    ax.set_ylim(-0.5, 12.0)
     ax.set_aspect("equal")
     ax.axis("off")
 
@@ -23,8 +23,8 @@ def diagram_stack_vs_heap():
 
     # Title
     ax.text(
-        5.25,
-        10.0,
+        5.5,
+        11.5,
         "Memory Layout of a Running Program",
         color=STYLE["text"],
         fontsize=16,
@@ -45,7 +45,7 @@ def diagram_stack_vs_heap():
 
     ax.text(
         stack_x + stack_w / 2,
-        9.4,
+        10.8,
         "STACK",
         color=STYLE["accent1"],
         fontsize=14,
@@ -56,7 +56,7 @@ def diagram_stack_vs_heap():
     )
     ax.text(
         stack_x + stack_w / 2,
-        9.15,
+        10.55,
         "grows downward",
         color=STYLE["text_dim"],
         fontsize=9,
@@ -68,7 +68,7 @@ def diagram_stack_vs_heap():
     ax.annotate(
         "",
         xy=(stack_x + stack_w + 0.3, 5.2),
-        xytext=(stack_x + stack_w + 0.3, 8.8),
+        xytext=(stack_x + stack_w + 0.3, 9.8),
         arrowprops={
             "arrowstyle": "->,head_width=0.3,head_length=0.2",
             "color": STYLE["accent1"],
@@ -185,29 +185,29 @@ def diagram_stack_vs_heap():
 
     # Address labels on edges
     ax.text(
-        stack_x + stack_w + 0.15,
-        9.0,
-        "0x7FFF...",
+        stack_x + stack_w + 0.6,
+        9.5,
+        "0x7FFF...\n(high)",
         color=STYLE["text_dim"],
         fontsize=8,
+        ha="center",
         va="center",
-        rotation=90,
     )
     ax.text(
-        heap_x - 0.15,
+        heap_x - 0.3,
         1.3,
-        "0x0055...",
+        "0x0055...\n(low)",
         color=STYLE["text_dim"],
         fontsize=8,
+        ha="center",
         va="center",
-        rotation=90,
     )
 
     # Center divider + labels
-    ax.plot([5.0, 5.0], [0.5, 9.5], "--", color=STYLE["grid"], lw=0.8, alpha=0.5)
+    ax.plot([5.0, 5.0], [0.5, 10.5], "--", color=STYLE["grid"], lw=0.8, alpha=0.5)
 
     # Key properties
-    props_y = 8.8
+    props_y = 9.8
     ax.text(
         heap_x + heap_w / 2,
         props_y,
