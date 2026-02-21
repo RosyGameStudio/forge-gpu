@@ -16,9 +16,11 @@
 
 #include "physics.h"  /* includes my_vec.h -> Vec2 and all Vec2_* functions */
 
-/* Gravitational acceleration: 9.8 m/s^2 downward.
- * 'static const' keeps this private to this translation unit. */
-static const Vec2 GRAVITY = { 0.0f, -9.8f };
+/* Gravitational acceleration in m/s^2 (downward, so negative Y). */
+#define GRAVITY_ACCEL -9.8f
+
+/* 'static const' keeps this private to this translation unit. */
+static const Vec2 GRAVITY = { 0.0f, GRAVITY_ACCEL };
 
 Vec2 physics_apply_gravity(Vec2 velocity, float dt)
 {
