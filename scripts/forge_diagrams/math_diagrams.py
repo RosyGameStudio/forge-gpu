@@ -3041,7 +3041,7 @@ def diagram_perlin_vs_simplex_grid():
                 simplex_pts.append((px, py, si, sj))
 
     # Draw edges
-    for _idx, (px, py, si, sj) in enumerate(simplex_pts):
+    for px, py, si, sj in simplex_pts:
         for dsi, dsj in [(1, 0), (0, 1), (1, -1)]:
             ni, nj = si + dsi, sj + dsj
             nt = (ni + nj) * G2
