@@ -207,9 +207,9 @@ because it affects when downloads happen and how you configure dependencies.
 ```mermaid
 flowchart TD
     A["include(FetchContent)"] --> B["FetchContent_Declare(SDL3 ...)"]
-    B --> C{"Already\ncached?"}
+    B --> C{"Already<br/>cached?"}
     C -->|Yes| D["Reuse build/_deps/SDL3-src/"]
-    C -->|No| E["git clone --shallow\ninto build/_deps/SDL3-src/"]
+    C -->|No| E["git clone --shallow<br/>into build/_deps/SDL3-src/"]
     D --> F["add_subdirectory(build/_deps/SDL3-src/)"]
     E --> F
     F --> G["SDL3::SDL3 target available"]
@@ -272,11 +272,11 @@ implements a three-tier strategy that adapts to the build environment:
 
 ```mermaid
 flowchart TD
-    Start["cmake -B build"] --> FP{"find_package(SDL3)\nfound?"}
+    Start["cmake -B build"] --> FP{"find_package(SDL3)<br/>found?"}
     FP -->|Yes| Pre["Use pre-installed SDL3"]
-    FP -->|No| Shim{"FORGE_USE_SHIM\n= ON?"}
-    Shim -->|Yes| ShimLib["Use minimal SDL3 shim\n(console-only lessons)"]
-    Shim -->|No| FC["FetchContent\ndownload + build SDL3"]
+    FP -->|No| Shim{"FORGE_USE_SHIM<br/>= ON?"}
+    Shim -->|Yes| ShimLib["Use minimal SDL3 shim<br/>(console-only lessons)"]
+    Shim -->|No| FC["FetchContent<br/>download + build SDL3"]
 
     Pre --> Target["SDL3::SDL3 target available"]
     ShimLib --> Target
@@ -371,12 +371,12 @@ This breaks reproducibility and can introduce unexpected failures.
 ```mermaid
 flowchart LR
     subgraph Stable["Stable (recommended)"]
-        Tag["release-3.4.0\n(always the same commit)"]
-        Hash["a1b2c3d...\n(immutable)"]
+        Tag["release-3.4.0<br/>(always the same commit)"]
+        Hash["a1b2c3d...<br/>(immutable)"]
     end
 
     subgraph Unstable["Unstable (avoid)"]
-        Branch["main\n(moves with every push)"]
+        Branch["main<br/>(moves with every push)"]
     end
 ```
 
@@ -467,12 +467,12 @@ documentation or its `CMakeLists.txt`. Common conventions:
 
 ```mermaid
 flowchart TD
-    A["Your CMakeLists.txt"] --> B["FetchContent_Declare\n(name, repo, tag)"]
-    B --> C["set() options\n(disable tests, set build type)"]
+    A["Your CMakeLists.txt"] --> B["FetchContent_Declare<br/>(name, repo, tag)"]
+    B --> C["set() options<br/>(disable tests, set build type)"]
     C --> D["FetchContent_MakeAvailable(name)"]
     D --> E["Dependency's CMakeLists.txt runs"]
-    E --> F["Targets created\n(e.g., cjson, SDL3::SDL3)"]
-    F --> G["target_link_libraries\n(my_app PRIVATE target_name)"]
+    E --> F["Targets created<br/>(e.g., cjson, SDL3::SDL3)"]
+    F --> G["target_link_libraries<br/>(my_app PRIVATE target_name)"]
 ```
 
 ### FetchContent vs other dependency methods
@@ -543,12 +543,12 @@ functions. GPU lessons are skipped because they need the real SDL3 GPU API.
 
 ```mermaid
 flowchart TD
-    Env{"Build\nenvironment"}
-    Env -->|"Has internet"| FC["FetchContent\n(default)"]
-    Env -->|"Pre-installed SDL3"| FP["find_package\n(fastest)"]
-    Env -->|"Cached build dir"| Disc["FETCHCONTENT_FULLY_\nDISCONNECTED=ON"]
-    Env -->|"Local source copy"| Src["FETCHCONTENT_SOURCE_\nDIR_SDL3=/path"]
-    Env -->|"No GPU needed"| Shim["FORGE_USE_SHIM=ON\n(console-only)"]
+    Env{"Build<br/>environment"}
+    Env -->|"Has internet"| FC["FetchContent<br/>(default)"]
+    Env -->|"Pre-installed SDL3"| FP["find_package<br/>(fastest)"]
+    Env -->|"Cached build dir"| Disc["FETCHCONTENT_FULLY_<br/>DISCONNECTED=ON"]
+    Env -->|"Local source copy"| Src["FETCHCONTENT_SOURCE_<br/>DIR_SDL3=/path"]
+    Env -->|"No GPU needed"| Shim["FORGE_USE_SHIM=ON<br/>(console-only)"]
 
     FC --> Build["Build succeeds"]
     FP --> Build
@@ -685,6 +685,8 @@ In forge-gpu:
   `SDL3::SDL3` comes from
 - [GPU Lesson 09 — Scene Loading](../../gpu/09-scene-loading/) — Uses
   `FetchContent` to add cJSON alongside SDL3
+- [Math Lesson 01 — Vectors](../../math/01-vectors/) — Links against
+  `SDL3::SDL3` via the same dependency chain in a math-only context
 
 ## Building
 

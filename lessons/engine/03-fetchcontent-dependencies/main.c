@@ -15,6 +15,8 @@
  * SPDX-License-Identifier: Zlib
  */
 
+#include <stdlib.h>
+
 #include <SDL3/SDL.h>
 #include "math/forge_math.h"
 
@@ -25,6 +27,10 @@
 #define SDL_VERSION_MAJOR_DIV  1000000
 #define SDL_VERSION_MINOR_DIV  1000
 #define SDL_VERSION_PART_MOD   1000
+
+/* SDL_Init(0) initialises no subsystems — just core SDL state and error
+ * handling.  We give the literal a name so the intent is explicit. */
+#define INIT_FLAGS  0
 
 /* Forward declarations */
 static void demo_how_sdl_arrived(void);
@@ -53,6 +59,10 @@ static void demo_how_sdl_arrived(void)
      * That is the key insight — your CMakeLists.txt links against
      * SDL3::SDL3 regardless of where the library came from. */
 
+#ifndef FORGE_USE_SHIM
+    /* SDL_GetVersion() is only available with the real SDL3 library.
+     * The shim does not provide it, so skip version reporting when
+     * building with -DFORGE_USE_SHIM=ON. */
     int version = SDL_GetVersion();
     int major = version / SDL_VERSION_MAJOR_DIV;
     int minor = (version / SDL_VERSION_MINOR_DIV) % SDL_VERSION_PART_MOD;
@@ -60,6 +70,7 @@ static void demo_how_sdl_arrived(void)
 
     SDL_Log("  SDL version: %d.%d.%d", major, minor, patch);
     SDL_Log(" ");
+#endif
     SDL_Log("  The root CMakeLists.txt tries three paths in order:");
     SDL_Log("    1. find_package(SDL3) -- use a pre-installed SDL3");
     SDL_Log("    2. FORGE_USE_SHIM=ON  -- use minimal SDL3 shim");
@@ -319,12 +330,12 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    /* SDL_Init(0) initializes no subsystems — just core SDL state and error
-     * handling.  This gives us SDL_Log and SDL_GetError without pulling in
-     * video, audio, etc.  Pass SDL_INIT_VIDEO when you need a window. */
-    if (!SDL_Init(0)) {
+    /* INIT_FLAGS is 0 — no subsystems, just core SDL state and error handling.
+     * This gives us SDL_Log and SDL_GetError without pulling in video, audio,
+     * etc.  Pass SDL_INIT_VIDEO when you need a window. */
+    if (!SDL_Init(INIT_FLAGS)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
-        return 1;
+        return EXIT_FAILURE;
     }
 
     SDL_Log("=== Engine Lesson 03: FetchContent & Dependencies ===");
@@ -349,5 +360,5 @@ int main(int argc, char *argv[])
     SDL_Log("explanation with diagrams and exercises.");
 
     SDL_Quit();
-    return 0;
+    return EXIT_SUCCESS;
 }

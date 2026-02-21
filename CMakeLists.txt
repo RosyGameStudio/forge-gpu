@@ -22,6 +22,7 @@ elseif(FORGE_USE_SHIM)
     add_library(sdl3_shim INTERFACE)
     target_include_directories(sdl3_shim INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/sdl3_shim)
+    target_compile_definitions(sdl3_shim INTERFACE FORGE_USE_SHIM)
     add_library(SDL3::SDL3 ALIAS sdl3_shim)
 else()
     message(STATUS "SDL3 not found — fetching from source")
