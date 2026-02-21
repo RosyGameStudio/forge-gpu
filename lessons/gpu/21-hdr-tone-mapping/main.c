@@ -140,6 +140,24 @@
 #define GRID_SHININESS 32.0f
 #define GRID_SPECULAR_STR 0.5f
 
+/* HDR clear color — forge-gpu dark theme background (#1a1a2e in linear). */
+#define CLEAR_COLOR_R 0.008f
+#define CLEAR_COLOR_G 0.008f
+#define CLEAR_COLOR_B 0.026f
+#define CLEAR_COLOR_A 1.0f
+
+/* Grid line color — blue accent matching the forge-gpu brand. */
+#define GRID_LINE_COLOR_R 0.15f
+#define GRID_LINE_COLOR_G 0.55f
+#define GRID_LINE_COLOR_B 0.85f
+#define GRID_LINE_COLOR_A 1.0f
+
+/* Grid background color — dark blue floor. */
+#define GRID_BG_COLOR_R 0.04f
+#define GRID_BG_COLOR_G 0.04f
+#define GRID_BG_COLOR_B 0.08f
+#define GRID_BG_COLOR_A 1.0f
+
 /* Model asset paths (copied from shared assets/ at build time). */
 #define TRUCK_MODEL_PATH "assets/models/CesiumMilkTruck/CesiumMilkTruck.gltf"
 #define BOX_MODEL_PATH "assets/models/BoxTextured/BoxTextured.gltf"
@@ -219,16 +237,16 @@ typedef struct GridFragUniforms {
   float light_dir[4];      /* light direction        (16 bytes) */
   float eye_pos[4];        /* camera position        (16 bytes) */
   float cascade_splits[4]; /* cascade far distances  (16 bytes) */
-  float grid_spacing;      /*                         (4 bytes) */
-  float line_width;        /*                         (4 bytes) */
-  float fade_distance;     /*                         (4 bytes) */
-  float ambient;           /*                         (4 bytes) */
-  float shininess;         /*                         (4 bytes) */
-  float specular_str;      /*                         (4 bytes) */
-  float light_intensity;   /*                         (4 bytes) */
-  float shadow_texel_size; /*                         (4 bytes) */
-  float shadow_bias;       /*                         (4 bytes) */
-  float _pad[3];           /*                        (12 bytes) */
+  float grid_spacing;      /* world-space distance between grid lines (4 bytes) */
+  float line_width;        /* grid line thickness in world units     (4 bytes) */
+  float fade_distance;     /* distance at which grid fades to zero   (4 bytes) */
+  float ambient;           /* global ambient light term              (4 bytes) */
+  float shininess;         /* specular exponent (highlight tightness)(4 bytes) */
+  float specular_str;      /* specular highlight strength multiplier (4 bytes) */
+  float light_intensity;   /* directional light brightness (HDR)     (4 bytes) */
+  float shadow_texel_size; /* 1/shadow_map_resolution for PCF offsets(4 bytes) */
+  float shadow_bias;       /* depth bias to prevent shadow acne      (4 bytes) */
+  float _pad[3];           /* pad to 128 bytes (std140 alignment)   (12 bytes) */
 } GridFragUniforms;        /* 128 bytes */
 
 /* Tone map fragment uniforms. */
@@ -1382,7 +1400,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   /* Step 11 — Create the 1x1 white fallback texture. */
   state->white_texture = create_white_texture(device);
   if (!state->white_texture) {
-    SDL_Log("Warning: white texture creation failed");
+    SDL_Log("Failed to create white texture: %s", SDL_GetError());
+    goto init_fail;
   }
 
   /* Step 12 — Create samplers.
@@ -1403,6 +1422,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     state->sampler = SDL_CreateGPUSampler(device, &sampler_info);
     if (!state->sampler) {
       SDL_Log("Failed to create diffuse sampler: %s", SDL_GetError());
+      goto init_fail;
     }
   }
   {
@@ -1415,6 +1435,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     state->hdr_sampler = SDL_CreateGPUSampler(device, &hdr_samp_info);
     if (!state->hdr_sampler) {
       SDL_Log("Failed to create HDR sampler: %s", SDL_GetError());
+      goto init_fail;
     }
   }
   {
@@ -1431,17 +1452,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     state->shadow_sampler = SDL_CreateGPUSampler(device, &shadow_samp_info);
     if (!state->shadow_sampler) {
       SDL_Log("Failed to create shadow sampler: %s", SDL_GetError());
+      goto init_fail;
     }
   }
 
   /* Step 13 — Load glTF models. */
   if (!setup_model(device, state->white_texture, &state->truck, TRUCK_MODEL_PATH)) {
     SDL_Log("Failed to set up truck model");
-    return SDL_APP_FAILURE;
+    goto init_fail;
   }
   if (!setup_model(device, state->white_texture, &state->box, BOX_MODEL_PATH)) {
     SDL_Log("Failed to set up box model");
-    return SDL_APP_FAILURE;
+    goto init_fail;
   }
 
   /* Step 14 — Upload grid geometry and generate box placements. */
@@ -1779,10 +1801,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   state->last_ticks = SDL_GetTicks();
 
   /* Capture mouse for FPS-style camera control. */
-  if (!SDL_SetWindowRelativeMouseMode(window, true)) {
+  if (SDL_SetWindowRelativeMouseMode(window, true)) {
+    state->mouse_captured = true;
+  } else {
     SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
+    state->mouse_captured = false;
   }
-  state->mouse_captured = true;
 
   SDL_Log("Tone mapping: ACES (press 1/2/3 to switch)");
   SDL_Log("Exposure: %.1f (press +/- to adjust)", state->exposure);
@@ -1801,6 +1825,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
   *appstate = state;
   return SDL_APP_CONTINUE;
+
+init_fail:
+  /* Centralized cleanup for late init failures.
+   * Setting *appstate lets SDL call SDL_AppQuit, which null-guards
+   * every resource and releases only what was successfully created. */
+  *appstate = state;
+  return SDL_APP_FAILURE;
 }
 
 /* ── SDL_AppEvent ─────────────────────────────────────────────────────────── */
@@ -2081,11 +2112,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     color_target.texture = state->hdr_target;
     color_target.load_op = SDL_GPU_LOADOP_CLEAR;
     color_target.store_op = SDL_GPU_STOREOP_STORE;
-    /* Clear to forge-gpu dark theme background (#1a1a2e in linear). */
-    color_target.clear_color.r = 0.008f;
-    color_target.clear_color.g = 0.008f;
-    color_target.clear_color.b = 0.026f;
-    color_target.clear_color.a = 1.0f;
+    color_target.clear_color.r = CLEAR_COLOR_R;
+    color_target.clear_color.g = CLEAR_COLOR_G;
+    color_target.clear_color.b = CLEAR_COLOR_B;
+    color_target.clear_color.a = CLEAR_COLOR_A;
 
     SDL_GPUDepthStencilTargetInfo depth_target;
     SDL_zero(depth_target);
@@ -2118,14 +2148,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
       /* Grid fragment uniforms. */
       GridFragUniforms grid_fu;
       SDL_zero(grid_fu);
-      grid_fu.line_color[0] = 0.15f;
-      grid_fu.line_color[1] = 0.55f;
-      grid_fu.line_color[2] = 0.85f;
-      grid_fu.line_color[3] = 1.0f;
-      grid_fu.bg_color[0] = 0.04f;
-      grid_fu.bg_color[1] = 0.04f;
-      grid_fu.bg_color[2] = 0.08f;
-      grid_fu.bg_color[3] = 1.0f;
+      grid_fu.line_color[0] = GRID_LINE_COLOR_R;
+      grid_fu.line_color[1] = GRID_LINE_COLOR_G;
+      grid_fu.line_color[2] = GRID_LINE_COLOR_B;
+      grid_fu.line_color[3] = GRID_LINE_COLOR_A;
+      grid_fu.bg_color[0] = GRID_BG_COLOR_R;
+      grid_fu.bg_color[1] = GRID_BG_COLOR_G;
+      grid_fu.bg_color[2] = GRID_BG_COLOR_B;
+      grid_fu.bg_color[3] = GRID_BG_COLOR_A;
       grid_fu.light_dir[0] = light_dir.x;
       grid_fu.light_dir[1] = light_dir.y;
       grid_fu.light_dir[2] = light_dir.z;

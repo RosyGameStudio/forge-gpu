@@ -7,6 +7,10 @@ from matplotlib.patches import Polygon, Rectangle
 
 from ._common import FORGE_CMAP, STYLE, draw_vector, save, setup_axes
 
+# ACES filmic tone mapping coefficients (Narkowicz approximation).
+# Shared across diagram functions to keep the curve definition in one place.
+ACES_COEFFS = (2.51, 0.03, 2.43, 0.59, 0.14)
+
 # ---------------------------------------------------------------------------
 # gpu/04-textures-and-samplers — uv_mapping.png
 # ---------------------------------------------------------------------------
@@ -4776,7 +4780,7 @@ def diagram_tone_map_comparison():
     ax.plot(x, reinhard, color=STYLE["accent1"], lw=2.5, label="Reinhard")
 
     # ACES (Narkowicz approximation)
-    a, b, c, d, e = 2.51, 0.03, 2.43, 0.59, 0.14
+    a, b, c, d, e = ACES_COEFFS
     aces = np.clip((x * (a * x + b)) / (x * (c * x + d) + e), 0, 1)
     ax.plot(x, aces, color=STYLE["accent2"], lw=2.5, label="ACES filmic")
 
@@ -4841,7 +4845,7 @@ def diagram_exposure_effect():
     exposures = [0.5, 1.0, 2.0, 4.0]
     colors_list = [STYLE["accent4"], STYLE["accent1"], STYLE["accent2"], STYLE["warn"]]
 
-    a, b, c, d, e = 2.51, 0.03, 2.43, 0.59, 0.14
+    a, b, c, d, e = ACES_COEFFS
 
     for exp, col in zip(exposures, colors_list):
         hdr = x * exp
