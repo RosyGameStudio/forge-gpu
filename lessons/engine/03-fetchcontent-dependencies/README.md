@@ -215,10 +215,10 @@ flowchart TD
     F --> G["SDL3::SDL3 target available"]
     G --> H["target_link_libraries(lesson PRIVATE SDL3::SDL3)"]
 
-    style A fill:#e8f4fd,stroke:#2196F3
-    style B fill:#e8f4fd,stroke:#2196F3
-    style E fill:#fff3e0,stroke:#FF9800
-    style G fill:#e8f5e9,stroke:#4CAF50
+    style A fill:#e8f4fd,stroke:#2196F3,color:#333
+    style B fill:#e8f4fd,stroke:#2196F3,color:#333
+    style E fill:#fff3e0,stroke:#FF9800,color:#333
+    style G fill:#e8f5e9,stroke:#4CAF50,color:#333
 ```
 
 **Stage 1: `FetchContent_Declare`** registers the dependency:
@@ -289,10 +289,10 @@ flowchart TD
 
     Target --> Lessons["All lessons link against SDL3::SDL3"]
 
-    style Pre fill:#e8f5e9,stroke:#4CAF50
-    style ShimLib fill:#fff3e0,stroke:#FF9800
-    style FC fill:#e8f4fd,stroke:#2196F3
-    style Target fill:#f3e5f5,stroke:#9C27B0
+    style Pre fill:#e8f5e9,stroke:#4CAF50,color:#333
+    style ShimLib fill:#fff3e0,stroke:#FF9800,color:#333
+    style FC fill:#e8f4fd,stroke:#2196F3,color:#333
+    style Target fill:#f3e5f5,stroke:#9C27B0,color:#333
 ```
 
 Here is the actual code from the root `CMakeLists.txt`:
@@ -389,8 +389,8 @@ flowchart LR
         Branch["main\n(moves with every push)"]
     end
 
-    style Stable fill:#e8f5e9,stroke:#4CAF50
-    style Unstable fill:#ffebee,stroke:#f44336
+    style Stable fill:#e8f5e9,stroke:#4CAF50,color:#333
+    style Unstable fill:#ffebee,stroke:#f44336,color:#333
 ```
 
 **`GIT_SHALLOW TRUE`** is an optimization. Without it, `git clone` downloads
@@ -487,9 +487,9 @@ flowchart TD
     E --> F["Targets created\n(e.g., cjson, SDL3::SDL3)"]
     F --> G["target_link_libraries\n(my_app PRIVATE target_name)"]
 
-    style B fill:#e8f4fd,stroke:#2196F3
-    style C fill:#fff3e0,stroke:#FF9800
-    style F fill:#e8f5e9,stroke:#4CAF50
+    style B fill:#e8f4fd,stroke:#2196F3,color:#333
+    style C fill:#fff3e0,stroke:#FF9800,color:#333
+    style F fill:#e8f5e9,stroke:#4CAF50,color:#333
 ```
 
 ### FetchContent vs other dependency methods
@@ -573,7 +573,7 @@ flowchart TD
     Src --> Build
     Shim --> Build
 
-    style Build fill:#e8f5e9,stroke:#4CAF50
+    style Build fill:#e8f5e9,stroke:#4CAF50,color:#333
 ```
 
 ## Common errors
