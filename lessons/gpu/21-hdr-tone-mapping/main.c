@@ -530,6 +530,9 @@ static SDL_GPUBuffer *upload_gpu_buffer(
 
   if (!SDL_SubmitGPUCommandBuffer(cmd)) {
     SDL_Log("Failed to submit upload command buffer: %s", SDL_GetError());
+    SDL_ReleaseGPUTransferBuffer(device, xfer);
+    SDL_ReleaseGPUBuffer(device, buffer);
+    return NULL;
   }
 
   SDL_ReleaseGPUTransferBuffer(device, xfer);
@@ -651,6 +654,9 @@ static SDL_GPUTexture *load_texture(SDL_GPUDevice *device, const char *path) {
 
   if (!SDL_SubmitGPUCommandBuffer(cmd)) {
     SDL_Log("Failed to submit texture upload: %s", SDL_GetError());
+    SDL_ReleaseGPUTransferBuffer(device, xfer);
+    SDL_ReleaseGPUTexture(device, tex);
+    return NULL;
   }
 
   SDL_ReleaseGPUTransferBuffer(device, xfer);
@@ -694,32 +700,50 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device) {
   }
 
   void *mapped = SDL_MapGPUTransferBuffer(device, xfer, false);
-  if (mapped) {
-    SDL_memcpy(mapped, white, 4);
-    SDL_UnmapGPUTransferBuffer(device, xfer);
+  if (!mapped) {
+    SDL_Log("Failed to map white texture transfer buffer: %s", SDL_GetError());
+    SDL_ReleaseGPUTransferBuffer(device, xfer);
+    SDL_ReleaseGPUTexture(device, tex);
+    return NULL;
   }
+  SDL_memcpy(mapped, white, 4);
+  SDL_UnmapGPUTransferBuffer(device, xfer);
 
   SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
-  if (cmd) {
-    SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
-    if (copy) {
-      SDL_GPUTextureTransferInfo src;
-      SDL_zero(src);
-      src.transfer_buffer = xfer;
+  if (!cmd) {
+    SDL_Log("Failed to acquire command buffer for white texture: %s", SDL_GetError());
+    SDL_ReleaseGPUTransferBuffer(device, xfer);
+    SDL_ReleaseGPUTexture(device, tex);
+    return NULL;
+  }
 
-      SDL_GPUTextureRegion dst;
-      SDL_zero(dst);
-      dst.texture = tex;
-      dst.w = 1;
-      dst.h = 1;
-      dst.d = 1;
+  SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+  if (!copy) {
+    SDL_Log("Failed to begin copy pass for white texture: %s", SDL_GetError());
+    SDL_ReleaseGPUTransferBuffer(device, xfer);
+    SDL_ReleaseGPUTexture(device, tex);
+    return NULL;
+  }
 
-      SDL_UploadToGPUTexture(copy, &src, &dst, false);
-      SDL_EndGPUCopyPass(copy);
-    }
-    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
-      SDL_Log("Failed to submit white texture upload: %s", SDL_GetError());
-    }
+  SDL_GPUTextureTransferInfo src;
+  SDL_zero(src);
+  src.transfer_buffer = xfer;
+
+  SDL_GPUTextureRegion dst;
+  SDL_zero(dst);
+  dst.texture = tex;
+  dst.w = 1;
+  dst.h = 1;
+  dst.d = 1;
+
+  SDL_UploadToGPUTexture(copy, &src, &dst, false);
+  SDL_EndGPUCopyPass(copy);
+
+  if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+    SDL_Log("Failed to submit white texture upload: %s", SDL_GetError());
+    SDL_ReleaseGPUTransferBuffer(device, xfer);
+    SDL_ReleaseGPUTexture(device, tex);
+    return NULL;
   }
 
   SDL_ReleaseGPUTransferBuffer(device, xfer);
@@ -1273,6 +1297,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
             SDL_GPU_PRESENTMODE_VSYNC
         )) {
       SDL_Log("SDL_SetGPUSwapchainParameters failed: %s", SDL_GetError());
+      SDL_DestroyWindow(window);
+      SDL_DestroyGPUDevice(device);
+      return SDL_APP_FAILURE;
     }
   }
 
@@ -1410,9 +1437,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   /* Step 13 — Load glTF models. */
   if (!setup_model(device, state->white_texture, &state->truck, TRUCK_MODEL_PATH)) {
     SDL_Log("Failed to set up truck model");
+    return SDL_APP_FAILURE;
   }
   if (!setup_model(device, state->white_texture, &state->box, BOX_MODEL_PATH)) {
     SDL_Log("Failed to set up box model");
+    return SDL_APP_FAILURE;
   }
 
   /* Step 14 — Upload grid geometry and generate box placements. */
@@ -1501,12 +1530,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
       pipe_info.target_info.depth_stencil_format = SHADOW_MAP_FORMAT;
 
       state->shadow_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe_info);
-      if (!state->shadow_pipeline) {
-        SDL_Log("Failed to create shadow pipeline: %s", SDL_GetError());
-      }
 
       SDL_ReleaseGPUShader(device, vert);
       SDL_ReleaseGPUShader(device, frag);
+
+      if (!state->shadow_pipeline) {
+        SDL_Log("Failed to create shadow pipeline: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+      }
     }
   }
 
@@ -1785,8 +1816,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     if (event->key.key == SDLK_ESCAPE) {
       if (state->mouse_captured) {
         /* Release mouse first, quit on second Escape. */
-        SDL_SetWindowRelativeMouseMode(state->window, false);
-        state->mouse_captured = false;
+        if (!SDL_SetWindowRelativeMouseMode(state->window, false)) {
+          SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
+        } else {
+          state->mouse_captured = false;
+        }
       } else {
         return SDL_APP_SUCCESS;
       }
@@ -1822,8 +1856,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
   case SDL_EVENT_MOUSE_BUTTON_DOWN:
     if (!state->mouse_captured) {
-      SDL_SetWindowRelativeMouseMode(state->window, true);
-      state->mouse_captured = true;
+      if (!SDL_SetWindowRelativeMouseMode(state->window, true)) {
+        SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
+      } else {
+        state->mouse_captured = true;
+      }
     }
     break;
 
@@ -1913,14 +1950,24 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
   /* ── Resize HDR target and depth texture if window changed ────────── */
   if (w != state->hdr_width || h != state->hdr_height) {
+    SDL_GPUTexture *new_hdr = create_hdr_target(state->device, w, h);
+    if (!new_hdr) {
+      SDL_Log("Failed to recreate HDR target on resize: %s", SDL_GetError());
+      return SDL_APP_CONTINUE;
+    }
     SDL_ReleaseGPUTexture(state->device, state->hdr_target);
-    state->hdr_target = create_hdr_target(state->device, w, h);
+    state->hdr_target = new_hdr;
     state->hdr_width = w;
     state->hdr_height = h;
   }
   if (w != state->depth_width || h != state->depth_height) {
+    SDL_GPUTexture *new_depth = create_depth_texture(state->device, w, h);
+    if (!new_depth) {
+      SDL_Log("Failed to recreate depth texture on resize: %s", SDL_GetError());
+      return SDL_APP_CONTINUE;
+    }
     SDL_ReleaseGPUTexture(state->device, state->depth_texture);
-    state->depth_texture = create_depth_texture(state->device, w, h);
+    state->depth_texture = new_depth;
     state->depth_width = w;
     state->depth_height = h;
   }
@@ -2057,7 +2104,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     }
 
     /* ── Draw grid ────────────────────────────────────────────────── */
-    if (state->grid_pipeline && state->grid_vertex_buffer) {
+    if (state->grid_pipeline && state->grid_vertex_buffer && state->grid_index_buffer) {
       SDL_BindGPUGraphicsPipeline(pass, state->grid_pipeline);
 
       /* Grid vertex uniforms slot 0: VP matrix. */
