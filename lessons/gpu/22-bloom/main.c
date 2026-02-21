@@ -972,7 +972,7 @@ static bool setup_model(
 
 /* ── Helper: upload grid geometry ─────────────────────────────────────────── */
 
-static void upload_grid_geometry(SDL_GPUDevice *device, app_state *state) {
+static bool upload_grid_geometry(SDL_GPUDevice *device, app_state *state) {
   float vertices[] = {
     -GRID_HALF_SIZE, 0.0f, -GRID_HALF_SIZE, GRID_HALF_SIZE,  0.0f, -GRID_HALF_SIZE,
     GRID_HALF_SIZE,  0.0f, GRID_HALF_SIZE,  -GRID_HALF_SIZE, 0.0f, GRID_HALF_SIZE,
@@ -982,8 +982,17 @@ static void upload_grid_geometry(SDL_GPUDevice *device, app_state *state) {
 
   state->grid_vertex_buffer =
       upload_gpu_buffer(device, SDL_GPU_BUFFERUSAGE_VERTEX, vertices, sizeof(vertices));
+  if (!state->grid_vertex_buffer) {
+    SDL_Log("Failed to upload grid vertex buffer");
+    return false;
+  }
   state->grid_index_buffer =
       upload_gpu_buffer(device, SDL_GPU_BUFFERUSAGE_INDEX, indices, sizeof(indices));
+  if (!state->grid_index_buffer) {
+    SDL_Log("Failed to upload grid index buffer");
+    return false;
+  }
+  return true;
 }
 
 /* ── Helper: generate UV sphere ───────────────────────────────────────────── */
@@ -991,7 +1000,7 @@ static void upload_grid_geometry(SDL_GPUDevice *device, app_state *state) {
 /* Generates a UV sphere using the ForgeGltfVertex layout (pos + normal + uv)
  * so it can share the scene vertex shader and pipeline vertex format.
  * 16 stacks x 32 slices = 561 vertices, 3072 indices. */
-static void generate_and_upload_sphere(SDL_GPUDevice *device, app_state *state) {
+static bool generate_and_upload_sphere(SDL_GPUDevice *device, app_state *state) {
   ForgeGltfVertex vertices[SPHERE_VERTEX_COUNT];
   Uint16 indices[SPHERE_INDEX_COUNT];
 
@@ -1001,13 +1010,13 @@ static void generate_and_upload_sphere(SDL_GPUDevice *device, app_state *state) 
   /* Generate vertices: sweep from top pole (stack=0) to bottom pole. */
   for (int stack = 0; stack <= SPHERE_STACKS; stack++) {
     float phi = FORGE_PI * (float)stack / (float)SPHERE_STACKS;
-    float sin_phi = SDL_sinf(phi);
-    float cos_phi = SDL_cosf(phi);
+    float sin_phi = forge_sinf(phi);
+    float cos_phi = forge_cosf(phi);
 
     for (int slice = 0; slice <= SPHERE_SLICES; slice++) {
       float theta = 2.0f * FORGE_PI * (float)slice / (float)SPHERE_SLICES;
-      float sin_theta = SDL_sinf(theta);
-      float cos_theta = SDL_cosf(theta);
+      float sin_theta = forge_sinf(theta);
+      float cos_theta = forge_cosf(theta);
 
       /* Normal is just the unit sphere direction. */
       float nx = sin_phi * cos_theta;
@@ -1046,9 +1055,18 @@ static void generate_and_upload_sphere(SDL_GPUDevice *device, app_state *state) 
   state->sphere_vertex_buffer = upload_gpu_buffer(
       device, SDL_GPU_BUFFERUSAGE_VERTEX, vertices, (Uint32)sizeof(vertices)
   );
+  if (!state->sphere_vertex_buffer) {
+    SDL_Log("Failed to upload sphere vertex buffer");
+    return false;
+  }
   state->sphere_index_buffer = upload_gpu_buffer(
       device, SDL_GPU_BUFFERUSAGE_INDEX, indices, (Uint32)sizeof(indices)
   );
+  if (!state->sphere_index_buffer) {
+    SDL_Log("Failed to upload sphere index buffer");
+    return false;
+  }
+  return true;
 }
 
 /* ── Helper: generate box placements ──────────────────────────────────────── */
@@ -1059,9 +1077,9 @@ static void generate_box_placements(app_state *state) {
   for (int i = 0; i < BOX_GROUND_COUNT; i++) {
     float angle = (float)i * (2.0f * FORGE_PI / BOX_GROUND_COUNT);
     state->box_placements[count].position = vec3_create(
-        BOX_RING_RADIUS * SDL_cosf(angle),
+        BOX_RING_RADIUS * forge_cosf(angle),
         BOX_GROUND_Y,
-        BOX_RING_RADIUS * SDL_sinf(angle)
+        BOX_RING_RADIUS * forge_sinf(angle)
     );
     state->box_placements[count].y_rotation = angle;
     count++;
@@ -1358,8 +1376,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   }
 
   /* Step 14 — Upload grid and sphere geometry, generate box placements. */
-  upload_grid_geometry(device, state);
-  generate_and_upload_sphere(device, state);
+  if (!upload_grid_geometry(device, state)) {
+    SDL_Log("Failed to upload grid geometry");
+    goto init_fail;
+  }
+  if (!generate_and_upload_sphere(device, state)) {
+    SDL_Log("Failed to upload sphere geometry");
+    goto init_fail;
+  }
   generate_box_placements(state);
 
   /* Step 15 — Create the scene pipeline.
@@ -1826,7 +1850,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 #ifdef FORGE_CAPTURE
   if (state->capture.mode != FORGE_CAPTURE_NONE) {
-    forge_capture_init(&state->capture, device, window);
+    if (!forge_capture_init(&state->capture, device, window)) {
+      SDL_Log("forge_capture_init failed — disabling capture");
+      state->capture.mode = FORGE_CAPTURE_NONE;
+    }
   }
 #endif
 
@@ -1961,9 +1988,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   /* ── Animate point light — orbits around the scene ─────────────── */
   state->light_angle += LIGHT_ORBIT_SPEED * dt;
   vec3 light_pos = vec3_create(
-      LIGHT_ORBIT_RADIUS * SDL_cosf(state->light_angle),
+      LIGHT_ORBIT_RADIUS * forge_cosf(state->light_angle),
       LIGHT_ORBIT_HEIGHT,
-      LIGHT_ORBIT_RADIUS * SDL_sinf(state->light_angle)
+      LIGHT_ORBIT_RADIUS * forge_sinf(state->light_angle)
   );
 
   /* ── Camera movement ──────────────────────────────────────────────── */
@@ -2226,7 +2253,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
    * bright pixels and progressively blurs them.  The upsample chain
    * combines the blurred results back up to create a multi-scale glow.
    * ════════════════════════════════════════════════════════════════════ */
+  bool bloom_ok = false;
   if (state->bloom_enabled) {
+    bloom_ok = true;
+
     /* ── Bloom downsample (5 passes) ─────────────────────────────── */
     for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
       SDL_GPUColorTargetInfo color_target;
@@ -2242,6 +2272,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
       SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &color_target, 1, NULL);
       if (!pass) {
         SDL_Log("Failed to begin bloom downsample pass %d: %s", i, SDL_GetError());
+        bloom_ok = false;
         break;
       }
 
@@ -2280,37 +2311,40 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     /* Each pass reads from bloom_mips[i+1] (smaller) and additively
      * blends into bloom_mips[i] (larger).  The LOAD op preserves
      * the existing downsample data; additive blend accumulates. */
-    for (int i = BLOOM_MIP_COUNT - 2; i >= 0; i--) {
-      SDL_GPUColorTargetInfo color_target;
-      SDL_zero(color_target);
-      color_target.texture = state->bloom_mips[i];
-      color_target.load_op = SDL_GPU_LOADOP_LOAD; /* Preserve existing data */
-      color_target.store_op = SDL_GPU_STOREOP_STORE;
+    if (bloom_ok) {
+      for (int i = BLOOM_MIP_COUNT - 2; i >= 0; i--) {
+        SDL_GPUColorTargetInfo color_target;
+        SDL_zero(color_target);
+        color_target.texture = state->bloom_mips[i];
+        color_target.load_op = SDL_GPU_LOADOP_LOAD; /* Preserve existing data */
+        color_target.store_op = SDL_GPU_STOREOP_STORE;
 
-      SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &color_target, 1, NULL);
-      if (!pass) {
-        SDL_Log("Failed to begin bloom upsample pass %d: %s", i, SDL_GetError());
-        break;
+        SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &color_target, 1, NULL);
+        if (!pass) {
+          SDL_Log("Failed to begin bloom upsample pass %d: %s", i, SDL_GetError());
+          bloom_ok = false;
+          break;
+        }
+
+        SDL_BindGPUGraphicsPipeline(pass, state->upsample_pipeline);
+
+        /* Source: the smaller mip we're upsampling from. */
+        SDL_GPUTextureSamplerBinding src_binding;
+        SDL_zero(src_binding);
+        src_binding.texture = state->bloom_mips[i + 1];
+        src_binding.sampler = state->bloom_sampler;
+        SDL_BindGPUFragmentSamplers(pass, 0, &src_binding, 1);
+
+        /* Texel size of the SOURCE (smaller) texture. */
+        BloomUpsampleUniforms us_u;
+        SDL_zero(us_u);
+        us_u.texel_size[0] = 1.0f / (float)state->bloom_widths[i + 1];
+        us_u.texel_size[1] = 1.0f / (float)state->bloom_heights[i + 1];
+        SDL_PushGPUFragmentUniformData(cmd, 0, &us_u, sizeof(us_u));
+
+        SDL_DrawGPUPrimitives(pass, FULLSCREEN_QUAD_VERTS, 1, 0, 0);
+        SDL_EndGPURenderPass(pass);
       }
-
-      SDL_BindGPUGraphicsPipeline(pass, state->upsample_pipeline);
-
-      /* Source: the smaller mip we're upsampling from. */
-      SDL_GPUTextureSamplerBinding src_binding;
-      SDL_zero(src_binding);
-      src_binding.texture = state->bloom_mips[i + 1];
-      src_binding.sampler = state->bloom_sampler;
-      SDL_BindGPUFragmentSamplers(pass, 0, &src_binding, 1);
-
-      /* Texel size of the SOURCE (smaller) texture. */
-      BloomUpsampleUniforms us_u;
-      SDL_zero(us_u);
-      us_u.texel_size[0] = 1.0f / (float)state->bloom_widths[i + 1];
-      us_u.texel_size[1] = 1.0f / (float)state->bloom_heights[i + 1];
-      SDL_PushGPUFragmentUniformData(cmd, 0, &us_u, sizeof(us_u));
-
-      SDL_DrawGPUPrimitives(pass, FULLSCREEN_QUAD_VERTS, 1, 0, 0);
-      SDL_EndGPURenderPass(pass);
     }
   }
 
@@ -2352,7 +2386,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
       SDL_zero(tonemap_u);
       tonemap_u.exposure = state->exposure;
       tonemap_u.tonemap_mode = state->tonemap_mode;
-      tonemap_u.bloom_intensity = state->bloom_enabled ? state->bloom_intensity : 0.0f;
+      tonemap_u.bloom_intensity = (bloom_ok && state->bloom_enabled) ? state->bloom_intensity : 0.0f;
       SDL_PushGPUFragmentUniformData(cmd, 0, &tonemap_u, sizeof(tonemap_u));
 
       SDL_DrawGPUPrimitives(pass, FULLSCREEN_QUAD_VERTS, 1, 0, 0);
