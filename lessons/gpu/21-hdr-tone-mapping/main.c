@@ -134,6 +134,13 @@
 #define TONEMAP_REINHARD 1
 #define TONEMAP_ACES 2
 
+/* Camera initial position and orientation (looking down at the truck). */
+#define CAM_START_X -6.1f
+#define CAM_START_Y 7.0f
+#define CAM_START_Z 4.4f
+#define CAM_START_YAW_DEG -50.0f
+#define CAM_START_PITCH_DEG -50.0f
+
 /* Frame timing. */
 #define MAX_FRAME_DT 0.1f /* 100 ms cap prevents huge jumps after hitches */
 
@@ -1661,13 +1668,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     pipe_info.target_info.has_depth_stencil_target = true;
 
     state->scene_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe_info);
+
+    SDL_ReleaseGPUShader(device, vert);
+    SDL_ReleaseGPUShader(device, frag);
+
     if (!state->scene_pipeline) {
       SDL_Log("Failed to create scene pipeline: %s", SDL_GetError());
       goto init_fail;
     }
-
-    SDL_ReleaseGPUShader(device, vert);
-    SDL_ReleaseGPUShader(device, frag);
   }
 
   /* Step 17 — Create the grid pipeline.
@@ -1742,13 +1750,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
       pipe_info.target_info.has_depth_stencil_target = true;
 
       state->grid_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe_info);
+
+      SDL_ReleaseGPUShader(device, vert);
+      SDL_ReleaseGPUShader(device, frag);
+
       if (!state->grid_pipeline) {
         SDL_Log("Failed to create grid pipeline: %s", SDL_GetError());
         goto init_fail;
       }
-
-      SDL_ReleaseGPUShader(device, vert);
-      SDL_ReleaseGPUShader(device, frag);
     }
   }
 
@@ -1806,20 +1815,21 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
       pipe_info.target_info.has_depth_stencil_target = false;
 
       state->tonemap_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipe_info);
+
+      SDL_ReleaseGPUShader(device, vert);
+      SDL_ReleaseGPUShader(device, frag);
+
       if (!state->tonemap_pipeline) {
         SDL_Log("Failed to create tonemap pipeline: %s", SDL_GetError());
         goto init_fail;
       }
-
-      SDL_ReleaseGPUShader(device, vert);
-      SDL_ReleaseGPUShader(device, frag);
     }
   }
 
   /* Step 19 — Initialize camera and HDR settings. */
-  state->cam_position = vec3_create(-6.1f, 7.0f, 4.4f);
-  state->cam_yaw = -50.0f * FORGE_DEG2RAD;
-  state->cam_pitch = -50.0f * FORGE_DEG2RAD;
+  state->cam_position = vec3_create(CAM_START_X, CAM_START_Y, CAM_START_Z);
+  state->cam_yaw = CAM_START_YAW_DEG * FORGE_DEG2RAD;
+  state->cam_pitch = CAM_START_PITCH_DEG * FORGE_DEG2RAD;
   state->exposure = DEFAULT_EXPOSURE;
   state->tonemap_mode = TONEMAP_ACES; /* Start with ACES — best default */
   state->last_ticks = SDL_GetTicks();
