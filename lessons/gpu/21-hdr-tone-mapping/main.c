@@ -93,6 +93,7 @@
 #define FAR_PLANE 100.0f
 #define CAM_SPEED 5.0f
 #define MOUSE_SENS 0.003f
+#define PITCH_CLAMP 1.5f /* ~86 degrees — prevents camera from flipping */
 
 /* Light — bright enough to push specular highlights past 1.0.
  * At intensity 3.0, a specular peak (specular_str * intensity) reaches 3.0,
@@ -106,13 +107,15 @@
 #define MATERIAL_SHININESS 64.0f
 #define MATERIAL_AMBIENT 0.1f
 #define MATERIAL_SPECULAR_STR 1.0f
+#define MAX_ANISOTROPY 4 /* diffuse sampler anisotropic filtering level */
 
 /* Box layout — ring of boxes around the truck. */
 #define BOX_GROUND_COUNT 8
 #define BOX_STACK_COUNT 4
 #define BOX_RING_RADIUS 5.0f
-#define BOX_GROUND_Y 0.5f /* center Y — box bottom sits at Y=0 */
-#define BOX_STACK_Y 1.5f  /* center Y — stacked box bottom at Y=1 */
+#define BOX_GROUND_Y 0.5f  /* center Y — box bottom sits at Y=0 */
+#define BOX_STACK_Y 1.5f   /* center Y — stacked box bottom at Y=1 */
+#define BOX_STACK_ROTATION_OFFSET 0.5f /* radians offset from base box */
 #define TOTAL_BOX_COUNT (BOX_GROUND_COUNT + BOX_STACK_COUNT)
 
 /* HDR render target format.
@@ -130,6 +133,15 @@
 #define TONEMAP_NONE 0
 #define TONEMAP_REINHARD 1
 #define TONEMAP_ACES 2
+
+/* Frame timing. */
+#define MAX_FRAME_DT 0.1f /* 100 ms cap prevents huge jumps after hitches */
+
+/* Fullscreen quad — two triangles, no vertex buffer (SV_VertexID). */
+#define FULLSCREEN_QUAD_VERTS 6
+
+/* Grid geometry — 4-vertex quad, drawn with 6 indices (2 triangles). */
+#define GRID_INDEX_COUNT 6
 
 /* Grid appearance. */
 #define GRID_HALF_SIZE 50.0f
@@ -529,6 +541,7 @@ static SDL_GPUBuffer *upload_gpu_buffer(
   SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
   if (!copy) {
     SDL_Log("Failed to begin copy pass: %s", SDL_GetError());
+    SDL_CancelGPUCommandBuffer(cmd);
     SDL_ReleaseGPUTransferBuffer(device, xfer);
     SDL_ReleaseGPUBuffer(device, buffer);
     return NULL;
@@ -649,6 +662,7 @@ static SDL_GPUTexture *load_texture(SDL_GPUDevice *device, const char *path) {
   SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
   if (!copy) {
     SDL_Log("Failed to begin texture copy pass: %s", SDL_GetError());
+    SDL_CancelGPUCommandBuffer(cmd);
     SDL_ReleaseGPUTransferBuffer(device, xfer);
     SDL_ReleaseGPUTexture(device, tex);
     return NULL;
@@ -708,7 +722,7 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device) {
   SDL_GPUTransferBufferCreateInfo xfer_info;
   SDL_zero(xfer_info);
   xfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-  xfer_info.size = 4;
+  xfer_info.size = sizeof(white);
 
   SDL_GPUTransferBuffer *xfer = SDL_CreateGPUTransferBuffer(device, &xfer_info);
   if (!xfer) {
@@ -724,7 +738,7 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device) {
     SDL_ReleaseGPUTexture(device, tex);
     return NULL;
   }
-  SDL_memcpy(mapped, white, 4);
+  SDL_memcpy(mapped, white, sizeof(white));
   SDL_UnmapGPUTransferBuffer(device, xfer);
 
   SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
@@ -738,6 +752,7 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device) {
   SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
   if (!copy) {
     SDL_Log("Failed to begin copy pass for white texture: %s", SDL_GetError());
+    SDL_CancelGPUCommandBuffer(cmd);
     SDL_ReleaseGPUTransferBuffer(device, xfer);
     SDL_ReleaseGPUTexture(device, tex);
     return NULL;
@@ -973,7 +988,7 @@ static void generate_box_placements(app_state *state) {
     int base = i * 2; /* every other ground box */
     vec3 base_pos = state->box_placements[base].position;
     state->box_placements[count].position = vec3_create(base_pos.x, BOX_STACK_Y, base_pos.z);
-    state->box_placements[count].y_rotation = state->box_placements[base].y_rotation + 0.5f;
+    state->box_placements[count].y_rotation = state->box_placements[base].y_rotation + BOX_STACK_ROTATION_OFFSET;
     count++;
   }
 
@@ -1417,7 +1432,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
     sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
     sampler_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
-    sampler_info.max_anisotropy = 4;
+    sampler_info.max_anisotropy = MAX_ANISOTROPY;
     sampler_info.enable_anisotropy = true;
     state->sampler = SDL_CreateGPUSampler(device, &sampler_info);
     if (!state->sampler) {
@@ -1910,10 +1925,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
       state->cam_pitch -= event->motion.yrel * MOUSE_SENS;
 
       /* Clamp pitch to avoid flipping. */
-      if (state->cam_pitch > 1.5f)
-        state->cam_pitch = 1.5f;
-      if (state->cam_pitch < -1.5f)
-        state->cam_pitch = -1.5f;
+      if (state->cam_pitch > PITCH_CLAMP)
+        state->cam_pitch = PITCH_CLAMP;
+      if (state->cam_pitch < -PITCH_CLAMP)
+        state->cam_pitch = -PITCH_CLAMP;
     }
     break;
 
@@ -1933,8 +1948,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   Uint64 now = SDL_GetTicks();
   float dt = (float)(now - state->last_ticks) / 1000.0f;
   state->last_ticks = now;
-  if (dt > 0.1f)
-    dt = 0.1f; /* Cap to prevent huge jumps */
+  if (dt > MAX_FRAME_DT)
+    dt = MAX_FRAME_DT;
 
   /* ── Camera movement ──────────────────────────────────────────────── */
   const bool *keys = SDL_GetKeyboardState(NULL);
@@ -2206,7 +2221,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
       ib.buffer = state->grid_index_buffer;
       SDL_BindGPUIndexBuffer(pass, &ib, SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
-      SDL_DrawGPUIndexedPrimitives(pass, 6, 1, 0, 0, 0);
+      SDL_DrawGPUIndexedPrimitives(pass, GRID_INDEX_COUNT, 1, 0, 0, 0);
     }
 
     /* ── Draw scene models ────────────────────────────────────────── */
@@ -2288,9 +2303,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
       tonemap_u.tonemap_mode = state->tonemap_mode;
       SDL_PushGPUFragmentUniformData(cmd, 0, &tonemap_u, sizeof(tonemap_u));
 
-      /* Draw 6 vertices — two triangles forming a fullscreen quad.
+      /* Two triangles forming a fullscreen quad.
        * No vertex buffer is bound; positions come from SV_VertexID. */
-      SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0);
+      SDL_DrawGPUPrimitives(pass, FULLSCREEN_QUAD_VERTS, 1, 0, 0);
     }
 
     SDL_EndGPURenderPass(pass);
