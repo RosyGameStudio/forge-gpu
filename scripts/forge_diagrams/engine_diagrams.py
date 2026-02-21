@@ -498,10 +498,10 @@ def diagram_vertex_memory_layout():
 # ---------------------------------------------------------------------------
 def diagram_pointer_arithmetic():
     """Visualize how pointer arithmetic scales by element size."""
-    fig, ax = plt.subplots(figsize=(11, 5.5), facecolor=STYLE["bg"])
+    fig, ax = plt.subplots(figsize=(11, 6.5), facecolor=STYLE["bg"])
     ax.set_facecolor(STYLE["bg"])
     ax.set_xlim(-1, 22)
-    ax.set_ylim(-1.5, 6.5)
+    ax.set_ylim(-0.8, 8.5)
     ax.set_aspect("equal")
     ax.axis("off")
 
@@ -509,7 +509,7 @@ def diagram_pointer_arithmetic():
 
     ax.text(
         10.5,
-        6.2,
+        8.2,
         "Pointer Arithmetic: Scaling by Element Size",
         color=STYLE["text"],
         fontsize=15,
