@@ -2064,15 +2064,21 @@ SDL_AppResult SDL_AppIterate(void *appstate)
      * the command buffer — SDL_CancelGPUCommandBuffer is not allowed once
      * a swapchain texture has been acquired. */
     if (!ensure_depth_texture(state, sw, sh)) {
-        SDL_SubmitGPUCommandBuffer(cmd);
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
         return SDL_APP_FAILURE;
     }
     if (!ensure_hdr_target(state, sw, sh)) {
-        SDL_SubmitGPUCommandBuffer(cmd);
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
         return SDL_APP_FAILURE;
     }
     if (!ensure_bloom_mips(state, sw, sh)) {
-        SDL_SubmitGPUCommandBuffer(cmd);
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
         return SDL_APP_FAILURE;
     }
 
@@ -2090,7 +2096,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             cmd, NULL, 0, &shadow_depth);
         if (!shadow_pass) {
             SDL_Log("SDL_BeginGPURenderPass (shadow) failed: %s", SDL_GetError());
-            SDL_SubmitGPUCommandBuffer(cmd);
+            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+            }
             return SDL_APP_FAILURE;
         }
 
@@ -2132,7 +2140,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         cmd, &color_target, 1, &depth_target);
     if (!pass) {
         SDL_Log("SDL_BeginGPURenderPass failed: %s", SDL_GetError());
-        SDL_SubmitGPUCommandBuffer(cmd);
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
         return SDL_APP_FAILURE;
     }
 
@@ -2256,7 +2266,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             if (!bloom_pass) {
                 SDL_Log("SDL_BeginGPURenderPass (bloom down %d) failed: %s",
                         i, SDL_GetError());
-                SDL_SubmitGPUCommandBuffer(cmd);
+                if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                    SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+                }
                 return SDL_APP_FAILURE;
             }
             SDL_BindGPUGraphicsPipeline(bloom_pass,
@@ -2295,7 +2307,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             if (!bloom_pass) {
                 SDL_Log("SDL_BeginGPURenderPass (bloom up %d) failed: %s",
                         i, SDL_GetError());
-                SDL_SubmitGPUCommandBuffer(cmd);
+                if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                    SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+                }
                 return SDL_APP_FAILURE;
             }
             SDL_BindGPUGraphicsPipeline(bloom_pass,
@@ -2324,7 +2338,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             cmd, &tone_ct, 1, NULL);
         if (!tone_pass) {
             SDL_Log("SDL_BeginGPURenderPass (tonemap) failed: %s", SDL_GetError());
-            SDL_SubmitGPUCommandBuffer(cmd);
+            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+            }
             return SDL_APP_FAILURE;
         }
 

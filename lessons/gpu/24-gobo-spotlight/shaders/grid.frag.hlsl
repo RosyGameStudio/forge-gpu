@@ -14,6 +14,13 @@ SamplerState gobo_smp   : register(s1, space2);
 /* Shadow bias. */
 #define SHADOW_BIAS 0.002
 
+/* Shadow map resolution — must match SHADOW_MAP_SIZE in main.c. */
+#define SHADOW_MAP_RES 1024.0
+
+/* Quadratic attenuation coefficients for distance falloff. */
+#define ATTEN_LINEAR    0.09
+#define ATTEN_QUADRATIC 0.032
+
 cbuffer FragUniforms : register(b0, space3)
 {
     float4 line_color;
@@ -117,12 +124,12 @@ float4 main(float4 clip_pos : SV_Position, float3 world_pos : TEXCOORD0) : SV_Ta
 
             float gobo = gobo_tex.Sample(gobo_smp, gobo_uv).r;
 
-            float2 texel_size = float2(1.0 / 1024.0, 1.0 / 1024.0);
+            float2 texel_size = float2(1.0 / SHADOW_MAP_RES, 1.0 / SHADOW_MAP_RES);
             float shadow = sample_shadow(light_ndc, texel_size);
 
             float3 L = normalize(spot_pos - world_pos);
             float NdotL = max(dot(N, L), 0.0);
-            float atten = 1.0 / (1.0 + 0.09 * d + 0.032 * d * d);
+            float atten = 1.0 / (1.0 + ATTEN_LINEAR * d + ATTEN_QUADRATIC * d * d);
 
             total_light += albedo * NdotL * cone * gobo * shadow *
                            in_bounds * atten * spot_intensity * spot_color;
