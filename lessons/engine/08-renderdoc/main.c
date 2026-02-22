@@ -50,6 +50,11 @@
  * including all resource creation that happened before it. */
 #define CAPTURE_TARGET_FRAME 60
 
+/* How often to print a status line (in frames).  At 60 fps this logs
+ * roughly every 5 seconds — frequent enough to confirm the program is
+ * running, infrequent enough to avoid flooding the console. */
+#define FRAME_LOG_INTERVAL 300
+
 /* ── RenderDoc in-application API (minimal definitions) ───────────────────
  *
  * The full RenderDoc API is defined in renderdoc_app.h, available at:
@@ -273,7 +278,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
                 device, window,
                 SDL_GPU_SWAPCHAINCOMPOSITION_SDR_LINEAR,
                 SDL_GPU_PRESENTMODE_VSYNC)) {
-            SDL_Log("SDL_SetGPUSwapchainParameters failed: %s", SDL_GetError());
+            SDL_Log("SDL_SetGPUSwapchainParameters failed: %s",
+                    SDL_GetError());
+            SDL_ReleaseWindowFromGPUDevice(device, window);
+            SDL_DestroyWindow(window);
+            SDL_DestroyGPUDevice(device);
+            return SDL_APP_FAILURE;
         }
     }
 
@@ -383,6 +393,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(state->device);
     if (!cmd) {
         SDL_Log("SDL_AcquireGPUCommandBuffer failed: %s", SDL_GetError());
+        if (capturing) {
+            state->rdoc->EndFrameCapture(NULL, NULL);
+        }
         return SDL_APP_FAILURE;
     }
 
@@ -408,6 +421,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_PopGPUDebugGroup(cmd);
         if (!SDL_SubmitGPUCommandBuffer(cmd)) {
             SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
+        if (capturing) {
+            state->rdoc->EndFrameCapture(NULL, NULL);
         }
         return SDL_APP_FAILURE;
     }
@@ -481,6 +497,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     /* ── Submit ────────────────────────────────────────────────────────── */
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        if (capturing) {
+            state->rdoc->EndFrameCapture(NULL, NULL);
+        }
         return SDL_APP_FAILURE;
     }
 
@@ -492,9 +511,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_Log("The capture file is saved in RenderDoc's capture directory.");
     }
 
-    /* Log every 300 frames (~5 seconds at 60 fps) so the user knows
-     * the program is running and can see the frame counter. */
-    if (state->frame_number > 0 && state->frame_number % 300 == 0) {
+    /* Log periodically so the user knows the program is still running. */
+    if (state->frame_number > 0
+        && state->frame_number % FRAME_LOG_INTERVAL == 0) {
         SDL_Log("Frame %d — press F12 in RenderDoc to capture",
                 state->frame_number);
     }
