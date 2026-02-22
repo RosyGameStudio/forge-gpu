@@ -413,6 +413,99 @@ scattering with scene rendering.
    the atmosphere integral from camera to the object distance, not to
    the atmosphere boundary.
 
+## Debugging notes
+
+This lesson required several non-obvious fixes during development. Each
+one teaches something about GPU programming and floating-point math that
+goes beyond the atmosphere algorithm itself.
+
+### 1. SDL_AppInit must return SDL_APP_CONTINUE
+
+**Symptom:** The app printed its init message and immediately exited
+with code 0 — no window visible.
+
+**Cause:** `SDL_AppInit` returned `SDL_APP_SUCCESS` instead of
+`SDL_APP_CONTINUE`. In SDL's callback architecture, `SDL_APP_SUCCESS`
+means "quit successfully" — it's a clean exit, not a signal to keep
+running. The app lifecycle worked exactly as told.
+
+**Fix:** Return `SDL_APP_CONTINUE` from `SDL_AppInit`.
+
+**Lesson:** In the SDL callback model, `SDL_APP_SUCCESS` and
+`SDL_APP_FAILURE` both terminate the app. Only `SDL_APP_CONTINUE` keeps
+it running. This is easy to confuse — `SUCCESS` sounds like the right
+thing to return from an init function, but it's actually the quit signal.
+
+### 2. Inverse VP fails at planet-centric coordinates
+
+**Symptom:** The sun disc was invisible and ray directions were wrong.
+Debug output (`ray_dir * 0.5 + 0.5` as color) showed incorrect
+directions. Enlarging the sun to 20x its real size still showed nothing.
+
+**Cause:** Catastrophic floating-point precision loss. The camera sits
+at `(0, 6360.001, 0)` km (1 meter above sea level). The inverse
+view-projection matrix produces world-space positions near
+`(x, 6360.0, z)`. The fragment shader then computes:
+
+```hlsl
+ray_dir = normalize(world_pos - cam_pos_km);
+/*                   6360.0   - 6360.001 = garbage in float32 */
+```
+
+With only ~7 significant digits in 32-bit float, the subtraction
+`6360.0 - 6360.001` loses all precision. The resulting ray directions
+are essentially random noise.
+
+**Fix:** Replace the inverse VP matrix with a **ray matrix** that maps
+NDC directly to world-space directions using camera basis vectors:
+
+```text
+ray_dir = ndc.x * (aspect * tan(fov/2) * right)
+        + ndc.y * (tan(fov/2) * up)
+        + forward
+```
+
+No large-position subtraction involved — the directions are computed
+purely from unit vectors and small scalars, all well within float32
+range.
+
+**Lesson:** Inverse VP works well for typical game scenes where the
+camera is near the origin. But when using planet-centric coordinates
+(thousands of km from the origin), the precision loss in the unproject
+subtraction becomes catastrophic. The ray matrix approach avoids this
+entirely and is also cheaper (no matrix inverse needed).
+
+### 3. Sun disc visible below the horizon
+
+**Symptom:** When the sun elevation went negative, the sun disc was
+still visible floating below the ground line.
+
+**Cause:** The `sun_disc()` function only checked the angular distance
+between the view ray and sun direction. It did not test whether the
+planet was blocking the sun — if the sun is below the horizon, a ray
+from the camera toward the sun hits the ground sphere, but the disc
+rendering ignored this occlusion.
+
+**Fix:** Before calling `sun_disc()`, test if a ray from the camera
+toward the sun intersects the ground sphere:
+
+```hlsl
+float t_gnd_near, t_gnd_far;
+bool sun_hits_ground = ray_sphere_intersect(
+    cam_pos_km, sun_dir, R_GROUND, t_gnd_near, t_gnd_far);
+if (!sun_hits_ground || t_gnd_near < 0.0)
+    color += sun_disc(ray_dir, sun_dir, transmittance);
+```
+
+If the ray hits the ground (`t_gnd_near > 0`), the planet occludes the
+sun and the disc is suppressed. The atmospheric glow near the horizon
+still renders from the ray march.
+
+**Lesson:** The atmosphere ray march naturally handles the sun going
+below the horizon (the inner march returns zero transmittance when it
+hits the ground). But separately rendered elements like the sun disc
+need their own occlusion test — they don't participate in the march.
+
 ## References
 
 - Hillaire, S. (2020). *A Scalable and Production Ready Sky and

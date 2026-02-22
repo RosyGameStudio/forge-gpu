@@ -167,9 +167,13 @@ disc and creates a natural glow halo.
 
 ## Common mistakes
 
-1. **Forgetting to normalize the view ray** — The fragment shader must
-   `normalize(input.view_ray - cam_pos_km)`. Without normalization, the
-   ray march step sizes are wrong and the sky appears stretched.
+1. **Inverse VP fails at planet-centric coordinates** — Do NOT use the
+   inverse view-projection matrix to reconstruct ray directions. The camera
+   is at `(0, 6360.001, 0)` km — the subtraction `world_pos - cam_pos`
+   in the fragment shader loses all float32 precision (`6360.0 - 6360.001`
+   has only ~7 significant digits). Use a ray matrix built from camera
+   basis vectors instead. The fragment shader then just calls
+   `normalize(input.view_ray)` — no position subtraction needed.
 
 2. **Wrong coordinate system** — All constants are in km. If you place the
    camera at `(0, 0, 0)` instead of `(0, 6360.001, 0)`, it's inside the
@@ -188,7 +192,20 @@ disc and creates a natural glow halo.
    bloom and tone mapping, this appears as a hard white circle with no
    soft glow.
 
-6. **Ray matrix not updated on resize** — If the window resizes, the
+6. **Sun disc visible below the horizon** — The `sun_disc()` function must
+   check if the planet occludes the sun. Before rendering the disc, test
+   `ray_sphere_intersect(cam_pos, sun_dir, R_GROUND)` — if the ray hits
+   the ground with `t_near > 0`, suppress the disc. The atmosphere ray
+   march handles this naturally (inner march returns zero when it hits
+   the ground), but the sun disc is rendered separately and needs its own
+   occlusion test.
+
+7. **SDL_AppInit return value** — Return `SDL_APP_CONTINUE`, not
+   `SDL_APP_SUCCESS`. In SDL's callback architecture, `SUCCESS` means
+   "quit successfully" — it terminates the app. Only `CONTINUE` keeps
+   the event loop running.
+
+8. **Ray matrix not updated on resize** — If the window resizes, the
    aspect ratio changes. The ray matrix must be recomputed every frame
    from the current window dimensions.
 
