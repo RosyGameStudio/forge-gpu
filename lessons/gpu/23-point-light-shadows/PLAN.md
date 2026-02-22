@@ -39,7 +39,7 @@ Each light has:
 - World-space position (`float3`)
 - Color (`float3`)
 - Intensity (HDR scalar, e.g. 5.0–15.0)
-- Shadow cube map (D32_FLOAT, `SDL_GPU_TEXTURETYPE_CUBE`)
+- Shadow cube map (R32_FLOAT color, `SDL_GPU_TEXTURETYPE_CUBE`) storing linear depth, with a separate D32_FLOAT depth buffer for rasterization
 - Attenuation: quadratic falloff `1 / (1 + 0.09*d + 0.032*d²)`
 
 ## New concept integration
