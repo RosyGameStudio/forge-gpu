@@ -150,7 +150,7 @@ Learn the SDL GPU API and modern rendering techniques:
 <b>25</b> — Shader Noise
 </td>
 <td align="center">
-<a href="lessons/gpu/26-procedural-sky/"><!-- img src="lessons/gpu/26-procedural-sky/assets/screenshot.png" width="200" alt="Procedural Sky" / --></a><br />
+<a href="lessons/gpu/26-procedural-sky/"><img src="lessons/gpu/26-procedural-sky/assets/screenshot.png" width="200" alt="Procedural Sky" /></a><br />
 <b>26</b> — Procedural Sky
 </td>
 </tr>

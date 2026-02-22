@@ -388,18 +388,18 @@ float3 sun_disc(float3 ray_dir, float3 sun_direction, float3 transmittance)
 
 float4 main(PSInput input) : SV_Target
 {
-    /* Reconstruct the view ray direction from the interpolated world
-     * position (set up by the vertex shader's inv_vp unproject). */
-    float3 ray_dir = normalize(input.view_ray - cam_pos_km);
+    /* The vertex shader outputs world-space ray directions via the ray
+     * matrix (camera basis vectors scaled by FOV/aspect).  Normalize
+     * to get the per-pixel view ray direction. */
+    float3 ray_dir = normalize(input.view_ray);
 
-    /* March through the atmosphere. */
+    /* March through the atmosphere, accumulating inscattered light. */
     float3 transmittance;
     float3 color = atmosphere(cam_pos_km, ray_dir, transmittance);
 
-    /* Add the sun disc, attenuated by atmospheric transmittance. */
+    /* Add the sun disc, modulated by view transmittance so it dims
+     * and reddens at sunset. */
     color += sun_disc(ray_dir, sun_dir, transmittance);
 
-    /* Output HDR values — the tone mapping pass will handle
-     * compressing these to the displayable [0,1] range. */
     return float4(color, 1.0);
 }

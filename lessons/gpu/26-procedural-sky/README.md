@@ -13,7 +13,7 @@ Mie, and ozone scattering.
 - The Beer-Lambert law for light extinction along a path
 - Phase functions (Rayleigh symmetric, Henyey-Greenstein forward)
 - Ray-sphere intersection for atmosphere entry/exit
-- Inverse view-projection for world-space ray reconstruction
+- Ray matrix reconstruction for world-space view directions
 - HDR rendering with Jimenez dual-filter bloom
 - ACES filmic tone mapping with exposure control
 - Sun disc rendering with limb darkening
@@ -21,7 +21,7 @@ Mie, and ozone scattering.
 
 ## Result
 
-<!-- ![Lesson 26 screenshot](assets/screenshot.png) -->
+![Lesson 26 screenshot](assets/screenshot.png)
 
 A real-time procedural sky with physically correct colors at any time of
 day. The sun creates natural bloom through HDR values exceeding 1.0.
@@ -287,25 +287,38 @@ The rendering follows a multi-pass HDR pipeline:
 This is the same bloom pipeline from
 [Lesson 22](../22-bloom/README.md), adapted for the procedural sky.
 
-### Inverse view-projection ray reconstruction
+### Ray matrix reconstruction
 
-The vertex shader places a fullscreen quad and uses the inverse
-view-projection matrix to unproject each vertex to world space:
+The vertex shader places a fullscreen quad and maps each vertex's NDC
+position to a world-space ray direction using a **ray matrix** built
+from camera basis vectors and FOV:
+
+```c
+/* C side: build the ray matrix from camera orientation */
+ray_dir = ndc.x * (aspect * tan(fov/2) * right)
+        + ndc.y * (tan(fov/2) * up)
+        + forward
+```
 
 ```hlsl
-float4 world_pos = mul(inv_vp, float4(ndc.x, ndc.y, 1.0, 1.0));
+/* Vertex shader: multiply NDC by the ray matrix */
+float4 world_pos = mul(ray_matrix, float4(ndc.x, ndc.y, 1.0, 1.0));
 output.view_ray = world_pos.xyz / world_pos.w;
 ```
 
-The fragment shader then computes the view ray direction:
+The fragment shader simply normalizes the interpolated direction:
 
 ```hlsl
-float3 ray_dir = normalize(input.view_ray - cam_pos_km);
+float3 ray_dir = normalize(input.view_ray);
 ```
 
-This avoids passing separate camera matrices to the fragment shader —
-the hardware interpolation of `view_ray` across the quad gives us
-correct per-pixel ray directions.
+Why not use the inverse view-projection matrix? With planet-centric
+coordinates the camera is at `(0, 6360.001, 0)` km. The inverse VP
+produces world positions near `(x, 6360, z)`, and subtracting the
+camera position `6360.001 - 6360.0` loses all precision in 32-bit
+float (only ~7 significant digits). The ray matrix avoids this by
+mapping NDC directly to directions — no large-position subtraction
+needed.
 
 ### Planet-centric coordinates
 
@@ -326,7 +339,7 @@ unit conversion needed between the C code and the shader.
 ├── CMakeLists.txt                Build configuration
 ├── README.md                     This file
 └── shaders/
-    ├── sky.vert.hlsl             Fullscreen quad + inv_vp ray reconstruction
+    ├── sky.vert.hlsl             Fullscreen quad + ray matrix reconstruction
     ├── sky.frag.hlsl             Atmospheric scattering ray march
     ├── fullscreen.vert.hlsl      Standard SV_VertexID quad (bloom/tonemap)
     ├── bloom_downsample.frag.hlsl  13-tap Jimenez with Karis averaging

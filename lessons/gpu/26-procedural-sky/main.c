@@ -146,9 +146,10 @@
 #define TONEMAP_REINHARD 1
 #define TONEMAP_ACES     2
 
-/* Capture mode — fixed sun angle for consistent screenshots. */
-#define CAPTURE_SUN_ELEVATION 0.3f  /* ~17 degrees above horizon */
-#define CAPTURE_SUN_AZIMUTH   1.0f  /* ~57 degrees from east     */
+/* Capture mode — fixed sun angle for consistent screenshots.
+ * Azimuth 4.71 ≈ 3π/2 places the sun along -Z (in front of the camera). */
+#define CAPTURE_SUN_ELEVATION 0.3f  /* ~17 degrees — daytime with visible sun disc */
+#define CAPTURE_SUN_AZIMUTH   4.71f /* 3π/2 — directly in front of camera (-Z)    */
 
 /* Frame timing. */
 #define MAX_FRAME_DT 0.1f
@@ -158,11 +159,11 @@
 
 /* ── Uniform structures ──────────────────────────────────────────────────── */
 
-/* Sky vertex uniforms — inverse view-projection matrix.
- * The vertex shader uses this to unproject screen corners to world-space
- * ray directions (see sky.vert.hlsl). */
+/* Sky vertex uniforms — ray matrix mapping NDC to world-space directions.
+ * Built from camera basis vectors scaled by FOV/aspect, avoiding the
+ * precision loss of inverse VP at planet-centric coordinates. */
 typedef struct SkyVertUniforms {
-  mat4 inv_vp;       /* inverse view-projection matrix (64 bytes) */
+  mat4 inv_vp;       /* ray matrix: NDC → world-space direction (64 bytes) */
 } SkyVertUniforms;   /* 64 bytes */
 
 /* Sky fragment uniforms — camera, sun, and march parameters.
@@ -751,7 +752,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   SDL_Log("  Controls: WASD + mouse = fly, arrows = sun, T = auto-sun, 1/2/3 = tonemap");
 
   *appstate = state;
-  return SDL_APP_SUCCESS;
+  return SDL_APP_CONTINUE;
 
 init_fail:
   *appstate = state;
@@ -937,9 +938,20 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     state->sun_azimuth += SUN_AUTO_SPEED * dt;
   }
 
-  /* ── Build view and projection matrices ─────────────────────────── */
+  /* ── Build ray matrix for sky rendering ──────────────────────────
+   * Instead of inv_vp (which loses precision when the camera is 6360 km
+   * from the origin), we build a matrix that maps NDC directly to
+   * world-space ray directions using camera basis vectors and FOV.
+   *
+   * For each pixel at NDC (nx, ny):
+   *   ray_dir = nx * (aspect * tan(fov/2) * right)
+   *           + ny * (tan(fov/2) * up)
+   *           + forward
+   *
+   * This avoids the catastrophic precision loss from subtracting
+   * huge world positions (≈6360 km) in the fragment shader.
+   * ─────────────────────────────────────────────────────────────── */
   quat orientation = quat_from_euler(state->cam_yaw, state->cam_pitch, 0.0f);
-  mat4 view = mat4_view_from_quat(state->cam_position, orientation);
 
   int draw_w = 0, draw_h = 0;
   if (!SDL_GetWindowSizeInPixels(state->window, &draw_w, &draw_h)) {
@@ -947,9 +959,40 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     draw_h = WINDOW_HEIGHT;
   }
   float aspect = (float)draw_w / (float)draw_h;
-  mat4 proj = mat4_perspective((float)FOV_DEG * FORGE_DEG2RAD, aspect, NEAR_PLANE, FAR_PLANE);
-  mat4 vp = mat4_multiply(proj, view);
-  mat4 inv_vp = mat4_inverse(vp);
+
+  /* Camera basis vectors from quaternion orientation. */
+  vec3 cam_right   = quat_right(orientation);
+  vec3 cam_up      = quat_up(orientation);
+  vec3 cam_forward = quat_forward(orientation);
+
+  /* Scale right/up by the projection's FOV and aspect ratio so that
+   * NDC [-1,1] maps to the correct angular range. */
+  float half_fov_tan = SDL_tanf((float)FOV_DEG * FORGE_DEG2RAD * 0.5f);
+  float sx = aspect * half_fov_tan;
+  float sy = half_fov_tan;
+
+  /* Build the ray matrix.  When the vertex shader computes
+   * mul(ray_matrix, float4(ndc.x, ndc.y, 1.0, 1.0)):
+   *   col0 * ndc.x  =  sx * right * ndc.x
+   *   col1 * ndc.y  =  sy * up * ndc.y
+   *   col2 * 1.0    =  (0,0,0,0)           — unused
+   *   col3 * 1.0    =  (forward, 1)         — constant forward + w=1
+   * Result: (sx*right*nx + sy*up*ny + forward, 1) */
+  mat4 ray_matrix = { 0 };
+  /* Column 0: scaled right direction */
+  ray_matrix.m[0]  = sx * cam_right.x;
+  ray_matrix.m[1]  = sx * cam_right.y;
+  ray_matrix.m[2]  = sx * cam_right.z;
+  /* Column 1: scaled up direction */
+  ray_matrix.m[4]  = sy * cam_up.x;
+  ray_matrix.m[5]  = sy * cam_up.y;
+  ray_matrix.m[6]  = sy * cam_up.z;
+  /* Column 2: zero (ndc.z = 1 but we don't use it for direction) */
+  /* Column 3: forward direction + w=1 */
+  ray_matrix.m[12] = cam_forward.x;
+  ray_matrix.m[13] = cam_forward.y;
+  ray_matrix.m[14] = cam_forward.z;
+  ray_matrix.m[15] = 1.0f;
 
   /* Handle window resize — recreate HDR target and bloom chain. */
   if ((Uint32)draw_w != state->hdr_width || (Uint32)draw_h != state->hdr_height) {
@@ -995,7 +1038,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
    * PASS 1 — SKY RENDERING → HDR target
    *
    * Ray-march through Earth's atmosphere for each pixel.  The vertex
-   * shader reconstructs world-space view rays via inverse VP.
+   * shader reconstructs world-space view rays via the ray matrix.
    * ════════════════════════════════════════════════════════════════════ */
   {
     SDL_GPUColorTargetInfo color_target;
@@ -1015,9 +1058,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     SDL_BindGPUGraphicsPipeline(pass, state->sky_pipeline);
 
-    /* Push vertex uniforms — inverse view-projection matrix. */
+    /* Push vertex uniforms — ray matrix that maps NDC to world-space
+     * view directions (replaces inv_vp to avoid float precision loss). */
     SkyVertUniforms vert_u;
-    vert_u.inv_vp = inv_vp;
+    vert_u.inv_vp = ray_matrix;
     SDL_PushGPUVertexUniformData(cmd, 0, &vert_u, sizeof(vert_u));
 
     /* Push fragment uniforms — camera, sun, march parameters. */

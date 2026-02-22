@@ -82,24 +82,26 @@ static const float  OZONE_CENTER = 25.0;  /* peak altitude (km) */
 static const float  OZONE_WIDTH  = 15.0;  /* tent half-width (km) */
 ```
 
-### Vertex shader: inverse VP ray reconstruction
+### Vertex shader: ray matrix reconstruction
 
 ```hlsl
 cbuffer SkyVertUniforms : register(b0, space1) {
-    float4x4 inv_vp;
+    float4x4 ray_matrix; /* maps NDC to world-space directions */
 };
 
-/* Unproject NDC to world space for ray direction */
-float4 world_pos = mul(inv_vp, float4(ndc.x, ndc.y, 1.0, 1.0));
+/* Map NDC to world-space ray direction via the ray matrix */
+float4 world_pos = mul(ray_matrix, float4(ndc.x, ndc.y, 1.0, 1.0));
 output.view_ray = world_pos.xyz / world_pos.w;
 ```
 
 ### C-side uniform structures
 
 ```c
-/* Sky vertex: inverse view-projection matrix (64 bytes) */
+/* Sky vertex: ray matrix mapping NDC to world-space directions (64 bytes).
+ * Built from camera basis vectors scaled by FOV/aspect — avoids precision
+ * loss from inverse VP at planet-centric coordinates (~6360 km). */
 typedef struct SkyVertUniforms {
-    mat4 inv_vp;
+    mat4 ray_matrix;
 } SkyVertUniforms;
 
 /* Sky fragment: camera + sun + march params (48 bytes) */
@@ -147,12 +149,11 @@ Planet-centric coordinates in km. Camera starts at surface:
 | `SDL_CreateGPUTexture` | HDR render target (R16G16B16A16_FLOAT) |
 | `SDL_CreateGPUSampler` | Linear/clamp samplers for HDR and bloom |
 | `SDL_CreateGPUGraphicsPipeline` | 4 pipelines (sky, downsample, upsample, tonemap) |
-| `SDL_PushGPUVertexUniformData` | Push inv_vp matrix to sky vertex shader |
+| `SDL_PushGPUVertexUniformData` | Push ray matrix to sky vertex shader |
 | `SDL_PushGPUFragmentUniformData` | Push sky params, bloom params, tonemap params |
 | `SDL_BindGPUFragmentSamplers` | Bind source textures for bloom and tonemap |
 | `SDL_DrawGPUPrimitives` | Fullscreen quad (6 verts, no vertex buffer) |
-| `mat4_inverse` | Invert VP matrix for ray reconstruction |
-| `mat4_view_from_quat` | Build view matrix from quaternion camera |
+| `quat_right`, `quat_up`, `quat_forward` | Camera basis vectors for ray matrix |
 | `quat_from_euler` | Camera orientation from yaw/pitch |
 
 ## Bloom pipeline (reused from Lesson 22)
@@ -187,9 +188,9 @@ disc and creates a natural glow halo.
    bloom and tone mapping, this appears as a hard white circle with no
    soft glow.
 
-6. **inv_vp not updated on resize** — If the window resizes, the
-   projection matrix changes. The inverse VP must be recomputed every
-   frame from the current window dimensions.
+6. **Ray matrix not updated on resize** — If the window resizes, the
+   aspect ratio changes. The ray matrix must be recomputed every frame
+   from the current window dimensions.
 
 ## Reference implementation
 

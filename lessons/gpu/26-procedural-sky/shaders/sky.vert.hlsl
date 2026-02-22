@@ -1,15 +1,19 @@
 /*
- * sky.vert.hlsl — Fullscreen quad with inverse VP ray reconstruction
+ * sky.vert.hlsl — Fullscreen quad with ray matrix reconstruction
  *
- * Draws a fullscreen quad via SV_VertexID and unpoprojects each vertex
- * position through the inverse view-projection matrix to reconstruct
- * world-space view ray directions.  The fragment shader uses these rays
+ * Draws a fullscreen quad via SV_VertexID and maps each vertex position
+ * to a world-space view ray direction using a ray matrix built from
+ * camera basis vectors and FOV.  The fragment shader uses these rays
  * to march through the atmosphere.
  *
  * The key idea: each screen pixel corresponds to a direction in world
- * space.  By placing vertices at the four NDC corners (-1,-1) to (1,1)
- * and multiplying by inv_vp, we get the world-space position on the
- * far plane.  Subtracting the camera position gives the view ray.
+ * space.  The ray matrix transforms NDC (nx, ny) into:
+ *   ray_dir = nx * (aspect * tan(fov/2) * right)
+ *           + ny * (tan(fov/2) * up)
+ *           + forward
+ *
+ * This avoids the precision loss that occurs when using inverse VP
+ * with planet-centric coordinates (camera at ~6360 km from origin).
  *
  * Six vertices form two triangles covering the screen:
  *   0--1    Triangle 1: 0, 1, 2
@@ -18,14 +22,14 @@
  *   2--3
  *
  * Uniform layout (64 bytes):
- *   float4x4 inv_vp   — inverse view-projection matrix
+ *   float4x4 ray_matrix — maps NDC to world-space ray directions
  *
  * SPDX-License-Identifier: Zlib
  */
 
 cbuffer SkyVertUniforms : register(b0, space1)
 {
-    float4x4 inv_vp;   /* inverse view-projection matrix */
+    float4x4 inv_vp;   /* ray matrix: maps NDC to world-space directions */
 };
 
 struct VSOutput
@@ -51,10 +55,10 @@ VSOutput main(uint vertex_id : SV_VertexID)
     float2 ndc = float2(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0);
     output.clip_pos = float4(ndc, 0.0, 1.0);
 
-    /* Unproject NDC position to world space via inverse VP.
-     * We use z=1 (far plane) so the resulting position is a point
-     * far along the view ray.  The fragment shader subtracts the
-     * camera position to get the ray direction. */
+    /* Map NDC to world-space ray direction via the ray matrix.
+     * The matrix encodes camera right/up/forward scaled by FOV,
+     * so the result is the unnormalized world-space view direction.
+     * The fragment shader normalizes it before ray marching. */
     float4 world_pos = mul(inv_vp, float4(ndc.x, ndc.y, 1.0, 1.0));
     output.view_ray = world_pos.xyz / world_pos.w;
 
