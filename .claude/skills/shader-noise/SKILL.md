@@ -215,12 +215,9 @@ clip(noise - dissolve_threshold);  /* discard if below threshold */
 
 ### Fullscreen noise visualization
 
-For standalone noise visualization (no vertex buffer needed):
-
-1. Create a pipeline with no vertex input state
-2. Use `SV_VertexID` to generate a fullscreen quad (6 vertices)
-3. Push uniforms: time, scale, resolution, mode
-4. Draw with `SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0)`
+For standalone noise visualization, use the SV_VertexID fullscreen quad
+pattern from [Lesson 21 — HDR & Tone Mapping](../../../lessons/gpu/21-hdr-tone-mapping/)
+(no vertex buffer, pipeline with no vertex input state).
 
 Fragment uniforms (register b0, space3 for SDL GPU):
 
@@ -279,17 +276,6 @@ color = lerp(color, grass,  smoothstep(0.38, 0.50, height));
 color = lerp(color, rock,   smoothstep(0.62, 0.75, height));
 color = lerp(color, snow,   smoothstep(0.75, 0.85, height));
 ```
-
-## Key API calls
-
-- `SDL_CreateGPUGraphicsPipeline` — create pipeline with **no vertex input
-  state** (positions generated from `SV_VertexID`)
-- `SDL_PushGPUFragmentUniformData` — push noise parameters (time, mode,
-  scale, resolution) each frame
-- `SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0)` — draw fullscreen quad (6
-  vertices, 2 triangles) without binding any vertex buffer
-- `SDL_BeginGPURenderPass` with `LOADOP_DONT_CARE` — no clear needed when
-  the fragment shader writes every pixel
 
 ## Common mistakes
 
