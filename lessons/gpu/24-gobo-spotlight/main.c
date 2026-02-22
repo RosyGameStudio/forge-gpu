@@ -68,13 +68,13 @@
 #define CAM_START_PITCH_DEG -20.0f
 
 /* Scene material defaults. */
-#define MATERIAL_AMBIENT      0.03f
+#define MATERIAL_AMBIENT      0.05f
 #define MATERIAL_SHININESS    64.0f
 #define MATERIAL_SPECULAR_STR 0.5f
 
 /* Dim directional fill light — just enough to show surface detail.
  * Points down and to the right (like a weak overhead fill). */
-#define FILL_INTENSITY  0.03f
+#define FILL_INTENSITY  0.05f
 #define FILL_DIR_X      0.3f
 #define FILL_DIR_Y     -0.8f
 #define FILL_DIR_Z      0.2f
@@ -209,8 +209,9 @@ typedef struct GridFragUniforms {
     float grid_spacing;  /* world units / line          (4 bytes) */
     float line_width;    /* line thickness              (4 bytes) */
     float fade_distance; /* fade-out distance           (4 bytes) */
-    float _pad0;         /*                             (4 bytes) */
-    float _pad1;         /*                             (4 bytes) */
+    float ambient;       /* ambient intensity            (4 bytes) */
+    float fill_intensity;/* directional fill strength    (4 bytes) */
+    float fill_dir[4];   /* fill light direction (xyz)  (16 bytes) */
     float spot_pos[3];   /* spotlight world position   (12 bytes) */
     float spot_intensity;/* spotlight HDR brightness     (4 bytes) */
     float spot_dir[3];   /* spotlight direction (unit)  (12 bytes) */
@@ -218,7 +219,7 @@ typedef struct GridFragUniforms {
     float spot_color[3]; /* spotlight RGB color         (12 bytes) */
     float cos_outer;     /* cos(outer cone half-angle)   (4 bytes) */
     mat4  light_vp;      /* spotlight view-projection   (64 bytes) */
-} GridFragUniforms;      /* 192 bytes total */
+} GridFragUniforms;      /* 208 bytes total */
 
 /* ── GPU-side model types ────────────────────────────────────────────────── */
 
@@ -1881,8 +1882,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         grid_fu.grid_spacing  = GRID_SPACING;
         grid_fu.line_width    = GRID_LINE_WIDTH;
         grid_fu.fade_distance = GRID_FADE_DISTANCE;
-        grid_fu._pad0         = 0.0f;
-        grid_fu._pad1         = 0.0f;
+        grid_fu.ambient       = MATERIAL_AMBIENT;
+        grid_fu.fill_intensity = FILL_INTENSITY;
+        grid_fu.fill_dir[0]   = FILL_DIR_X;
+        grid_fu.fill_dir[1]   = FILL_DIR_Y;
+        grid_fu.fill_dir[2]   = FILL_DIR_Z;
+        grid_fu.fill_dir[3]   = 0.0f;
 
         /* Spotlight parameters for grid floor illumination. */
         grid_fu.spot_pos[0]   = SPOT_POS_X;

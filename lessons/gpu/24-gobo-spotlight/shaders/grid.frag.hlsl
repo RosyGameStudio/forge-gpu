@@ -22,8 +22,9 @@ cbuffer FragUniforms : register(b0, space3)
     float  grid_spacing;
     float  line_width;
     float  fade_distance;
-    float  _pad0;
-    float  _pad1;
+    float  ambient;        /* ambient intensity              */
+    float  fill_intensity; /* directional fill strength      */
+    float4 fill_dir;       /* fill light direction (xyz)     */
     /* Spotlight data (same layout as scene shader). */
     float3 spot_pos;
     float  spot_intensity;
@@ -78,12 +79,24 @@ float4 main(float4 clip_pos : SV_Position, float3 world_pos : TEXCOORD0) : SV_Ta
     float fade = 1.0 - smoothstep(fade_distance * 0.5, fade_distance, cam_dist);
     grid *= fade;
 
-    float3 surface = lerp(bg_color.rgb, line_color.rgb, grid);
+    float3 albedo = lerp(bg_color.rgb, line_color.rgb, grid);
+
+    /* Grid normal is straight up. */
+    float3 N = float3(0.0, 1.0, 0.0);
+    float3 V = normalize(eye_pos - world_pos);
+
+    /* ── Ambient term ────────────────────────────────────────────────── */
+    float3 total_light = albedo * ambient;
+
+    /* ── Directional fill light ──────────────────────────────────────── */
+    {
+        float3 L = normalize(-fill_dir.xyz);
+        float NdotL = max(dot(N, L), 0.0);
+        total_light += albedo * NdotL * fill_intensity;
+    }
 
     /* ── Spotlight on the grid floor ─────────────────────────────────── */
     {
-        float3 N = float3(0.0, 1.0, 0.0); /* grid normal is straight up */
-
         float3 to_frag = world_pos - spot_pos;
         float  d       = length(to_frag);
         float3 L_frag  = to_frag / d;
@@ -111,10 +124,10 @@ float4 main(float4 clip_pos : SV_Position, float3 world_pos : TEXCOORD0) : SV_Ta
             float NdotL = max(dot(N, L), 0.0);
             float atten = 1.0 / (1.0 + 0.09 * d + 0.032 * d * d);
 
-            surface += surface * NdotL * cone * gobo * shadow *
-                       in_bounds * atten * spot_intensity * spot_color;
+            total_light += albedo * NdotL * cone * gobo * shadow *
+                           in_bounds * atten * spot_intensity * spot_color;
         }
     }
 
-    return float4(surface, 1.0);
+    return float4(total_light, 1.0);
 }
