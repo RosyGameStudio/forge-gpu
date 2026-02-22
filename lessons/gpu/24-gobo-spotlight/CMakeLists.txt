@@ -35,3 +35,17 @@ add_custom_command(TARGET 24-gobo-spotlight POST_BUILD
         ${FORGE_ASSETS_DIR}/models/BoxTextured
         $<TARGET_FILE_DIR:24-gobo-spotlight>/assets/models/BoxTextured
 )
+
+# Copy Searchlight model from lesson-local assets
+add_custom_command(TARGET 24-gobo-spotlight POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/models/Searchlight
+        $<TARGET_FILE_DIR:24-gobo-spotlight>/assets/models/Searchlight
+)
+
+# Copy gobo texture from lesson-local assets
+add_custom_command(TARGET 24-gobo-spotlight POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/gobo_window.png
+        $<TARGET_FILE_DIR:24-gobo-spotlight>/assets/gobo_window.png
+)
