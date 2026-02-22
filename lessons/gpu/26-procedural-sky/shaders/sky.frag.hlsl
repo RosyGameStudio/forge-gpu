@@ -397,9 +397,14 @@ float4 main(PSInput input) : SV_Target
     float3 transmittance;
     float3 color = atmosphere(cam_pos_km, ray_dir, transmittance);
 
-    /* Add the sun disc, modulated by view transmittance so it dims
-     * and reddens at sunset. */
-    color += sun_disc(ray_dir, sun_dir, transmittance);
+    /* Add the sun disc only if the sun is not occluded by the planet.
+     * Check if a ray from the camera toward the sun hits the ground
+     * sphere — if it does, the planet blocks the sun disc. */
+    float t_gnd_near, t_gnd_far;
+    bool sun_hits_ground = ray_sphere_intersect(
+        cam_pos_km, sun_dir, R_GROUND, t_gnd_near, t_gnd_far);
+    if (!sun_hits_ground || t_gnd_near < 0.0)
+        color += sun_disc(ray_dir, sun_dir, transmittance);
 
     return float4(color, 1.0);
 }
