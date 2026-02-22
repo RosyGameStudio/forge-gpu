@@ -65,12 +65,12 @@
 #define MOUSE_SENS         0.003f
 #define PITCH_CLAMP        1.5f
 
-/* Camera initial position — elevated, looking at the scene. */
-#define CAM_START_X         5.0f
-#define CAM_START_Y         4.0f
-#define CAM_START_Z         8.0f
-#define CAM_START_YAW_DEG   34.0f
-#define CAM_START_PITCH_DEG -20.0f
+/* Camera initial position — front-right view of the truck and spotlight. */
+#define CAM_START_X        -2.7f
+#define CAM_START_Y         2.5f
+#define CAM_START_Z         8.4f
+#define CAM_START_YAW_DEG  -20.0f
+#define CAM_START_PITCH_DEG -12.0f
 
 /* Scene material defaults. */
 #define MATERIAL_AMBIENT      0.05f
