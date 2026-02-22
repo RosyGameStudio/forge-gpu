@@ -148,8 +148,8 @@
 #define TONEMAP_ACES     2
 
 /* Capture mode — fixed sun angle for consistent screenshots.
- * Azimuth 4.71 ≈ 3π/2 places the sun along -Z (in front of the camera). */
-#define CAPTURE_SUN_ELEVATION 0.3f  /* ~17 degrees — daytime with visible sun disc */
+ * Low elevation shows warm scattering, bloom halo, and orange horizon. */
+#define CAPTURE_SUN_ELEVATION 0.07f /* ~4 degrees — low sun for sunset scattering  */
 #define CAPTURE_SUN_AZIMUTH   4.71f /* 3π/2 — directly in front of camera (-Z)    */
 
 /* Frame timing. */
