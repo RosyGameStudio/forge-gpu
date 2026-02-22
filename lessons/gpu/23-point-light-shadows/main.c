@@ -10,7 +10,7 @@
  *
  * Scene:
  *   CesiumMilkTruck + BoxTextured ring on a procedural grid floor,
- *   lit by 3 colored point lights (visible as emissive spheres).
+ *   lit by 4 colored point lights (visible as emissive spheres).
  *   Each light casts omnidirectional shadows via cube depth maps.
  *
  * Render passes (per frame):
@@ -23,9 +23,9 @@
  * Controls:
  *   WASD / Space / LShift — Move camera
  *   Mouse                 — Look around
- *   1                     — Toggle light 0 (warm white, orbiting)
- *   2                     — Toggle light 1 (cool blue)
- *   3                     — Toggle light 2 (soft red)
+ *   1                     — Toggle light 0 (cyan, orbiting)
+ *   2                     — Toggle light 1 (orange)
+ *   3                     — Toggle light 2 (green)
  *   4                     — Toggle light 3 (purple)
  *   =/+                   — Increase exposure
  *   -                     — Decrease exposure
@@ -216,8 +216,6 @@
 #define SHADOW_DEPTH_FORMAT SDL_GPU_TEXTUREFORMAT_D32_FLOAT
 #define SHADOW_NEAR_PLANE 0.1f
 #define SHADOW_FAR_PLANE 25.0f
-#define SHADOW_DEPTH_BIAS 1
-#define SHADOW_SLOPE_BIAS 1.5f
 #define CUBE_FACE_COUNT 6
 
 /* HDR clear color — forge-gpu dark theme background. */
@@ -301,23 +299,23 @@ typedef struct GridFragUniforms {
 
 /* Bloom downsample uniforms. */
 typedef struct BloomDownsampleUniforms {
-  float texel_size[2]; /* 1/source_width, 1/source_height */
-  float threshold;
-  float use_karis;
+  float texel_size[2]; /* 1/source_width, 1/source_height           */
+  float threshold;     /* brightness cutoff for bloom extraction     */
+  float use_karis;     /* 1.0 = first pass (Karis + threshold), 0.0 = standard */
 } BloomDownsampleUniforms; /* 16 bytes */
 
 /* Bloom upsample uniforms. */
 typedef struct BloomUpsampleUniforms {
-  float texel_size[2];
-  float _pad[2];
+  float texel_size[2]; /* 1/source_width, 1/source_height */
+  float _pad[2];       /* pad to 16 bytes                 */
 } BloomUpsampleUniforms; /* 16 bytes */
 
 /* Tone map fragment uniforms (matches tonemap.frag.hlsl cbuffer). */
 typedef struct TonemapFragUniforms {
-  float exposure;
-  float bloom_intensity;
-  float _pad0;
-  float _pad1;
+  float exposure;        /* scene exposure multiplier        */
+  float bloom_intensity; /* bloom contribution strength [0..1] */
+  float _pad0;           /* pad to 16 bytes                  */
+  float _pad1;           /* pad to 16 bytes                  */
 } TonemapFragUniforms; /* 16 bytes */
 
 /* Shadow vertex uniforms — light view-projection and model matrix. */
@@ -335,31 +333,31 @@ typedef struct ShadowFragUniforms {
 /* ── GPU-side model types ─────────────────────────────────────────────────── */
 
 typedef struct GpuPrimitive {
-  SDL_GPUBuffer *vertex_buffer;
-  SDL_GPUBuffer *index_buffer;
-  Uint32 index_count;
-  int material_index;
-  SDL_GPUIndexElementSize index_type;
-  bool has_uvs;
+  SDL_GPUBuffer *vertex_buffer; /* GPU-side vertex data (position, normal, UV) */
+  SDL_GPUBuffer *index_buffer;  /* GPU-side index data for indexed drawing     */
+  Uint32 index_count;           /* number of indices in this primitive         */
+  int material_index;           /* index into ModelData.materials (-1 = none)  */
+  SDL_GPUIndexElementSize index_type; /* 16-bit or 32-bit indices              */
+  bool has_uvs;                 /* true if vertices contain texture UVs        */
 } GpuPrimitive;
 
 typedef struct GpuMaterial {
-  float base_color[4];
-  SDL_GPUTexture *texture;
-  bool has_texture;
+  float base_color[4];     /* RGBA base color factor (linear, premultiplied) */
+  SDL_GPUTexture *texture; /* diffuse/albedo texture (NULL if untextured)    */
+  bool has_texture;        /* true if texture is valid and should be sampled */
 } GpuMaterial;
 
 typedef struct ModelData {
-  ForgeGltfScene scene;
-  GpuPrimitive *primitives;
-  int primitive_count;
-  GpuMaterial *materials;
-  int material_count;
+  ForgeGltfScene scene;        /* parsed glTF scene (CPU-side geometry + metadata) */
+  GpuPrimitive *primitives;    /* GPU buffers for each mesh primitive              */
+  int primitive_count;         /* number of primitives uploaded to GPU             */
+  GpuMaterial *materials;      /* per-material colors and textures                */
+  int material_count;          /* number of materials in the model                */
 } ModelData;
 
 typedef struct BoxPlacement {
-  vec3 position;
-  float y_rotation;
+  vec3 position;    /* world-space center of the box  */
+  float y_rotation; /* rotation around Y axis (radians) */
 } BoxPlacement;
 
 /* ── Application state ────────────────────────────────────────────────────── */
@@ -2008,7 +2006,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
       SDL_Log("Light 2 (green): %s", state->light_enabled[2] ? "ON" : "OFF");
     } else if (event->key.key == SDLK_4) {
       state->light_enabled[3] = !state->light_enabled[3];
-      SDL_Log("Light 3 (magenta): %s", state->light_enabled[3] ? "ON" : "OFF");
+      SDL_Log("Light 3 (purple): %s", state->light_enabled[3] ? "ON" : "OFF");
     }
 
     /* Exposure. */

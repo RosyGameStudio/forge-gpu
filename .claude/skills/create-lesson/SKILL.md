@@ -251,7 +251,7 @@ Tell the user:
 - Does **not** create a branch or PR (that's `/publish-lesson`)
 - Does **not** do a full quality review (that's `/final-pass`)
 
-## Code style reminders
+## README style reminders
 
 - README uses `# Lesson NN — Title` format (em dash, not hyphen)
 - All code blocks have language tags (` ```c `, ` ```bash `, ` ```text `)

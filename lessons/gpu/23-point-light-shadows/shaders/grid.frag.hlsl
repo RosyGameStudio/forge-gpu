@@ -9,6 +9,15 @@
 
 #define MAX_POINT_LIGHTS 4
 
+/* Shadow comparison bias — prevents self-shadowing (shadow acne).
+ * Tuned for 512x512 cube maps; increase for lower resolution. */
+#define SHADOW_BIAS 0.002
+
+/* Quadratic attenuation coefficients for point light falloff.
+ * Models inverse-square decay: 1 / (1 + kL*d + kQ*d^2). */
+#define ATTEN_LINEAR    0.35
+#define ATTEN_QUADRATIC 0.44
+
 struct PointLight
 {
     float3 position;     /* world-space position   */
@@ -49,7 +58,7 @@ cbuffer FragUniforms : register(b0, space3)
 float sample_shadow(int light_index, float3 light_to_frag)
 {
     float current_depth = length(light_to_frag) / shadow_far_plane;
-    float bias = 0.002;
+    float bias = SHADOW_BIAS;
 
     float stored_depth;
     if (light_index == 0)
@@ -101,7 +110,7 @@ float4 main(float4 clip_pos : SV_Position, float3 world_pos : TEXCOORD0) : SV_Ta
         L /= d; /* normalize */
 
         /* Quadratic attenuation */
-        float attenuation = 1.0 / (1.0 + 0.35 * d + 0.44 * d * d);
+        float attenuation = 1.0 / (1.0 + ATTEN_LINEAR * d + ATTEN_QUADRATIC * d * d);
 
         /* Diffuse */
         float NdotL = max(dot(N, L), 0.0);

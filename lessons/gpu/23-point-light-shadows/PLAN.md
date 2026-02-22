@@ -103,9 +103,9 @@ projection direction.
 
 - [x] Directory scaffolded (`/start-lesson`)
 - [x] Scene building (main.c, shaders)
-- [ ] New concept implemented
-- [ ] README written (`/create-lesson`)
-- [ ] Skill file created (`/create-lesson`)
-- [ ] Screenshot captured
+- [x] New concept implemented
+- [x] README written (`/create-lesson`)
+- [x] Skill file created (`/create-lesson`)
+- [x] Screenshot captured
 - [ ] Final pass (`/final-pass`)
 - [ ] Published (`/publish-lesson`)
