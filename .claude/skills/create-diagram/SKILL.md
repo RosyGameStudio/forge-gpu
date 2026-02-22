@@ -1,6 +1,7 @@
 ---
 name: create-diagram
 description: Create a matplotlib diagram for a forge-gpu lesson using the project's dark theme and visual identity
+disable-model-invocation: false
 ---
 
 Create a diagram or visualization for a forge-gpu lesson using the project's
