@@ -63,7 +63,7 @@
 #define CAM_START_PITCH_DEG -20.0f
 
 /* Scene material defaults. */
-#define MATERIAL_AMBIENT      0.15f
+#define MATERIAL_AMBIENT      0.03f
 #define MATERIAL_SHININESS    64.0f
 #define MATERIAL_SPECULAR_STR 0.5f
 
