@@ -95,6 +95,10 @@
 #define SPOT_NEAR        0.5f
 #define SPOT_FAR         30.0f
 
+/* Searchlight glass — blazing HDR emissive so it looks like the bulb is on. */
+#define GLASS_MATERIAL_INDEX  1
+#define GLASS_HDR_BRIGHTNESS  20.0f
+
 /* Shadow map. */
 #define SHADOW_MAP_SIZE   1024
 #define SHADOW_DEPTH_FMT  SDL_GPU_TEXTUREFORMAT_D32_FLOAT
@@ -1254,6 +1258,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_snprintf(path, sizeof(path), "%s%s", base, SEARCHLIGHT_MODEL_PATH);
         if (!setup_model(device, &state->searchlight, path))
             goto init_fail;
+
+        /* Override glass material with HDR emissive brightness. */
+        if (state->searchlight.material_count > GLASS_MATERIAL_INDEX) {
+            GpuMaterial *glass = &state->searchlight.materials[GLASS_MATERIAL_INDEX];
+            glass->base_color[0] = GLASS_HDR_BRIGHTNESS;
+            glass->base_color[1] = GLASS_HDR_BRIGHTNESS;
+            glass->base_color[2] = GLASS_HDR_BRIGHTNESS;
+            glass->base_color[3] = 1.0f;
+        }
 
     }
 
