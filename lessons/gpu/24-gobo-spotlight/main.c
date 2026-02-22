@@ -42,6 +42,11 @@
 #include "shaders/compiled/shadow_vert_dxil.h"
 #include "shaders/compiled/shadow_vert_spirv.h"
 
+#include "shaders/compiled/tonemap_frag_dxil.h"
+#include "shaders/compiled/tonemap_frag_spirv.h"
+#include "shaders/compiled/tonemap_vert_dxil.h"
+#include "shaders/compiled/tonemap_vert_spirv.h"
+
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
 #define WINDOW_WIDTH  1280
@@ -93,6 +98,21 @@
 /* Shadow map. */
 #define SHADOW_MAP_SIZE   1024
 #define SHADOW_DEPTH_FMT  SDL_GPU_TEXTUREFORMAT_D32_FLOAT
+
+/* HDR render target — 16-bit float for values above 1.0. */
+#define HDR_FORMAT SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT
+
+/* Tone mapping operators. */
+#define TONEMAP_CLAMP    0
+#define TONEMAP_REINHARD 1
+#define TONEMAP_ACES     2
+
+/* Default HDR settings. */
+#define DEFAULT_EXPOSURE    1.0f
+#define DEFAULT_TONEMAP     TONEMAP_ACES
+
+/* Fullscreen quad (2 triangles, no vertex buffer). */
+#define FULLSCREEN_QUAD_VERTS 6
 
 /* Gobo texture path (relative to executable). */
 #define GOBO_TEXTURE_PATH "assets/gobo_window.png"
@@ -169,6 +189,13 @@ typedef struct ShadowVertUniforms {
     mat4 light_mvp; /* light VP * model matrix (64 bytes) */
 } ShadowVertUniforms;
 
+/* Tone map fragment uniforms — matches tonemap.frag.hlsl cbuffer. */
+typedef struct TonemapFragUniforms {
+    float  exposure;     /* exposure multiplier     (4 bytes) */
+    Uint32 tonemap_mode; /* 0=clamp, 1=Reinh, 2=AC (4 bytes) */
+    float  _pad[2];      /* pad to 16 bytes         (8 bytes) */
+} TonemapFragUniforms;
+
 /* Grid vertex uniforms — one VP matrix. */
 typedef struct GridVertUniforms {
     mat4 vp;  /* view-projection matrix (64 bytes) */
@@ -233,6 +260,17 @@ typedef struct app_state {
     SDL_GPUGraphicsPipeline *scene_pipeline;
     SDL_GPUGraphicsPipeline *grid_pipeline;
     SDL_GPUGraphicsPipeline *shadow_pipeline;
+    SDL_GPUGraphicsPipeline *tonemap_pipeline;
+
+    /* HDR render target — floating-point buffer for values above 1.0. */
+    SDL_GPUTexture *hdr_target;
+    SDL_GPUSampler *hdr_sampler;
+    Uint32 hdr_width;
+    Uint32 hdr_height;
+
+    /* HDR settings. */
+    float  exposure;
+    Uint32 tonemap_mode;
 
     /* Depth buffer (main render pass). */
     SDL_GPUTexture *depth_texture;
@@ -888,6 +926,53 @@ static bool ensure_depth_texture(app_state *state, Uint32 w, Uint32 h)
     return true;
 }
 
+/* ── Helper: create HDR render target ────────────────────────────────────── */
+
+static SDL_GPUTexture *create_hdr_target(SDL_GPUDevice *device, Uint32 w, Uint32 h)
+{
+    SDL_GPUTextureCreateInfo info;
+    SDL_zero(info);
+    info.type                 = SDL_GPU_TEXTURETYPE_2D;
+    info.format               = HDR_FORMAT;
+    info.width                = w;
+    info.height               = h;
+    info.layer_count_or_depth = 1;
+    info.num_levels           = 1;
+    /* COLOR_TARGET: render the scene into it.
+     * SAMPLER: the tone map pass reads from it. */
+    info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET
+               | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+    SDL_GPUTexture *tex = SDL_CreateGPUTexture(device, &info);
+    if (!tex) {
+        SDL_Log("Failed to create HDR render target: %s", SDL_GetError());
+    }
+    return tex;
+}
+
+/* ── Helper: (re)create HDR target on resize ────────────────────────────── */
+
+static bool ensure_hdr_target(app_state *state, Uint32 w, Uint32 h)
+{
+    if (state->hdr_target && state->hdr_width == w && state->hdr_height == h) {
+        return true;
+    }
+
+    if (state->hdr_target) {
+        SDL_ReleaseGPUTexture(state->device, state->hdr_target);
+        state->hdr_target = NULL;
+    }
+
+    state->hdr_target = create_hdr_target(state->device, w, h);
+    if (!state->hdr_target) {
+        return false;
+    }
+
+    state->hdr_width  = w;
+    state->hdr_height = h;
+    return true;
+}
+
 /* ── Helper: generate box placements ────────────────────────────────────── */
 
 static void generate_box_placements(app_state *state)
@@ -1171,7 +1256,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     }
 
-    /* ── Scene pipeline (lit geometry → swapchain) ──────────────────── */
+    /* ── Scene pipeline (lit geometry → HDR buffer) ─────────────────── */
     {
         SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
             scene_vert_spirv, sizeof(scene_vert_spirv),
@@ -1204,9 +1289,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         attrs[2].format   = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
         attrs[2].offset   = offsetof(ForgeGltfVertex, uv);
 
+        /* Target the HDR render target, not the swapchain — the scene
+         * produces values above 1.0 that the tone map pass will compress. */
         SDL_GPUColorTargetDescription color_desc;
         SDL_zero(color_desc);
-        color_desc.format = swapchain_format;
+        color_desc.format = HDR_FORMAT;
 
         SDL_GPUGraphicsPipelineCreateInfo pi;
         SDL_zero(pi);
@@ -1237,7 +1324,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         }
     }
 
-    /* ── Grid pipeline ──────────────────────────────────────────────── */
+    /* ── Grid pipeline (procedural grid → HDR buffer) ──────────────── */
     {
         SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
             grid_vert_spirv, sizeof(grid_vert_spirv),
@@ -1264,9 +1351,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         attr.format   = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
         attr.offset   = 0;
 
+        /* Grid also targets HDR — spotlight illumination produces HDR values. */
         SDL_GPUColorTargetDescription color_desc;
         SDL_zero(color_desc);
-        color_desc.format = swapchain_format;
+        color_desc.format = HDR_FORMAT;
 
         SDL_GPUGraphicsPipelineCreateInfo pi;
         SDL_zero(pi);
@@ -1292,6 +1380,48 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_ReleaseGPUShader(device, frag);
         if (!state->grid_pipeline) {
             SDL_Log("Failed to create grid pipeline: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
+    /* ── Tone map pipeline (fullscreen quad, HDR → swapchain) ──────── */
+    {
+        SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
+            tonemap_vert_spirv, sizeof(tonemap_vert_spirv),
+            tonemap_vert_dxil, sizeof(tonemap_vert_dxil), 0, 0);
+        /* 1 sampler (HDR texture), 1 uniform buffer (exposure + mode). */
+        SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
+            tonemap_frag_spirv, sizeof(tonemap_frag_spirv),
+            tonemap_frag_dxil, sizeof(tonemap_frag_dxil), 1, 1);
+        if (!vert || !frag) {
+            if (vert) SDL_ReleaseGPUShader(device, vert);
+            if (frag) SDL_ReleaseGPUShader(device, frag);
+            goto init_fail;
+        }
+
+        /* No vertex input — positions generated from SV_VertexID. */
+        SDL_GPUColorTargetDescription color_desc;
+        SDL_zero(color_desc);
+        color_desc.format = swapchain_format;
+
+        SDL_GPUGraphicsPipelineCreateInfo pi;
+        SDL_zero(pi);
+        pi.vertex_shader   = vert;
+        pi.fragment_shader = frag;
+        pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+        pi.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+        /* No depth test — fullscreen quad always draws. */
+        pi.depth_stencil_state.enable_depth_test  = false;
+        pi.depth_stencil_state.enable_depth_write = false;
+        pi.target_info.color_target_descriptions  = &color_desc;
+        pi.target_info.num_color_targets          = 1;
+        pi.target_info.has_depth_stencil_target   = false;
+
+        state->tonemap_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+        SDL_ReleaseGPUShader(device, vert);
+        SDL_ReleaseGPUShader(device, frag);
+        if (!state->tonemap_pipeline) {
+            SDL_Log("Failed to create tonemap pipeline: %s", SDL_GetError());
             goto init_fail;
         }
     }
@@ -1434,6 +1564,23 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         }
     }
 
+    /* ── HDR sampler (linear, clamp — tone map pass reads HDR target) ── */
+    {
+        SDL_GPUSamplerCreateInfo si;
+        SDL_zero(si);
+        si.min_filter     = SDL_GPU_FILTER_LINEAR;
+        si.mag_filter     = SDL_GPU_FILTER_LINEAR;
+        si.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+        state->hdr_sampler = SDL_CreateGPUSampler(device, &si);
+        if (!state->hdr_sampler) {
+            SDL_Log("Failed to create HDR sampler: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
     /* ── Load gobo pattern texture ─────────────────────────────────── */
     {
         const char *base = SDL_GetBasePath();
@@ -1474,6 +1621,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         state->spot_dir = vec3_normalize(vec3_sub(spot_target, spot_pos));
     }
 
+    /* ── HDR defaults ──────────────────────────────────────────────── */
+    state->exposure     = DEFAULT_EXPOSURE;
+    state->tonemap_mode = DEFAULT_TONEMAP;
+
     /* ── Camera initial state ───────────────────────────────────────── */
     state->cam_position = vec3_create(CAM_START_X, CAM_START_Y, CAM_START_Z);
     state->cam_yaw      = CAM_START_YAW_DEG * FORGE_DEG2RAD;
@@ -1498,6 +1649,8 @@ init_fail:
         SDL_ReleaseGPUGraphicsPipeline(device, state->grid_pipeline);
     if (state->shadow_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(device, state->shadow_pipeline);
+    if (state->tonemap_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(device, state->tonemap_pipeline);
     if (state->grid_vertex_buffer)
         SDL_ReleaseGPUBuffer(device, state->grid_vertex_buffer);
     if (state->grid_index_buffer)
@@ -1508,12 +1661,16 @@ init_fail:
         SDL_ReleaseGPUSampler(device, state->shadow_sampler);
     if (state->gobo_sampler)
         SDL_ReleaseGPUSampler(device, state->gobo_sampler);
+    if (state->hdr_sampler)
+        SDL_ReleaseGPUSampler(device, state->hdr_sampler);
     if (state->white_texture)
         SDL_ReleaseGPUTexture(device, state->white_texture);
     if (state->shadow_depth_texture)
         SDL_ReleaseGPUTexture(device, state->shadow_depth_texture);
     if (state->gobo_texture)
         SDL_ReleaseGPUTexture(device, state->gobo_texture);
+    if (state->hdr_target)
+        SDL_ReleaseGPUTexture(device, state->hdr_target);
     if (state->depth_texture)
         SDL_ReleaseGPUTexture(device, state->depth_texture);
     free_model_gpu(device, &state->truck);
@@ -1640,8 +1797,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
     }
 
-    /* ── Ensure depth buffer matches swapchain size ─────────────────── */
+    /* ── Ensure depth buffer and HDR target match swapchain size ───── */
     if (!ensure_depth_texture(state, sw, sh)) {
+        return SDL_APP_FAILURE;
+    }
+    if (!ensure_hdr_target(state, sw, sh)) {
         return SDL_APP_FAILURE;
     }
 
@@ -1677,10 +1837,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_EndGPURenderPass(shadow_pass);
     }
 
-    /* ── Main render pass ──────────────────────────────────────────── */
+    /* ── Scene pass — render to HDR target ────────────────────────── */
     SDL_GPUColorTargetInfo color_target;
     SDL_zero(color_target);
-    color_target.texture     = swapchain_tex;
+    color_target.texture     = state->hdr_target;
     color_target.load_op     = SDL_GPU_LOADOP_CLEAR;
     color_target.store_op    = SDL_GPU_STOREOP_STORE;
     color_target.clear_color = (SDL_FColor){ CLEAR_R, CLEAR_G, CLEAR_B, 1.0f };
@@ -1786,6 +1946,42 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     SDL_EndGPURenderPass(pass);
 
+    /* ── Tone map pass — compress HDR → swapchain ─────────────────── */
+    {
+        SDL_GPUColorTargetInfo tone_ct;
+        SDL_zero(tone_ct);
+        tone_ct.texture  = swapchain_tex;
+        tone_ct.load_op  = SDL_GPU_LOADOP_DONT_CARE;
+        tone_ct.store_op = SDL_GPU_STOREOP_STORE;
+
+        SDL_GPURenderPass *tone_pass = SDL_BeginGPURenderPass(
+            cmd, &tone_ct, 1, NULL);
+        if (!tone_pass) {
+            SDL_Log("SDL_BeginGPURenderPass (tonemap) failed: %s", SDL_GetError());
+            return SDL_APP_FAILURE;
+        }
+
+        SDL_BindGPUGraphicsPipeline(tone_pass, state->tonemap_pipeline);
+
+        /* Bind the HDR render target as a texture for sampling. */
+        SDL_GPUTextureSamplerBinding hdr_binding;
+        hdr_binding.texture = state->hdr_target;
+        hdr_binding.sampler = state->hdr_sampler;
+        SDL_BindGPUFragmentSamplers(tone_pass, 0, &hdr_binding, 1);
+
+        /* Push tone map uniforms (exposure and operator selection). */
+        TonemapFragUniforms tone_u;
+        SDL_zero(tone_u);
+        tone_u.exposure     = state->exposure;
+        tone_u.tonemap_mode = state->tonemap_mode;
+        SDL_PushGPUFragmentUniformData(cmd, 0, &tone_u, sizeof(tone_u));
+
+        /* No vertex buffer — positions generated from SV_VertexID. */
+        SDL_DrawGPUPrimitives(tone_pass, FULLSCREEN_QUAD_VERTS, 1, 0, 0);
+
+        SDL_EndGPURenderPass(tone_pass);
+    }
+
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
@@ -1812,6 +2008,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->grid_pipeline);
     if (state->shadow_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->shadow_pipeline);
+    if (state->tonemap_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(state->device, state->tonemap_pipeline);
     if (state->grid_vertex_buffer)
         SDL_ReleaseGPUBuffer(state->device, state->grid_vertex_buffer);
     if (state->grid_index_buffer)
@@ -1822,12 +2020,16 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
         SDL_ReleaseGPUTexture(state->device, state->shadow_depth_texture);
     if (state->gobo_texture)
         SDL_ReleaseGPUTexture(state->device, state->gobo_texture);
+    if (state->hdr_target)
+        SDL_ReleaseGPUTexture(state->device, state->hdr_target);
     if (state->sampler)
         SDL_ReleaseGPUSampler(state->device, state->sampler);
     if (state->shadow_sampler)
         SDL_ReleaseGPUSampler(state->device, state->shadow_sampler);
     if (state->gobo_sampler)
         SDL_ReleaseGPUSampler(state->device, state->gobo_sampler);
+    if (state->hdr_sampler)
+        SDL_ReleaseGPUSampler(state->device, state->hdr_sampler);
     if (state->depth_texture)
         SDL_ReleaseGPUTexture(state->device, state->depth_texture);
 
