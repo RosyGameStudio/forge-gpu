@@ -463,6 +463,19 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(
             cmd, &color_target, 1, NULL
         );
+        if (!pass) {
+            SDL_Log("SDL_BeginGPURenderPass failed: %s", SDL_GetError());
+            SDL_PopGPUDebugGroup(cmd);  /* Render Scene */
+            SDL_PopGPUDebugGroup(cmd);  /* Frame */
+            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s",
+                        SDL_GetError());
+            }
+            if (capturing) {
+                state->rdoc->EndFrameCapture(NULL, NULL);
+            }
+            return SDL_APP_FAILURE;
+        }
 
         /* ── Debug label: mark a specific point ───────────────────────
          *
