@@ -117,7 +117,8 @@
 #define SUN_AZIMUTH_DEFAULT   0.0f   /* radians from east               */
 #define SUN_ELEVATION_SPEED   0.5f   /* radians/sec for arrow keys      */
 #define SUN_AZIMUTH_SPEED     0.5f   /* radians/sec for arrow keys      */
-#define SUN_AUTO_SPEED        0.1f   /* radians/sec for auto rotation   */
+#define SUN_AUTO_SPEED        0.1f   /* radians/sec for orbit rotation   */
+#define SUN_ORBIT_TILT        1.2f   /* max elevation (~69 deg), full day/night cycle */
 #define SUN_INTENSITY         20.0f  /* radiance multiplier             */
 
 /* Atmosphere ray march defaults. */
@@ -240,7 +241,8 @@ typedef struct AppState {
   /* Sun direction — controlled by elevation + azimuth angles. */
   float sun_elevation;  /* radians above horizon (0 = horizon, π/2 = zenith)  */
   float sun_azimuth;    /* radians from east (0 = east, increases CCW)        */
-  bool  sun_auto;       /* true = auto-rotate sun azimuth over time           */
+  bool  sun_auto;       /* true = auto day/night cycle                        */
+  float sun_orbit_angle;/* continuous orbit angle for day/night cycle (radians)*/
 
   /* HDR settings — switchable at runtime. */
   float  exposure;      /* brightness multiplier before tone mapping (>0)  */
@@ -721,6 +723,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   state->sun_elevation = SUN_ELEVATION_DEFAULT;
   state->sun_azimuth = SUN_AZIMUTH_DEFAULT;
   state->sun_auto = true;
+  state->sun_orbit_angle = SUN_ELEVATION_DEFAULT; /* start orbit at default elevation */
 
   state->exposure = DEFAULT_EXPOSURE;
   state->tonemap_mode = TONEMAP_ACES;
@@ -933,9 +936,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     if (state->sun_elevation < -PI_F * 0.5f) state->sun_elevation = -PI_F * 0.5f;
   }
 
-  /* Auto sun rotation. */
+  /* Auto day/night cycle — orbit the sun in a full circle so it rises,
+   * passes overhead, sets, goes through night, and rises again.
+   * The orbit angle drives elevation via sin() and azimuth via cos(),
+   * giving a natural arc from east (sunrise) to west (sunset). */
   if (state->sun_auto) {
-    state->sun_azimuth += SUN_AUTO_SPEED * dt;
+    state->sun_orbit_angle += SUN_AUTO_SPEED * dt;
+    state->sun_elevation = SDL_sinf(state->sun_orbit_angle) * SUN_ORBIT_TILT;
+    state->sun_azimuth   = state->sun_orbit_angle;
   }
 
   /* ── Build ray matrix for sky rendering ──────────────────────────
