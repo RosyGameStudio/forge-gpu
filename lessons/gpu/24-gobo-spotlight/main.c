@@ -37,6 +37,11 @@
 #include "shaders/compiled/scene_vert_dxil.h"
 #include "shaders/compiled/scene_vert_spirv.h"
 
+#include "shaders/compiled/shadow_frag_dxil.h"
+#include "shaders/compiled/shadow_frag_spirv.h"
+#include "shaders/compiled/shadow_vert_dxil.h"
+#include "shaders/compiled/shadow_vert_spirv.h"
+
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
 #define WINDOW_WIDTH  1280
@@ -58,16 +63,39 @@
 #define CAM_START_PITCH_DEG -20.0f
 
 /* Scene material defaults. */
-#define MATERIAL_AMBIENT      0.04f
+#define MATERIAL_AMBIENT      0.01f
 #define MATERIAL_SHININESS    64.0f
 #define MATERIAL_SPECULAR_STR 0.5f
 
 /* Dim directional fill light — just enough to show surface detail.
  * Points down and to the right (like a weak overhead fill). */
-#define FILL_INTENSITY  0.25f
+#define FILL_INTENSITY  0.03f
 #define FILL_DIR_X      0.3f
 #define FILL_DIR_Y     -0.8f
 #define FILL_DIR_Z      0.2f
+
+/* Spotlight — position, direction, cone angles, and color. */
+#define SPOT_POS_X       6.0f
+#define SPOT_POS_Y       5.0f
+#define SPOT_POS_Z       4.0f
+#define SPOT_TARGET_X    0.0f
+#define SPOT_TARGET_Y    0.0f
+#define SPOT_TARGET_Z    0.0f
+#define SPOT_INNER_DEG   20.0f   /* full-intensity inner cone half-angle */
+#define SPOT_OUTER_DEG   30.0f   /* falloff-to-zero outer cone half-angle */
+#define SPOT_INTENSITY   5.0f    /* HDR brightness */
+#define SPOT_COLOR_R     1.0f    /* warm white spotlight */
+#define SPOT_COLOR_G     0.95f
+#define SPOT_COLOR_B     0.8f
+#define SPOT_NEAR        0.5f
+#define SPOT_FAR         30.0f
+
+/* Shadow map. */
+#define SHADOW_MAP_SIZE   1024
+#define SHADOW_DEPTH_FMT  SDL_GPU_TEXTUREFORMAT_D32_FLOAT
+
+/* Gobo texture path (relative to executable). */
+#define GOBO_TEXTURE_PATH "assets/gobo_window.png"
 
 /* Grid. */
 #define GRID_HALF_SIZE     50.0f
@@ -127,7 +155,19 @@ typedef struct SceneFragUniforms {
     float shininess;        /* specular exponent              (4 bytes) */
     float specular_str;     /* specular strength              (4 bytes) */
     float fill_dir[4];      /* fill light direction (xyz,pad) (16 bytes) */
-} SceneFragUniforms;        /* 64 bytes total */
+    float spot_pos[3];      /* spotlight world position       (12 bytes) */
+    float spot_intensity;   /* spotlight HDR brightness        (4 bytes) */
+    float spot_dir[3];      /* spotlight direction (unit)     (12 bytes) */
+    float cos_inner;        /* cos(inner cone half-angle)      (4 bytes) */
+    float spot_color[3];    /* spotlight RGB color            (12 bytes) */
+    float cos_outer;        /* cos(outer cone half-angle)      (4 bytes) */
+    mat4  light_vp;         /* spotlight view-projection      (64 bytes) */
+} SceneFragUniforms;        /* 192 bytes total */
+
+/* Shadow vertex uniforms — just the light MVP per draw call. */
+typedef struct ShadowVertUniforms {
+    mat4 light_mvp; /* light VP * model matrix (64 bytes) */
+} ShadowVertUniforms;
 
 /* Grid vertex uniforms — one VP matrix. */
 typedef struct GridVertUniforms {
@@ -136,15 +176,22 @@ typedef struct GridVertUniforms {
 
 /* Grid fragment uniforms — matches grid.frag.hlsl cbuffer. */
 typedef struct GridFragUniforms {
-    float line_color[4]; /* grid line color       (16 bytes) */
-    float bg_color[4];   /* background color      (16 bytes) */
-    float eye_pos[3];    /* camera position       (12 bytes) */
-    float grid_spacing;  /* world units / line     (4 bytes) */
-    float line_width;    /* line thickness         (4 bytes) */
-    float fade_distance; /* fade-out distance      (4 bytes) */
-    float _pad0;         /*                        (4 bytes) */
-    float _pad1;         /*                        (4 bytes) */
-} GridFragUniforms;      /* 64 bytes total */
+    float line_color[4]; /* grid line color            (16 bytes) */
+    float bg_color[4];   /* background color           (16 bytes) */
+    float eye_pos[3];    /* camera position            (12 bytes) */
+    float grid_spacing;  /* world units / line          (4 bytes) */
+    float line_width;    /* line thickness              (4 bytes) */
+    float fade_distance; /* fade-out distance           (4 bytes) */
+    float _pad0;         /*                             (4 bytes) */
+    float _pad1;         /*                             (4 bytes) */
+    float spot_pos[3];   /* spotlight world position   (12 bytes) */
+    float spot_intensity;/* spotlight HDR brightness     (4 bytes) */
+    float spot_dir[3];   /* spotlight direction (unit)  (12 bytes) */
+    float cos_inner;     /* cos(inner cone half-angle)   (4 bytes) */
+    float spot_color[3]; /* spotlight RGB color         (12 bytes) */
+    float cos_outer;     /* cos(outer cone half-angle)   (4 bytes) */
+    mat4  light_vp;      /* spotlight view-projection   (64 bytes) */
+} GridFragUniforms;      /* 192 bytes total */
 
 /* ── GPU-side model types ────────────────────────────────────────────────── */
 
@@ -185,8 +232,9 @@ typedef struct app_state {
     /* Pipelines. */
     SDL_GPUGraphicsPipeline *scene_pipeline;
     SDL_GPUGraphicsPipeline *grid_pipeline;
+    SDL_GPUGraphicsPipeline *shadow_pipeline;
 
-    /* Depth buffer. */
+    /* Depth buffer (main render pass). */
     SDL_GPUTexture *depth_texture;
     Uint32 depth_width;
     Uint32 depth_height;
@@ -195,9 +243,21 @@ typedef struct app_state {
     SDL_GPUBuffer *grid_vertex_buffer;
     SDL_GPUBuffer *grid_index_buffer;
 
-    /* Textures and sampler. */
+    /* Textures and samplers. */
     SDL_GPUTexture *white_texture;
-    SDL_GPUSampler *sampler;
+    SDL_GPUSampler *sampler;           /* trilinear for diffuse textures */
+
+    /* Shadow map — single 2D depth texture from the spotlight's frustum. */
+    SDL_GPUTexture *shadow_depth_texture;
+    SDL_GPUSampler *shadow_sampler;    /* nearest, clamp-to-edge */
+
+    /* Gobo pattern — grayscale texture projected through the spotlight. */
+    SDL_GPUTexture *gobo_texture;
+    SDL_GPUSampler *gobo_sampler;      /* linear, clamp-to-edge */
+
+    /* Spotlight view-projection matrix (static — light doesn't move). */
+    mat4 light_vp;
+    vec3 spot_dir;                     /* normalized spotlight direction */
 
     /* Models. */
     ModelData truck;
@@ -521,6 +581,116 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device)
     return tex;
 }
 
+/* ── Helper: load gobo texture (linear UNORM, no mipmaps) ──────────────── */
+
+static SDL_GPUTexture *load_gobo_texture(SDL_GPUDevice *device, const char *path)
+{
+    SDL_Surface *surface = SDL_LoadSurface(path);
+    if (!surface) {
+        SDL_Log("Failed to load gobo texture '%s': %s", path, SDL_GetError());
+        return NULL;
+    }
+
+    SDL_Surface *converted = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_ABGR8888);
+    SDL_DestroySurface(surface);
+    if (!converted) {
+        SDL_Log("Failed to convert gobo surface: %s", SDL_GetError());
+        return NULL;
+    }
+
+    Uint32 w = (Uint32)converted->w;
+    Uint32 h = (Uint32)converted->h;
+
+    /* Use UNORM (not sRGB) — the gobo is a linear light attenuation mask,
+     * not a color texture.  We sample .r in the shader. */
+    SDL_GPUTextureCreateInfo tex_info;
+    SDL_zero(tex_info);
+    tex_info.type                = SDL_GPU_TEXTURETYPE_2D;
+    tex_info.format              = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    tex_info.width               = w;
+    tex_info.height              = h;
+    tex_info.layer_count_or_depth = 1;
+    tex_info.num_levels          = 1;
+    tex_info.usage               = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+    SDL_GPUTexture *tex = SDL_CreateGPUTexture(device, &tex_info);
+    if (!tex) {
+        SDL_Log("Failed to create gobo texture: %s", SDL_GetError());
+        SDL_DestroySurface(converted);
+        return NULL;
+    }
+
+    Uint32 row_bytes   = w * BYTES_PER_PIXEL;
+    Uint32 total_bytes = w * h * BYTES_PER_PIXEL;
+
+    SDL_GPUTransferBufferCreateInfo xfer_info;
+    SDL_zero(xfer_info);
+    xfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    xfer_info.size  = total_bytes;
+
+    SDL_GPUTransferBuffer *xfer = SDL_CreateGPUTransferBuffer(device, &xfer_info);
+    if (!xfer) {
+        SDL_Log("Failed to create gobo transfer buffer: %s", SDL_GetError());
+        SDL_ReleaseGPUTexture(device, tex);
+        SDL_DestroySurface(converted);
+        return NULL;
+    }
+
+    void *mapped = SDL_MapGPUTransferBuffer(device, xfer, false);
+    if (!mapped) {
+        SDL_Log("Failed to map gobo transfer buffer: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUTexture(device, tex);
+        SDL_DestroySurface(converted);
+        return NULL;
+    }
+
+    {
+        const Uint8 *row_src = (const Uint8 *)converted->pixels;
+        Uint8 *row_dst = (Uint8 *)mapped;
+        for (Uint32 row = 0; row < h; row++) {
+            SDL_memcpy(row_dst + row * row_bytes,
+                       row_src + row * converted->pitch, row_bytes);
+        }
+    }
+    SDL_UnmapGPUTransferBuffer(device, xfer);
+    SDL_DestroySurface(converted);
+
+    SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
+    if (!cmd) {
+        SDL_Log("Failed to acquire cmd for gobo upload: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUTexture(device, tex);
+        return NULL;
+    }
+
+    SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+
+    SDL_GPUTextureTransferInfo src;
+    SDL_zero(src);
+    src.transfer_buffer = xfer;
+
+    SDL_GPUTextureRegion dst;
+    SDL_zero(dst);
+    dst.texture = tex;
+    dst.w       = w;
+    dst.h       = h;
+    dst.d       = 1;
+
+    SDL_UploadToGPUTexture(copy, &src, &dst, false);
+    SDL_EndGPUCopyPass(copy);
+
+    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+        SDL_Log("Failed to submit gobo upload: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUTexture(device, tex);
+        return NULL;
+    }
+
+    SDL_ReleaseGPUTransferBuffer(device, xfer);
+    return tex;
+}
+
 /* ── Helper: free model GPU resources ───────────────────────────────────── */
 
 static void free_model_gpu(SDL_GPUDevice *device, ModelData *model)
@@ -797,12 +967,78 @@ static void draw_model_scene(
             frag_u.fill_dir[2]   = FILL_DIR_Z;
             frag_u.fill_dir[3]   = 0.0f;
 
+            /* Spotlight parameters. */
+            frag_u.spot_pos[0]   = SPOT_POS_X;
+            frag_u.spot_pos[1]   = SPOT_POS_Y;
+            frag_u.spot_pos[2]   = SPOT_POS_Z;
+            frag_u.spot_intensity = SPOT_INTENSITY;
+            frag_u.spot_dir[0]   = state->spot_dir.x;
+            frag_u.spot_dir[1]   = state->spot_dir.y;
+            frag_u.spot_dir[2]   = state->spot_dir.z;
+            frag_u.cos_inner     = SDL_cosf(SPOT_INNER_DEG * FORGE_DEG2RAD);
+            frag_u.spot_color[0] = SPOT_COLOR_R;
+            frag_u.spot_color[1] = SPOT_COLOR_G;
+            frag_u.spot_color[2] = SPOT_COLOR_B;
+            frag_u.cos_outer     = SDL_cosf(SPOT_OUTER_DEG * FORGE_DEG2RAD);
+            frag_u.light_vp      = state->light_vp;
+
             SDL_PushGPUFragmentUniformData(cmd, 0, &frag_u, sizeof(frag_u));
 
-            SDL_GPUTextureSamplerBinding tex_bind = {
-                .texture = tex, .sampler = state->sampler
-            };
-            SDL_BindGPUFragmentSamplers(pass, 0, &tex_bind, 1);
+            /* Bind 3 samplers: diffuse, shadow depth, gobo pattern. */
+            SDL_GPUTextureSamplerBinding tex_binds[3];
+            tex_binds[0] = (SDL_GPUTextureSamplerBinding){
+                .texture = tex, .sampler = state->sampler };
+            tex_binds[1] = (SDL_GPUTextureSamplerBinding){
+                .texture = state->shadow_depth_texture,
+                .sampler = state->shadow_sampler };
+            tex_binds[2] = (SDL_GPUTextureSamplerBinding){
+                .texture = state->gobo_texture,
+                .sampler = state->gobo_sampler };
+            SDL_BindGPUFragmentSamplers(pass, 0, tex_binds, 3);
+
+            SDL_GPUBufferBinding vb;
+            SDL_zero(vb);
+            vb.buffer = gpu_prim->vertex_buffer;
+            SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
+
+            SDL_GPUBufferBinding ib;
+            SDL_zero(ib);
+            ib.buffer = gpu_prim->index_buffer;
+            SDL_BindGPUIndexBuffer(pass, &ib, gpu_prim->index_type);
+
+            SDL_DrawGPUIndexedPrimitives(pass, gpu_prim->index_count, 1, 0, 0, 0);
+        }
+    }
+}
+
+/* ── Helper: draw a model into the shadow map (depth-only) ─────────────── */
+
+static void draw_model_shadow(
+    SDL_GPURenderPass *pass,
+    SDL_GPUCommandBuffer *cmd,
+    const ModelData *model,
+    const mat4 *placement,
+    const mat4 *light_vp)
+{
+    const ForgeGltfScene *scene = &model->scene;
+
+    for (int ni = 0; ni < scene->node_count; ni++) {
+        const ForgeGltfNode *node = &scene->nodes[ni];
+        if (node->mesh_index < 0 || node->mesh_index >= scene->mesh_count)
+            continue;
+
+        mat4 model_mat = mat4_multiply(*placement, node->world_transform);
+        ShadowVertUniforms vert_u;
+        vert_u.light_mvp = mat4_multiply(*light_vp, model_mat);
+        SDL_PushGPUVertexUniformData(cmd, 0, &vert_u, sizeof(vert_u));
+
+        const ForgeGltfMesh *mesh = &scene->meshes[node->mesh_index];
+        for (int pi = 0; pi < mesh->primitive_count; pi++) {
+            int prim_idx = mesh->first_primitive + pi;
+            const GpuPrimitive *gpu_prim = &model->primitives[prim_idx];
+
+            if (!gpu_prim->vertex_buffer || !gpu_prim->index_buffer)
+                continue;
 
             SDL_GPUBufferBinding vb;
             SDL_zero(vb);
@@ -921,6 +1157,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_snprintf(path, sizeof(path), "%s%s", base, SEARCHLIGHT_MODEL_PATH);
         if (!setup_model(device, &state->searchlight, path))
             goto init_fail;
+
     }
 
     /* ── Scene pipeline (lit geometry → swapchain) ──────────────────── */
@@ -928,9 +1165,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
             scene_vert_spirv, sizeof(scene_vert_spirv),
             scene_vert_dxil, sizeof(scene_vert_dxil), 0, 1);
+        /* 3 samplers: diffuse (slot 0), shadow (slot 1), gobo (slot 2). */
         SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
             scene_frag_spirv, sizeof(scene_frag_spirv),
-            scene_frag_dxil, sizeof(scene_frag_dxil), 1, 1);
+            scene_frag_dxil, sizeof(scene_frag_dxil), 3, 1);
         if (!vert || !frag) {
             if (vert) SDL_ReleaseGPUShader(device, vert);
             if (frag) SDL_ReleaseGPUShader(device, frag);
@@ -993,9 +1231,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
             grid_vert_spirv, sizeof(grid_vert_spirv),
             grid_vert_dxil, sizeof(grid_vert_dxil), 0, 1);
+        /* 2 samplers: shadow (slot 0), gobo (slot 1). */
         SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
             grid_frag_spirv, sizeof(grid_frag_spirv),
-            grid_frag_dxil, sizeof(grid_frag_dxil), 0, 1);
+            grid_frag_dxil, sizeof(grid_frag_dxil), 2, 1);
         if (!vert || !frag) {
             if (vert) SDL_ReleaseGPUShader(device, vert);
             if (frag) SDL_ReleaseGPUShader(device, frag);
@@ -1046,6 +1285,71 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         }
     }
 
+    /* ── Shadow pipeline (depth-only pass from spotlight's perspective) */
+    {
+        SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
+            shadow_vert_spirv, sizeof(shadow_vert_spirv),
+            shadow_vert_dxil, sizeof(shadow_vert_dxil), 0, 1);
+        /* Shadow fragment shader — no samplers, no uniforms (hardware depth write). */
+        SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
+            shadow_frag_spirv, sizeof(shadow_frag_spirv),
+            shadow_frag_dxil, sizeof(shadow_frag_dxil), 0, 0);
+        if (!vert || !frag) {
+            if (vert) SDL_ReleaseGPUShader(device, vert);
+            if (frag) SDL_ReleaseGPUShader(device, frag);
+            goto init_fail;
+        }
+
+        /* Same vertex layout as scene pipeline (glTF vertices: pos+normal+uv).
+         * The shadow vertex shader only reads position, but the buffer pitch
+         * must match the actual vertex stride. */
+        SDL_GPUVertexBufferDescription vb_desc;
+        SDL_zero(vb_desc);
+        vb_desc.slot       = 0;
+        vb_desc.pitch      = sizeof(ForgeGltfVertex);
+        vb_desc.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+        SDL_GPUVertexAttribute attrs[3];
+        SDL_zero(attrs);
+        attrs[0].location = 0;
+        attrs[0].format   = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attrs[0].offset   = offsetof(ForgeGltfVertex, position);
+        attrs[1].location = 1;
+        attrs[1].format   = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+        attrs[1].offset   = offsetof(ForgeGltfVertex, normal);
+        attrs[2].location = 2;
+        attrs[2].format   = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+        attrs[2].offset   = offsetof(ForgeGltfVertex, uv);
+
+        SDL_GPUGraphicsPipelineCreateInfo pi;
+        SDL_zero(pi);
+        pi.vertex_shader   = vert;
+        pi.fragment_shader = frag;
+        pi.vertex_input_state.vertex_buffer_descriptions = &vb_desc;
+        pi.vertex_input_state.num_vertex_buffers         = 1;
+        pi.vertex_input_state.vertex_attributes          = attrs;
+        pi.vertex_input_state.num_vertex_attributes      = 3;
+        pi.primitive_type                  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+        pi.rasterizer_state.cull_mode      = SDL_GPU_CULLMODE_BACK;
+        pi.rasterizer_state.front_face     = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+        pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        pi.depth_stencil_state.compare_op       = SDL_GPU_COMPAREOP_LESS;
+        pi.depth_stencil_state.enable_depth_test  = true;
+        pi.depth_stencil_state.enable_depth_write = true;
+        /* No color targets — depth-only pass. */
+        pi.target_info.num_color_targets        = 0;
+        pi.target_info.depth_stencil_format     = SHADOW_DEPTH_FMT;
+        pi.target_info.has_depth_stencil_target = true;
+
+        state->shadow_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+        SDL_ReleaseGPUShader(device, vert);
+        SDL_ReleaseGPUShader(device, frag);
+        if (!state->shadow_pipeline) {
+            SDL_Log("Failed to create shadow pipeline: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
     /* ── Grid geometry (flat quad on XZ plane) ──────────────────────── */
     {
         float verts[] = {
@@ -1065,11 +1369,75 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
             goto init_fail;
     }
 
+    /* ── Shadow depth texture (1024x1024 from spotlight's frustum) ──── */
+    {
+        SDL_GPUTextureCreateInfo ti;
+        SDL_zero(ti);
+        ti.type                = SDL_GPU_TEXTURETYPE_2D;
+        ti.format              = SHADOW_DEPTH_FMT;
+        ti.width               = SHADOW_MAP_SIZE;
+        ti.height              = SHADOW_MAP_SIZE;
+        ti.layer_count_or_depth = 1;
+        ti.num_levels          = 1;
+        ti.usage               = SDL_GPU_TEXTUREUSAGE_SAMPLER |
+                                 SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+
+        state->shadow_depth_texture = SDL_CreateGPUTexture(device, &ti);
+        if (!state->shadow_depth_texture) {
+            SDL_Log("Failed to create shadow depth texture: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
+    /* ── Shadow sampler (nearest, clamp — we do manual PCF in shader) ── */
+    {
+        SDL_GPUSamplerCreateInfo si;
+        SDL_zero(si);
+        si.min_filter     = SDL_GPU_FILTER_NEAREST;
+        si.mag_filter     = SDL_GPU_FILTER_NEAREST;
+        si.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+        state->shadow_sampler = SDL_CreateGPUSampler(device, &si);
+        if (!state->shadow_sampler) {
+            SDL_Log("Failed to create shadow sampler: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
+    /* ── Gobo sampler (linear, clamp — smooth projected pattern) ───── */
+    {
+        SDL_GPUSamplerCreateInfo si;
+        SDL_zero(si);
+        si.min_filter     = SDL_GPU_FILTER_LINEAR;
+        si.mag_filter     = SDL_GPU_FILTER_LINEAR;
+        si.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+        state->gobo_sampler = SDL_CreateGPUSampler(device, &si);
+        if (!state->gobo_sampler) {
+            SDL_Log("Failed to create gobo sampler: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
+    /* ── Load gobo pattern texture ─────────────────────────────────── */
+    {
+        const char *base = SDL_GetBasePath();
+        char gobo_path[512];
+        SDL_snprintf(gobo_path, sizeof(gobo_path), "%s%s", base, GOBO_TEXTURE_PATH);
+
+        state->gobo_texture = load_gobo_texture(device, gobo_path);
+        if (!state->gobo_texture) goto init_fail;
+    }
+
     /* ── Scene placement ────────────────────────────────────────────── */
     generate_box_placements(state);
 
     /* Searchlight: scale down, raise to sit on the ground, rotate to
-     * face the truck (roughly 45 degrees counter-clockwise). */
+     * face the truck (225 degrees clockwise from +Z). */
     {
         mat4 scale     = mat4_scale(vec3_create(
             SEARCHLIGHT_SCALE, SEARCHLIGHT_SCALE, SEARCHLIGHT_SCALE));
@@ -1078,6 +1446,21 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         /* T * R * S — scale first, then rotate, then translate. */
         state->searchlight_placement = mat4_multiply(
             translate, mat4_multiply(rotate, scale));
+    }
+
+    /* ── Spotlight view-projection (static — light doesn't move) ──── */
+    {
+        vec3 spot_pos    = vec3_create(SPOT_POS_X, SPOT_POS_Y, SPOT_POS_Z);
+        vec3 spot_target = vec3_create(SPOT_TARGET_X, SPOT_TARGET_Y, SPOT_TARGET_Z);
+        vec3 spot_up     = vec3_create(0.0f, 1.0f, 0.0f);
+
+        mat4 light_view = mat4_look_at(spot_pos, spot_target, spot_up);
+        /* FOV = 2 * outer cone half-angle to fully cover the spotlight cone. */
+        float outer_rad  = SPOT_OUTER_DEG * FORGE_DEG2RAD;
+        mat4 light_proj  = mat4_perspective(2.0f * outer_rad, 1.0f,
+                                            SPOT_NEAR, SPOT_FAR);
+        state->light_vp = mat4_multiply(light_proj, light_view);
+        state->spot_dir = vec3_normalize(vec3_sub(spot_target, spot_pos));
     }
 
     /* ── Camera initial state ───────────────────────────────────────── */
@@ -1102,14 +1485,24 @@ init_fail:
         SDL_ReleaseGPUGraphicsPipeline(device, state->scene_pipeline);
     if (state->grid_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(device, state->grid_pipeline);
+    if (state->shadow_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(device, state->shadow_pipeline);
     if (state->grid_vertex_buffer)
         SDL_ReleaseGPUBuffer(device, state->grid_vertex_buffer);
     if (state->grid_index_buffer)
         SDL_ReleaseGPUBuffer(device, state->grid_index_buffer);
     if (state->sampler)
         SDL_ReleaseGPUSampler(device, state->sampler);
+    if (state->shadow_sampler)
+        SDL_ReleaseGPUSampler(device, state->shadow_sampler);
+    if (state->gobo_sampler)
+        SDL_ReleaseGPUSampler(device, state->gobo_sampler);
     if (state->white_texture)
         SDL_ReleaseGPUTexture(device, state->white_texture);
+    if (state->shadow_depth_texture)
+        SDL_ReleaseGPUTexture(device, state->shadow_depth_texture);
+    if (state->gobo_texture)
+        SDL_ReleaseGPUTexture(device, state->gobo_texture);
     if (state->depth_texture)
         SDL_ReleaseGPUTexture(device, state->depth_texture);
     free_model_gpu(device, &state->truck);
@@ -1241,7 +1634,39 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_FAILURE;
     }
 
-    /* ── Render pass ────────────────────────────────────────────────── */
+    /* ── Shadow pass — render scene from spotlight's perspective ──── */
+    {
+        SDL_GPUDepthStencilTargetInfo shadow_depth;
+        SDL_zero(shadow_depth);
+        shadow_depth.texture     = state->shadow_depth_texture;
+        shadow_depth.load_op     = SDL_GPU_LOADOP_CLEAR;
+        shadow_depth.store_op    = SDL_GPU_STOREOP_STORE; /* read later */
+        shadow_depth.clear_depth = 1.0f;
+
+        /* No color targets — depth-only pass. */
+        SDL_GPURenderPass *shadow_pass = SDL_BeginGPURenderPass(
+            cmd, NULL, 0, &shadow_depth);
+
+        SDL_BindGPUGraphicsPipeline(shadow_pass, state->shadow_pipeline);
+
+        /* Draw shadow casters (truck + crates, not the searchlight). */
+        mat4 truck_placement = mat4_identity();
+        draw_model_shadow(shadow_pass, cmd, &state->truck,
+                          &truck_placement, &state->light_vp);
+
+        for (int i = 0; i < BOX_COUNT; i++) {
+            BoxPlacement *bp = &state->box_placements[i];
+            mat4 box_placement = mat4_multiply(
+                mat4_translate(bp->position),
+                mat4_rotate_y(bp->y_rotation));
+            draw_model_shadow(shadow_pass, cmd, &state->box,
+                              &box_placement, &state->light_vp);
+        }
+
+        SDL_EndGPURenderPass(shadow_pass);
+    }
+
+    /* ── Main render pass ──────────────────────────────────────────── */
     SDL_GPUColorTargetInfo color_target;
     SDL_zero(color_target);
     color_target.texture     = swapchain_tex;
@@ -1287,7 +1712,33 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         grid_fu.fade_distance = GRID_FADE_DISTANCE;
         grid_fu._pad0         = 0.0f;
         grid_fu._pad1         = 0.0f;
+
+        /* Spotlight parameters for grid floor illumination. */
+        grid_fu.spot_pos[0]   = SPOT_POS_X;
+        grid_fu.spot_pos[1]   = SPOT_POS_Y;
+        grid_fu.spot_pos[2]   = SPOT_POS_Z;
+        grid_fu.spot_intensity = SPOT_INTENSITY;
+        grid_fu.spot_dir[0]   = state->spot_dir.x;
+        grid_fu.spot_dir[1]   = state->spot_dir.y;
+        grid_fu.spot_dir[2]   = state->spot_dir.z;
+        grid_fu.cos_inner     = SDL_cosf(SPOT_INNER_DEG * FORGE_DEG2RAD);
+        grid_fu.spot_color[0] = SPOT_COLOR_R;
+        grid_fu.spot_color[1] = SPOT_COLOR_G;
+        grid_fu.spot_color[2] = SPOT_COLOR_B;
+        grid_fu.cos_outer     = SDL_cosf(SPOT_OUTER_DEG * FORGE_DEG2RAD);
+        grid_fu.light_vp      = state->light_vp;
+
         SDL_PushGPUFragmentUniformData(cmd, 0, &grid_fu, sizeof(grid_fu));
+
+        /* Bind 2 samplers: shadow depth, gobo pattern. */
+        SDL_GPUTextureSamplerBinding grid_tex_binds[2];
+        grid_tex_binds[0] = (SDL_GPUTextureSamplerBinding){
+            .texture = state->shadow_depth_texture,
+            .sampler = state->shadow_sampler };
+        grid_tex_binds[1] = (SDL_GPUTextureSamplerBinding){
+            .texture = state->gobo_texture,
+            .sampler = state->gobo_sampler };
+        SDL_BindGPUFragmentSamplers(pass, 0, grid_tex_binds, 2);
 
         SDL_GPUBufferBinding vb_bind = { state->grid_vertex_buffer, 0 };
         SDL_BindGPUVertexBuffers(pass, 0, &vb_bind, 1);
@@ -1348,14 +1799,24 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->scene_pipeline);
     if (state->grid_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->grid_pipeline);
+    if (state->shadow_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(state->device, state->shadow_pipeline);
     if (state->grid_vertex_buffer)
         SDL_ReleaseGPUBuffer(state->device, state->grid_vertex_buffer);
     if (state->grid_index_buffer)
         SDL_ReleaseGPUBuffer(state->device, state->grid_index_buffer);
     if (state->white_texture)
         SDL_ReleaseGPUTexture(state->device, state->white_texture);
+    if (state->shadow_depth_texture)
+        SDL_ReleaseGPUTexture(state->device, state->shadow_depth_texture);
+    if (state->gobo_texture)
+        SDL_ReleaseGPUTexture(state->device, state->gobo_texture);
     if (state->sampler)
         SDL_ReleaseGPUSampler(state->device, state->sampler);
+    if (state->shadow_sampler)
+        SDL_ReleaseGPUSampler(state->device, state->shadow_sampler);
+    if (state->gobo_sampler)
+        SDL_ReleaseGPUSampler(state->device, state->gobo_sampler);
     if (state->depth_texture)
         SDL_ReleaseGPUTexture(state->device, state->depth_texture);
 
