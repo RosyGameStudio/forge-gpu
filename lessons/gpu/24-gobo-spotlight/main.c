@@ -134,6 +134,9 @@
 
 #define BYTES_PER_PIXEL 4
 
+/* Normal-axis groups for searchlight surface identification. */
+#define NORMAL_GROUP_COUNT 6
+
 /* Texture sampler — trilinear filtering with anisotropy. */
 #define MAX_ANISOTROPY 4
 
@@ -697,8 +700,19 @@ static void free_model_gpu(SDL_GPUDevice *device, ModelData *model)
 {
     if (model->primitives) {
         for (int i = 0; i < model->primitive_count; i++) {
-            if (model->primitives[i].vertex_buffer)
-                SDL_ReleaseGPUBuffer(device, model->primitives[i].vertex_buffer);
+            /* Dedup vertex buffers (split primitives may share one). */
+            if (model->primitives[i].vertex_buffer) {
+                bool already_released = false;
+                for (int j = 0; j < i; j++) {
+                    if (model->primitives[j].vertex_buffer ==
+                        model->primitives[i].vertex_buffer) {
+                        already_released = true;
+                        break;
+                    }
+                }
+                if (!already_released)
+                    SDL_ReleaseGPUBuffer(device, model->primitives[i].vertex_buffer);
+            }
             if (model->primitives[i].index_buffer)
                 SDL_ReleaseGPUBuffer(device, model->primitives[i].index_buffer);
         }
@@ -840,6 +854,149 @@ static bool setup_model(SDL_GPUDevice *device, ModelData *model, const char *pat
         return false;
     }
     return upload_model_to_gpu(device, model);
+}
+
+/* ── Helper: classify a normal vector by its dominant axis ──────────────── */
+
+static int major_axis_group(vec3 n)
+{
+    float ax = SDL_fabsf(n.x);
+    float ay = SDL_fabsf(n.y);
+    float az = SDL_fabsf(n.z);
+
+    if (ax >= ay && ax >= az)
+        return n.x >= 0.0f ? 0 : 1;  /* +X or -X */
+    if (ay >= ax && ay >= az)
+        return n.y >= 0.0f ? 2 : 3;  /* +Y or -Y */
+    return n.z >= 0.0f ? 4 : 5;      /* +Z or -Z */
+}
+
+/* ── Split searchlight into per-normal-group primitives with distinct colors ─
+ *
+ * Replaces the model's single primitive with one primitive per normal-axis
+ * group, each assigned a visually distinct base color. All primitives share
+ * the same vertex buffer; only the index buffers differ. */
+
+static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
+{
+    /* Group 3 (-Y) is the light lens surface; all others revert to the
+     * original glTF base color (gray 0.8). */
+    static const float colors[NORMAL_GROUP_COUNT][4] = {
+        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 0  +X: original gray */
+        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 1  -X: original gray */
+        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 2  +Y: original gray */
+        { 1.0f, 0.0f, 1.0f, 1.0f },  /* group 3  -Y: LIGHT LENS   */
+        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 4  +Z: original gray */
+        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 5  -Z: original gray */
+    };
+    static const char *names[NORMAL_GROUP_COUNT] = {
+        "+X (gray)", "-X (gray)", "+Y (gray)",
+        "-Y (LENS)", "+Z (gray)", "-Z (gray)"
+    };
+
+    if (model->primitive_count != 1) return true;
+
+    const ForgeGltfPrimitive *src = &model->scene.primitives[0];
+    if (!src->indices || src->index_count < 3) return true;
+
+    const Uint32 *indices = (const Uint32 *)src->indices;
+    Uint32 tri_count = src->index_count / 3;
+
+    /* Allocate per-group index arrays (worst case: all in one group). */
+    Uint32 *group_idx[NORMAL_GROUP_COUNT];
+    Uint32  group_cnt[NORMAL_GROUP_COUNT];
+    SDL_memset(group_cnt, 0, sizeof(group_cnt));
+
+    for (int g = 0; g < NORMAL_GROUP_COUNT; g++) {
+        group_idx[g] = (Uint32 *)SDL_malloc(src->index_count * sizeof(Uint32));
+        if (!group_idx[g]) {
+            for (int j = 0; j < g; j++) SDL_free(group_idx[j]);
+            SDL_Log("Failed to allocate normal group indices");
+            return false;
+        }
+    }
+
+    /* Classify each triangle by average vertex normal direction. */
+    for (Uint32 t = 0; t < tri_count; t++) {
+        Uint32 i0 = indices[t * 3 + 0];
+        Uint32 i1 = indices[t * 3 + 1];
+        Uint32 i2 = indices[t * 3 + 2];
+
+        vec3 avg = vec3_normalize(vec3_add(
+            vec3_add(src->vertices[i0].normal, src->vertices[i1].normal),
+            src->vertices[i2].normal));
+
+        int g = major_axis_group(avg);
+        group_idx[g][group_cnt[g]++] = i0;
+        group_idx[g][group_cnt[g]++] = i1;
+        group_idx[g][group_cnt[g]++] = i2;
+    }
+
+    /* Count non-empty groups and log. */
+    int active = 0;
+    for (int g = 0; g < NORMAL_GROUP_COUNT; g++) {
+        if (group_cnt[g] > 0) {
+            SDL_Log("Searchlight group %s: %u triangles",
+                    names[g], group_cnt[g] / 3);
+            active++;
+        }
+    }
+
+    /* Keep the shared vertex buffer; release only the original index buffer. */
+    SDL_GPUBuffer *shared_vb = model->primitives[0].vertex_buffer;
+    SDL_ReleaseGPUBuffer(device, model->primitives[0].index_buffer);
+
+    SDL_free(model->primitives);
+    model->primitives = (GpuPrimitive *)SDL_calloc(
+        (size_t)active, sizeof(GpuPrimitive));
+
+    SDL_free(model->materials);
+    model->materials = (GpuMaterial *)SDL_calloc(
+        (size_t)active, sizeof(GpuMaterial));
+
+    if (!model->primitives || !model->materials) {
+        SDL_Log("Failed to allocate split primitives/materials");
+        for (int g = 0; g < NORMAL_GROUP_COUNT; g++) SDL_free(group_idx[g]);
+        return false;
+    }
+
+    int pi = 0;
+    for (int g = 0; g < NORMAL_GROUP_COUNT; g++) {
+        if (group_cnt[g] == 0) continue;
+
+        model->primitives[pi].vertex_buffer = shared_vb;
+        model->primitives[pi].index_buffer  = upload_gpu_buffer(device,
+            SDL_GPU_BUFFERUSAGE_INDEX,
+            group_idx[g], group_cnt[g] * sizeof(Uint32));
+        model->primitives[pi].index_count    = group_cnt[g];
+        model->primitives[pi].index_type     = SDL_GPU_INDEXELEMENTSIZE_32BIT;
+        model->primitives[pi].material_index = pi;
+        model->primitives[pi].has_uvs        = src->has_uvs;
+
+        if (!model->primitives[pi].index_buffer) {
+            for (int gg = 0; gg < NORMAL_GROUP_COUNT; gg++)
+                SDL_free(group_idx[gg]);
+            return false;
+        }
+
+        model->materials[pi].base_color[0] = colors[g][0];
+        model->materials[pi].base_color[1] = colors[g][1];
+        model->materials[pi].base_color[2] = colors[g][2];
+        model->materials[pi].base_color[3] = colors[g][3];
+        model->materials[pi].has_texture   = false;
+        model->materials[pi].texture       = NULL;
+
+        pi++;
+    }
+
+    model->primitive_count = active;
+    model->material_count  = active;
+
+    /* Update the scene mesh so the draw loop iterates all new primitives. */
+    model->scene.meshes[0].primitive_count = active;
+
+    for (int g = 0; g < NORMAL_GROUP_COUNT; g++) SDL_free(group_idx[g]);
+    return true;
 }
 
 /* ── Helper: (re)create depth buffer ────────────────────────────────────── */
@@ -1158,6 +1315,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         if (!setup_model(device, &state->searchlight, path))
             goto init_fail;
 
+        /* Split searchlight into per-normal-group primitives so each
+         * surface facing a different direction gets a distinct color.
+         * This lets us visually identify which surface is the light. */
+        if (!split_searchlight_by_normal(device, &state->searchlight))
+            goto init_fail;
     }
 
     /* ── Scene pipeline (lit geometry → swapchain) ──────────────────── */
