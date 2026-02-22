@@ -997,13 +997,26 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
         pi++;
     }
 
-    /* Lens group → one primitive per triangle.  Triangles whose hue is
-     * close to magenta (hue 5/6) keep their unique color; the rest revert
-     * to gray so only the glass surface remains visually distinct. */
+    /* Lens group → two passes.  First count the glass triangles (near
+     * magenta hue), then assign each a unique color spread across the
+     * full spectrum so they're visually distinct from each other. */
     {
         const float magenta_hue = 5.0f / 6.0f;
         const float hue_threshold = 0.15f; /* ~54 degrees each side */
 
+        /* Pass 1: count glass triangles. */
+        Uint32 glass_count = 0;
+        for (Uint32 t = 0; t < lens_tris; t++) {
+            float hue = (float)t / (float)lens_tris;
+            float dist = SDL_fabsf(hue - magenta_hue);
+            if (dist > 0.5f) dist = 1.0f - dist;
+            if (dist <= hue_threshold) glass_count++;
+        }
+        SDL_Log("  Lens: %u glass triangles out of %u total", glass_count, lens_tris);
+
+        /* Pass 2: assign colors. Glass triangles get evenly-spaced hues
+         * across the full spectrum; non-glass triangles get gray. */
+        Uint32 glass_idx = 0;
         for (Uint32 t = 0; t < lens_tris; t++) {
             Uint32 tri_idx[3] = {
                 group_idx[LENS_GROUP][t * 3 + 0],
@@ -1027,16 +1040,27 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
 
             float hue = (float)t / (float)lens_tris;
             float dist = SDL_fabsf(hue - magenta_hue);
-            if (dist > 0.5f) dist = 1.0f - dist; /* wrap around */
+            if (dist > 0.5f) dist = 1.0f - dist;
 
             if (dist <= hue_threshold) {
-                float r, g, b;
-                hue_to_rgb(hue, &r, &g, &b);
-                model->materials[pi].base_color[0] = r;
-                model->materials[pi].base_color[1] = g;
-                model->materials[pi].base_color[2] = b;
-                SDL_Log("  Lens triangle %u → GLASS (%.2f, %.2f, %.2f)",
-                        t, r, g, b);
+                float glass_hue = (float)glass_idx / (float)glass_count;
+                glass_idx++;
+
+                /* Cull red (0–0.05, 0.95–1), blue (0.55–0.7),
+                 * purple/magenta (0.7–0.95) — keep only greens/yellows/cyans. */
+                if (glass_hue <= 0.05f || glass_hue >= 0.55f) {
+                    model->materials[pi].base_color[0] = 0.8f;
+                    model->materials[pi].base_color[1] = 0.8f;
+                    model->materials[pi].base_color[2] = 0.8f;
+                } else {
+                    float r, g, b;
+                    hue_to_rgb(glass_hue, &r, &g, &b);
+                    model->materials[pi].base_color[0] = r;
+                    model->materials[pi].base_color[1] = g;
+                    model->materials[pi].base_color[2] = b;
+                    SDL_Log("  Glass #%u → (%.2f, %.2f, %.2f)",
+                            glass_idx - 1, r, g, b);
+                }
             } else {
                 model->materials[pi].base_color[0] = 0.8f;
                 model->materials[pi].base_color[1] = 0.8f;
