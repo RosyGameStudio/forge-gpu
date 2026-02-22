@@ -109,6 +109,12 @@ provides reusable skills and libraries so humans and AI can build together.
   never directly from the main agent. This keeps the main context clean, uses
   fewer tokens, and is faster.
 
+### Git workflow
+
+- **Never commit directly to `main`.** All changes go through pull requests.
+- Create a feature branch, commit there, push, and open a PR with `gh pr create`.
+- Use the **/publish-lesson** skill for lesson PRs — it handles branch + PR creation.
+
 ## Project Structure
 
 ```text
