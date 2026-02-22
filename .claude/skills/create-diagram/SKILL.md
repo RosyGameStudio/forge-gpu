@@ -47,11 +47,19 @@ Choose the correct file based on the lesson category:
 
 Add a new function to the appropriate module following the existing patterns.
 
-**Required imports and helpers (from `_common.py`):**
+**Required imports and helpers:**
 
 ```python
-from ._common import STYLE, setup_axes, draw_vector, save
+import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
+import numpy as np
+
+from ._common import FORGE_CMAP, STYLE, draw_vector, save, setup_axes
 ```
+
+`pe` is needed for the text readability stroke (`path_effects=[pe.withStroke(...)]`)
+used throughout diagram code. `FORGE_CMAP` is a custom colormap for heatmaps and
+gradient visualizations — import it when using `imshow()` or `pcolormesh()`.
 
 **Theme colors — always use `STYLE` dict values, never hardcoded colors:**
 
