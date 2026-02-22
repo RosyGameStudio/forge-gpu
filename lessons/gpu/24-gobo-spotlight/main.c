@@ -63,7 +63,7 @@
 #define CAM_START_PITCH_DEG -20.0f
 
 /* Scene material defaults. */
-#define MATERIAL_AMBIENT      0.01f
+#define MATERIAL_AMBIENT      0.15f
 #define MATERIAL_SHININESS    64.0f
 #define MATERIAL_SPECULAR_STR 0.5f
 
@@ -871,29 +871,35 @@ static int major_axis_group(vec3 n)
     return n.z >= 0.0f ? 4 : 5;      /* +Z or -Z */
 }
 
-/* ── Split searchlight into per-normal-group primitives with distinct colors ─
+/* ── Helper: convert hue [0,1] to a saturated RGB color ─────────────────── */
+
+static void hue_to_rgb(float hue, float *r, float *g, float *b)
+{
+    float h = hue * 6.0f;
+    float f = h - SDL_floorf(h);
+    int   i = (int)SDL_floorf(h) % 6;
+
+    switch (i) {
+    case 0: *r = 1.0f; *g = f;        *b = 0.0f;     break;
+    case 1: *r = 1.0f - f; *g = 1.0f; *b = 0.0f;     break;
+    case 2: *r = 0.0f; *g = 1.0f;     *b = f;        break;
+    case 3: *r = 0.0f; *g = 1.0f - f; *b = 1.0f;     break;
+    case 4: *r = f;    *g = 0.0f;     *b = 1.0f;     break;
+    default:*r = 1.0f; *g = 0.0f;     *b = 1.0f - f; break;
+    }
+}
+
+/* ── Split searchlight into per-normal-group primitives ──────────────────
  *
- * Replaces the model's single primitive with one primitive per normal-axis
- * group, each assigned a visually distinct base color. All primitives share
- * the same vertex buffer; only the index buffers differ. */
+ * Non-lens groups get the original gray base color.  The lens group (-Y,
+ * group 3) is further split into individual triangles, each with a unique
+ * hue-wheel color so the user can visually identify which triangles form
+ * the actual light surface. */
+
+#define LENS_GROUP 3  /* -Y axis = light lens */
 
 static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
 {
-    /* Group 3 (-Y) is the light lens surface; all others revert to the
-     * original glTF base color (gray 0.8). */
-    static const float colors[NORMAL_GROUP_COUNT][4] = {
-        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 0  +X: original gray */
-        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 1  -X: original gray */
-        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 2  +Y: original gray */
-        { 1.0f, 0.0f, 1.0f, 1.0f },  /* group 3  -Y: LIGHT LENS   */
-        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 4  +Z: original gray */
-        { 0.8f, 0.8f, 0.8f, 1.0f },  /* group 5  -Z: original gray */
-    };
-    static const char *names[NORMAL_GROUP_COUNT] = {
-        "+X (gray)", "-X (gray)", "+Y (gray)",
-        "-Y (LENS)", "+Z (gray)", "-Z (gray)"
-    };
-
     if (model->primitive_count != 1) return true;
 
     const ForgeGltfPrimitive *src = &model->scene.primitives[0];
@@ -902,7 +908,7 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
     const Uint32 *indices = (const Uint32 *)src->indices;
     Uint32 tri_count = src->index_count / 3;
 
-    /* Allocate per-group index arrays (worst case: all in one group). */
+    /* ── Phase 1: classify triangles into normal-axis groups ────────── */
     Uint32 *group_idx[NORMAL_GROUP_COUNT];
     Uint32  group_cnt[NORMAL_GROUP_COUNT];
     SDL_memset(group_cnt, 0, sizeof(group_cnt));
@@ -916,7 +922,6 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
         }
     }
 
-    /* Classify each triangle by average vertex normal direction. */
     for (Uint32 t = 0; t < tri_count; t++) {
         Uint32 i0 = indices[t * 3 + 0];
         Uint32 i1 = indices[t * 3 + 1];
@@ -932,27 +937,28 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
         group_idx[g][group_cnt[g]++] = i2;
     }
 
-    /* Count non-empty groups and log. */
-    int active = 0;
+    /* ── Phase 2: count primitives ──────────────────────────────────── */
+    Uint32 lens_tris = group_cnt[LENS_GROUP] / 3;
+    int non_lens_groups = 0;
     for (int g = 0; g < NORMAL_GROUP_COUNT; g++) {
-        if (group_cnt[g] > 0) {
-            SDL_Log("Searchlight group %s: %u triangles",
-                    names[g], group_cnt[g] / 3);
-            active++;
-        }
+        if (g != LENS_GROUP && group_cnt[g] > 0) non_lens_groups++;
     }
+    int total_prims = non_lens_groups + (int)lens_tris;
 
-    /* Keep the shared vertex buffer; release only the original index buffer. */
+    SDL_Log("Searchlight: %d non-lens groups + %u lens triangles = %d primitives",
+            non_lens_groups, lens_tris, total_prims);
+
+    /* ── Phase 3: allocate and fill ─────────────────────────────────── */
     SDL_GPUBuffer *shared_vb = model->primitives[0].vertex_buffer;
     SDL_ReleaseGPUBuffer(device, model->primitives[0].index_buffer);
 
     SDL_free(model->primitives);
     model->primitives = (GpuPrimitive *)SDL_calloc(
-        (size_t)active, sizeof(GpuPrimitive));
+        (size_t)total_prims, sizeof(GpuPrimitive));
 
     SDL_free(model->materials);
     model->materials = (GpuMaterial *)SDL_calloc(
-        (size_t)active, sizeof(GpuMaterial));
+        (size_t)total_prims, sizeof(GpuMaterial));
 
     if (!model->primitives || !model->materials) {
         SDL_Log("Failed to allocate split primitives/materials");
@@ -961,8 +967,10 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
     }
 
     int pi = 0;
+
+    /* Non-lens groups → one primitive each, original gray. */
     for (int g = 0; g < NORMAL_GROUP_COUNT; g++) {
-        if (group_cnt[g] == 0) continue;
+        if (g == LENS_GROUP || group_cnt[g] == 0) continue;
 
         model->primitives[pi].vertex_buffer = shared_vb;
         model->primitives[pi].index_buffer  = upload_gpu_buffer(device,
@@ -979,21 +987,74 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
             return false;
         }
 
-        model->materials[pi].base_color[0] = colors[g][0];
-        model->materials[pi].base_color[1] = colors[g][1];
-        model->materials[pi].base_color[2] = colors[g][2];
-        model->materials[pi].base_color[3] = colors[g][3];
+        model->materials[pi].base_color[0] = 0.8f;
+        model->materials[pi].base_color[1] = 0.8f;
+        model->materials[pi].base_color[2] = 0.8f;
+        model->materials[pi].base_color[3] = 1.0f;
         model->materials[pi].has_texture   = false;
         model->materials[pi].texture       = NULL;
 
         pi++;
     }
 
-    model->primitive_count = active;
-    model->material_count  = active;
+    /* Lens group → one primitive per triangle.  Triangles whose hue is
+     * close to magenta (hue 5/6) keep their unique color; the rest revert
+     * to gray so only the glass surface remains visually distinct. */
+    {
+        const float magenta_hue = 5.0f / 6.0f;
+        const float hue_threshold = 0.15f; /* ~54 degrees each side */
+
+        for (Uint32 t = 0; t < lens_tris; t++) {
+            Uint32 tri_idx[3] = {
+                group_idx[LENS_GROUP][t * 3 + 0],
+                group_idx[LENS_GROUP][t * 3 + 1],
+                group_idx[LENS_GROUP][t * 3 + 2],
+            };
+
+            model->primitives[pi].vertex_buffer = shared_vb;
+            model->primitives[pi].index_buffer  = upload_gpu_buffer(device,
+                SDL_GPU_BUFFERUSAGE_INDEX, tri_idx, sizeof(tri_idx));
+            model->primitives[pi].index_count    = 3;
+            model->primitives[pi].index_type     = SDL_GPU_INDEXELEMENTSIZE_32BIT;
+            model->primitives[pi].material_index = pi;
+            model->primitives[pi].has_uvs        = src->has_uvs;
+
+            if (!model->primitives[pi].index_buffer) {
+                for (int gg = 0; gg < NORMAL_GROUP_COUNT; gg++)
+                    SDL_free(group_idx[gg]);
+                return false;
+            }
+
+            float hue = (float)t / (float)lens_tris;
+            float dist = SDL_fabsf(hue - magenta_hue);
+            if (dist > 0.5f) dist = 1.0f - dist; /* wrap around */
+
+            if (dist <= hue_threshold) {
+                float r, g, b;
+                hue_to_rgb(hue, &r, &g, &b);
+                model->materials[pi].base_color[0] = r;
+                model->materials[pi].base_color[1] = g;
+                model->materials[pi].base_color[2] = b;
+                SDL_Log("  Lens triangle %u → GLASS (%.2f, %.2f, %.2f)",
+                        t, r, g, b);
+            } else {
+                model->materials[pi].base_color[0] = 0.8f;
+                model->materials[pi].base_color[1] = 0.8f;
+                model->materials[pi].base_color[2] = 0.8f;
+            }
+            model->materials[pi].base_color[3] = 1.0f;
+            model->materials[pi].has_texture   = false;
+            model->materials[pi].texture       = NULL;
+
+            pi++;
+        }
+    }
+
+    model->primitive_count = total_prims;
+    model->material_count  = total_prims;
 
     /* Update the scene mesh so the draw loop iterates all new primitives. */
-    model->scene.meshes[0].primitive_count = active;
+    model->scene.meshes[0].primitive_count = total_prims;
 
     for (int g = 0; g < NORMAL_GROUP_COUNT; g++) SDL_free(group_idx[g]);
     return true;
