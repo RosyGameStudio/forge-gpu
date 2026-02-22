@@ -1004,19 +1004,42 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
         const float magenta_hue = 5.0f / 6.0f;
         const float hue_threshold = 0.15f; /* ~54 degrees each side */
 
-        /* Pass 1: count glass triangles. */
+        /* Precompute which lens triangles are survivors: within magenta
+         * hue threshold AND not in the culled color ranges. */
+        bool *is_survivor = (bool *)SDL_calloc(lens_tris, sizeof(bool));
+        if (!is_survivor) {
+            for (int g = 0; g < NORMAL_GROUP_COUNT; g++) SDL_free(group_idx[g]);
+            return false;
+        }
+
         Uint32 glass_count = 0;
+        Uint32 glass_running = 0;
+        /* First pass: count triangles within magenta threshold. */
         for (Uint32 t = 0; t < lens_tris; t++) {
             float hue = (float)t / (float)lens_tris;
             float dist = SDL_fabsf(hue - magenta_hue);
             if (dist > 0.5f) dist = 1.0f - dist;
             if (dist <= hue_threshold) glass_count++;
         }
-        SDL_Log("  Lens: %u glass triangles out of %u total", glass_count, lens_tris);
+        /* Second pass: mark survivors (within threshold, not culled). */
+        Uint32 survivor_count = 0;
+        for (Uint32 t = 0; t < lens_tris; t++) {
+            float hue = (float)t / (float)lens_tris;
+            float dist = SDL_fabsf(hue - magenta_hue);
+            if (dist > 0.5f) dist = 1.0f - dist;
+            if (dist <= hue_threshold) {
+                float glass_hue = (float)glass_running / (float)glass_count;
+                glass_running++;
+                if (glass_hue > 0.05f && glass_hue < 0.55f) {
+                    is_survivor[t] = true;
+                    survivor_count++;
+                }
+            }
+        }
+        SDL_Log("  Lens: %u survivors out of %u total", survivor_count, lens_tris);
 
-        /* Pass 2: assign colors. Glass triangles get evenly-spaced hues
-         * across the full spectrum; non-glass triangles get gray. */
-        Uint32 glass_idx = 0;
+        /* Assign fresh hues across the full spectrum to survivors only. */
+        Uint32 surv_idx = 0;
         for (Uint32 t = 0; t < lens_tris; t++) {
             Uint32 tri_idx[3] = {
                 group_idx[LENS_GROUP][t * 3 + 0],
@@ -1033,33 +1056,32 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
             model->primitives[pi].has_uvs        = src->has_uvs;
 
             if (!model->primitives[pi].index_buffer) {
+                SDL_free(is_survivor);
                 for (int gg = 0; gg < NORMAL_GROUP_COUNT; gg++)
                     SDL_free(group_idx[gg]);
                 return false;
             }
 
-            float hue = (float)t / (float)lens_tris;
-            float dist = SDL_fabsf(hue - magenta_hue);
-            if (dist > 0.5f) dist = 1.0f - dist;
+            if (is_survivor[t]) {
+                float surv_hue = (float)surv_idx / (float)survivor_count;
+                surv_idx++;
 
-            if (dist <= hue_threshold) {
-                float glass_hue = (float)glass_idx / (float)glass_count;
-                glass_idx++;
-
-                /* Cull red (0–0.05, 0.95–1), blue (0.55–0.7),
-                 * purple/magenta (0.7–0.95) — keep only greens/yellows/cyans. */
-                if (glass_hue <= 0.05f || glass_hue >= 0.55f) {
+                /* Cull red (<0.05), blue (0.55–0.7), purple (>0.7),
+                 * and manually culled triangles #5, #6, #7. */
+                Uint32 sid = surv_idx - 1;
+                if (surv_hue <= 0.05f || surv_hue >= 0.55f ||
+                    sid >= 39) {
                     model->materials[pi].base_color[0] = 0.8f;
                     model->materials[pi].base_color[1] = 0.8f;
                     model->materials[pi].base_color[2] = 0.8f;
                 } else {
                     float r, g, b;
-                    hue_to_rgb(glass_hue, &r, &g, &b);
+                    hue_to_rgb(surv_hue, &r, &g, &b);
                     model->materials[pi].base_color[0] = r;
                     model->materials[pi].base_color[1] = g;
                     model->materials[pi].base_color[2] = b;
                     SDL_Log("  Glass #%u → (%.2f, %.2f, %.2f)",
-                            glass_idx - 1, r, g, b);
+                            surv_idx - 1, r, g, b);
                 }
             } else {
                 model->materials[pi].base_color[0] = 0.8f;
@@ -1072,6 +1094,7 @@ static bool split_searchlight_by_normal(SDL_GPUDevice *device, ModelData *model)
 
             pi++;
         }
+        SDL_free(is_survivor);
     }
 
     model->primitive_count = total_prims;
