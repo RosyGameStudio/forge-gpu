@@ -14,10 +14,11 @@
  *   Each light casts omnidirectional shadows via cube depth maps.
  *
  * Render passes (per frame):
- *   1. Scene pass -> HDR buffer (grid + truck + boxes + emissive spheres)
- *   2. Bloom downsample (5 passes) -> bloom mip chain
- *   3. Bloom upsample (4 passes) -> accumulate back up the chain
- *   4. Tone map pass -> swapchain (combine HDR + bloom, tone map)
+ *   1. Shadow passes -> 4 cube maps (6 faces each, truck + boxes only)
+ *   2. Scene pass -> HDR buffer (grid + truck + boxes + emissive spheres)
+ *   3. Bloom downsample (5 passes) -> bloom mip chain
+ *   4. Bloom upsample (4 passes) -> accumulate back up the chain
+ *   5. Tone map pass -> swapchain (combine HDR + bloom, tone map)
  *
  * Controls:
  *   WASD / Space / LShift — Move camera
@@ -25,6 +26,7 @@
  *   1                     — Toggle light 0 (warm white, orbiting)
  *   2                     — Toggle light 1 (cool blue)
  *   3                     — Toggle light 2 (soft red)
+ *   4                     — Toggle light 3 (purple)
  *   =/+                   — Increase exposure
  *   -                     — Decrease exposure
  *   B                     — Toggle bloom on/off
@@ -82,6 +84,12 @@
 #include "shaders/compiled/tonemap_frag_dxil.h"
 #include "shaders/compiled/tonemap_frag_spirv.h"
 
+/* Shadow shaders — cube map depth rendering for point light shadows */
+#include "shaders/compiled/shadow_frag_dxil.h"
+#include "shaders/compiled/shadow_frag_spirv.h"
+#include "shaders/compiled/shadow_vert_dxil.h"
+#include "shaders/compiled/shadow_vert_spirv.h"
+
 /* ── Constants ────────────────────────────────────────────────────────────── */
 
 #define WINDOW_WIDTH 1280
@@ -105,37 +113,37 @@
 /* Point lights — 4 colored lights at different positions. */
 #define MAX_POINT_LIGHTS 4
 
-/* Light 0: green, orbiting the scene. */
-#define LIGHT0_COLOR_R 0.2f
-#define LIGHT0_COLOR_G 1.0f
-#define LIGHT0_COLOR_B 0.2f
+/* Light 0: cyan (#4fc3f7), orbiting the scene. */
+#define LIGHT0_COLOR_R 0.08f
+#define LIGHT0_COLOR_G 0.55f
+#define LIGHT0_COLOR_B 0.93f
 #define LIGHT0_INTENSITY 8.0f
 #define LIGHT0_ORBIT_RADIUS 4.0f
 #define LIGHT0_ORBIT_HEIGHT 3.5f
 #define LIGHT0_ORBIT_SPEED 0.5f
 
-/* Light 1: cool blue, positioned to the right. */
-#define LIGHT1_COLOR_R 0.4f
-#define LIGHT1_COLOR_G 0.6f
-#define LIGHT1_COLOR_B 1.0f
+/* Light 1: orange (#ff7043), positioned to the right. */
+#define LIGHT1_COLOR_R 1.00f
+#define LIGHT1_COLOR_G 0.16f
+#define LIGHT1_COLOR_B 0.05f
 #define LIGHT1_INTENSITY 6.0f
 #define LIGHT1_POS_X 6.0f
 #define LIGHT1_POS_Y 2.5f
 #define LIGHT1_POS_Z -3.0f
 
-/* Light 2: soft red, positioned behind. */
-#define LIGHT2_COLOR_R 1.0f
-#define LIGHT2_COLOR_G 0.3f
-#define LIGHT2_COLOR_B 0.2f
+/* Light 2: green (#66bb6a), positioned behind. */
+#define LIGHT2_COLOR_R 0.13f
+#define LIGHT2_COLOR_G 0.51f
+#define LIGHT2_COLOR_B 0.14f
 #define LIGHT2_INTENSITY 5.0f
 #define LIGHT2_POS_X -5.0f
 #define LIGHT2_POS_Y 4.0f
 #define LIGHT2_POS_Z -2.0f
 
-/* Light 3: magenta, positioned in front. */
-#define LIGHT3_COLOR_R 1.0f
-#define LIGHT3_COLOR_G 0.1f
-#define LIGHT3_COLOR_B 0.8f
+/* Light 3: purple (#ab47bc), positioned in front. */
+#define LIGHT3_COLOR_R 0.42f
+#define LIGHT3_COLOR_G 0.06f
+#define LIGHT3_COLOR_B 0.51f
 #define LIGHT3_INTENSITY 6.0f
 #define LIGHT3_POS_X 2.0f
 #define LIGHT3_POS_Y 3.0f
@@ -202,6 +210,16 @@
 #define GRID_SHININESS 32.0f
 #define GRID_SPECULAR_STR 0.5f
 
+/* Shadow mapping — omnidirectional cube map shadows for point lights. */
+#define SHADOW_MAP_SIZE 512
+#define SHADOW_MAP_FORMAT SDL_GPU_TEXTUREFORMAT_R32_FLOAT
+#define SHADOW_DEPTH_FORMAT SDL_GPU_TEXTUREFORMAT_D32_FLOAT
+#define SHADOW_NEAR_PLANE 0.1f
+#define SHADOW_FAR_PLANE 25.0f
+#define SHADOW_DEPTH_BIAS 1
+#define SHADOW_SLOPE_BIAS 1.5f
+#define CUBE_FACE_COUNT 6
+
 /* HDR clear color — forge-gpu dark theme background. */
 #define CLEAR_COLOR_R 0.008f
 #define CLEAR_COLOR_G 0.008f
@@ -241,7 +259,7 @@ typedef struct SceneVertUniforms {
   mat4 model; /* model (world) matrix         (64 bytes) */
 } SceneVertUniforms; /* 128 bytes */
 
-/* Scene fragment uniforms — multiple point lights, no shadows yet. */
+/* Scene fragment uniforms — point lights with shadow far plane. */
 typedef struct SceneFragUniforms {
   float base_color[4];                  /* material RGBA            (16 bytes) */
   float eye_pos[3];                     /* camera position          (12 bytes) */
@@ -249,7 +267,7 @@ typedef struct SceneFragUniforms {
   float shininess;                      /* specular exponent          (4 bytes) */
   float ambient;                        /* ambient intensity          (4 bytes) */
   float specular_str;                   /* specular strength          (4 bytes) */
-  float _pad;                           /* pad to 16-byte boundary    (4 bytes) */
+  float shadow_far_plane;               /* shadow map far plane       (4 bytes) */
   PointLight lights[MAX_POINT_LIGHTS];  /* point light array        (128 bytes) */
 } SceneFragUniforms; /* 176 bytes */
 
@@ -264,7 +282,7 @@ typedef struct GridVertUniforms {
   mat4 vp; /* view-projection matrix (64 bytes) */
 } GridVertUniforms;  /* 64 bytes */
 
-/* Grid fragment uniforms — multiple point lights. */
+/* Grid fragment uniforms — point lights with shadow far plane. */
 typedef struct GridFragUniforms {
   float line_color[4];                  /* grid line color        (16 bytes) */
   float bg_color[4];                    /* background color       (16 bytes) */
@@ -275,7 +293,7 @@ typedef struct GridFragUniforms {
   float ambient;                        /* ambient term            (4 bytes) */
   float shininess;                      /* specular exponent       (4 bytes) */
   float specular_str;                   /* specular strength       (4 bytes) */
-  float _pad0;                          /* pad to 16 bytes         (4 bytes) */
+  float shadow_far_plane;               /* shadow map far plane    (4 bytes) */
   float _pad1;                          /*                         (4 bytes) */
   float _pad2;                          /*                         (4 bytes) */
   PointLight lights[MAX_POINT_LIGHTS];  /* point light array     (128 bytes) */
@@ -301,6 +319,18 @@ typedef struct TonemapFragUniforms {
   float _pad0;
   float _pad1;
 } TonemapFragUniforms; /* 16 bytes */
+
+/* Shadow vertex uniforms — light view-projection and model matrix. */
+typedef struct ShadowVertUniforms {
+  mat4 light_mvp; /* light VP * model matrix  (64 bytes) */
+  mat4 model;     /* model (world) matrix     (64 bytes) */
+} ShadowVertUniforms; /* 128 bytes */
+
+/* Shadow fragment uniforms — light position and far plane. */
+typedef struct ShadowFragUniforms {
+  float light_pos[3]; /* world-space light position (12 bytes) */
+  float far_plane;    /* shadow far plane distance   (4 bytes) */
+} ShadowFragUniforms; /* 16 bytes */
 
 /* ── GPU-side model types ─────────────────────────────────────────────────── */
 
@@ -342,6 +372,7 @@ typedef struct app_state {
   SDL_GPUGraphicsPipeline *scene_pipeline;
   SDL_GPUGraphicsPipeline *grid_pipeline;
   SDL_GPUGraphicsPipeline *emissive_pipeline;
+  SDL_GPUGraphicsPipeline *shadow_pipeline;
   SDL_GPUGraphicsPipeline *downsample_pipeline;
   SDL_GPUGraphicsPipeline *upsample_pipeline;
   SDL_GPUGraphicsPipeline *tonemap_pipeline;
@@ -356,6 +387,11 @@ typedef struct app_state {
   SDL_GPUTexture *depth_texture;
   Uint32 depth_width;
   Uint32 depth_height;
+
+  /* Shadow mapping — one R32_FLOAT cube map per light + shared depth buffer. */
+  SDL_GPUTexture *shadow_cubes[MAX_POINT_LIGHTS];
+  SDL_GPUTexture *shadow_depth;
+  SDL_GPUSampler *shadow_sampler;
 
   /* Bloom mip chain. */
   SDL_GPUTexture *bloom_mips[BLOOM_MIP_COUNT];
@@ -414,7 +450,7 @@ typedef struct app_state {
 static void fill_lights(const app_state *state, PointLight lights[MAX_POINT_LIGHTS]) {
   SDL_memset(lights, 0, sizeof(PointLight) * MAX_POINT_LIGHTS);
 
-  /* Light 0: warm white, orbiting. */
+  /* Light 0: cyan, orbiting. */
   lights[0].position[0] = LIGHT0_ORBIT_RADIUS * forge_cosf(state->light0_angle);
   lights[0].position[1] = LIGHT0_ORBIT_HEIGHT;
   lights[0].position[2] = LIGHT0_ORBIT_RADIUS * forge_sinf(state->light0_angle);
@@ -423,7 +459,7 @@ static void fill_lights(const app_state *state, PointLight lights[MAX_POINT_LIGH
   lights[0].color[1] = LIGHT0_COLOR_G;
   lights[0].color[2] = LIGHT0_COLOR_B;
 
-  /* Light 1: cool blue, static. */
+  /* Light 1: orange, static. */
   lights[1].position[0] = LIGHT1_POS_X;
   lights[1].position[1] = LIGHT1_POS_Y;
   lights[1].position[2] = LIGHT1_POS_Z;
@@ -432,7 +468,7 @@ static void fill_lights(const app_state *state, PointLight lights[MAX_POINT_LIGH
   lights[1].color[1] = LIGHT1_COLOR_G;
   lights[1].color[2] = LIGHT1_COLOR_B;
 
-  /* Light 2: soft red, static. */
+  /* Light 2: green, static. */
   lights[2].position[0] = LIGHT2_POS_X;
   lights[2].position[1] = LIGHT2_POS_Y;
   lights[2].position[2] = LIGHT2_POS_Z;
@@ -441,7 +477,7 @@ static void fill_lights(const app_state *state, PointLight lights[MAX_POINT_LIGH
   lights[2].color[1] = LIGHT2_COLOR_G;
   lights[2].color[2] = LIGHT2_COLOR_B;
 
-  /* Light 3: magenta, static. */
+  /* Light 3: purple, static. */
   lights[3].position[0] = LIGHT3_POS_X;
   lights[3].position[1] = LIGHT3_POS_Y;
   lights[3].position[2] = LIGHT3_POS_Z;
@@ -1102,6 +1138,128 @@ static void generate_box_placements(app_state *state) {
   state->box_count = count;
 }
 
+/* ── Helper: create one R32_FLOAT cube map for shadow mapping ─────────────── */
+
+static SDL_GPUTexture *create_shadow_cube(SDL_GPUDevice *device) {
+  SDL_GPUTextureCreateInfo info;
+  SDL_zero(info);
+  info.type = SDL_GPU_TEXTURETYPE_CUBE;
+  info.format = SHADOW_MAP_FORMAT;
+  info.width = SHADOW_MAP_SIZE;
+  info.height = SHADOW_MAP_SIZE;
+  info.layer_count_or_depth = CUBE_FACE_COUNT;
+  info.num_levels = 1;
+  info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+  SDL_GPUTexture *tex = SDL_CreateGPUTexture(device, &info);
+  if (!tex) {
+    SDL_Log("Failed to create shadow cube map: %s", SDL_GetError());
+  }
+  return tex;
+}
+
+/* ── Helper: build 6 view-projection matrices for a cube map ─────────────── */
+/*
+ * Standard cube map face order (matches SDL_GPUCubeMapFace):
+ *   Face 0 (+X): look right,   up = (0,-1, 0)
+ *   Face 1 (-X): look left,    up = (0,-1, 0)
+ *   Face 2 (+Y): look up,      up = (0, 0, 1)
+ *   Face 3 (-Y): look down,    up = (0, 0,-1)
+ *   Face 4 (+Z): look forward, up = (0,-1, 0)
+ *   Face 5 (-Z): look back,    up = (0,-1, 0)
+ */
+static void build_cube_face_vp(vec3 light_pos, mat4 out_vp[CUBE_FACE_COUNT]) {
+  /* Cube face look directions and up vectors. */
+  const vec3 look_dirs[CUBE_FACE_COUNT] = {
+    { 1.0f,  0.0f,  0.0f }, /* +X */
+    { -1.0f,  0.0f,  0.0f }, /* -X */
+    { 0.0f,  1.0f,  0.0f }, /* +Y */
+    { 0.0f, -1.0f,  0.0f }, /* -Y */
+    { 0.0f,  0.0f,  1.0f }, /* +Z */
+    { 0.0f,  0.0f, -1.0f }, /* -Z */
+  };
+  const vec3 up_dirs[CUBE_FACE_COUNT] = {
+    { 0.0f, -1.0f,  0.0f }, /* +X */
+    { 0.0f, -1.0f,  0.0f }, /* -X */
+    { 0.0f,  0.0f,  1.0f }, /* +Y */
+    { 0.0f,  0.0f, -1.0f }, /* -Y */
+    { 0.0f, -1.0f,  0.0f }, /* +Z */
+    { 0.0f, -1.0f,  0.0f }, /* -Z */
+  };
+
+  /* 90-degree FOV, 1:1 aspect, shared near/far planes.
+   *
+   * Negate Y (m[5]) to compensate for the texture row order mismatch:
+   * SDL3 GPU maps NDC Y=+1 to texture row 0 (top), but the cube map
+   * sampler's t-coordinate convention expects the opposite vertical
+   * orientation. Negating Y in the projection flips the rendered image
+   * so each face matches what TextureCube.Sample() expects. */
+  mat4 shadow_proj = mat4_perspective(
+      FORGE_PI / 2.0f, 1.0f, SHADOW_NEAR_PLANE, SHADOW_FAR_PLANE);
+  shadow_proj.m[5] = -shadow_proj.m[5];
+
+  for (int face = 0; face < CUBE_FACE_COUNT; face++) {
+    vec3 target = vec3_add(light_pos, look_dirs[face]);
+    mat4 shadow_view = mat4_look_at(light_pos, target, up_dirs[face]);
+    out_vp[face] = mat4_multiply(shadow_proj, shadow_view);
+  }
+}
+
+/* ── Helper: draw model into shadow pass ──────────────────────────────────── */
+
+static void draw_model_shadow(
+    SDL_GPURenderPass *pass,
+    SDL_GPUCommandBuffer *cmd,
+    const ModelData *model,
+    const mat4 *placement,
+    const mat4 *face_vp,
+    const float light_pos[3]
+) {
+  const ForgeGltfScene *scene = &model->scene;
+
+  for (int ni = 0; ni < scene->node_count; ni++) {
+    const ForgeGltfNode *node = &scene->nodes[ni];
+    if (node->mesh_index < 0 || node->mesh_index >= scene->mesh_count)
+      continue;
+
+    mat4 model_mat = mat4_multiply(*placement, node->world_transform);
+    mat4 mvp = mat4_multiply(*face_vp, model_mat);
+
+    ShadowVertUniforms vert_u;
+    vert_u.light_mvp = mvp;
+    vert_u.model = model_mat;
+    SDL_PushGPUVertexUniformData(cmd, 0, &vert_u, sizeof(vert_u));
+
+    ShadowFragUniforms frag_u;
+    frag_u.light_pos[0] = light_pos[0];
+    frag_u.light_pos[1] = light_pos[1];
+    frag_u.light_pos[2] = light_pos[2];
+    frag_u.far_plane = SHADOW_FAR_PLANE;
+    SDL_PushGPUFragmentUniformData(cmd, 0, &frag_u, sizeof(frag_u));
+
+    const ForgeGltfMesh *mesh = &scene->meshes[node->mesh_index];
+    for (int pi = 0; pi < mesh->primitive_count; pi++) {
+      int prim_idx = mesh->first_primitive + pi;
+      const GpuPrimitive *gpu_prim = &model->primitives[prim_idx];
+
+      if (!gpu_prim->vertex_buffer || !gpu_prim->index_buffer)
+        continue;
+
+      SDL_GPUBufferBinding vb;
+      SDL_zero(vb);
+      vb.buffer = gpu_prim->vertex_buffer;
+      SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
+
+      SDL_GPUBufferBinding ib;
+      SDL_zero(ib);
+      ib.buffer = gpu_prim->index_buffer;
+      SDL_BindGPUIndexBuffer(pass, &ib, gpu_prim->index_type);
+
+      SDL_DrawGPUIndexedPrimitives(pass, gpu_prim->index_count, 1, 0, 0, 0);
+    }
+  }
+}
+
 /* ── Helper: draw model for scene pass ────────────────────────────────────── */
 
 static void draw_model_scene(
@@ -1165,15 +1323,24 @@ static void draw_model_scene(
       frag_u.shininess = MATERIAL_SHININESS;
       frag_u.ambient = MATERIAL_AMBIENT;
       frag_u.specular_str = MATERIAL_SPECULAR_STR;
+      frag_u.shadow_far_plane = SHADOW_FAR_PLANE;
       SDL_memcpy(frag_u.lights, lights, sizeof(PointLight) * MAX_POINT_LIGHTS);
 
       SDL_PushGPUFragmentUniformData(cmd, 0, &frag_u, sizeof(frag_u));
 
-      SDL_GPUTextureSamplerBinding tex_binding;
-      SDL_zero(tex_binding);
-      tex_binding.texture = tex;
-      tex_binding.sampler = state->sampler;
-      SDL_BindGPUFragmentSamplers(pass, 0, &tex_binding, 1);
+      /* Bind diffuse texture (slot 0) + 4 shadow cube maps (slots 1-4). */
+      SDL_GPUTextureSamplerBinding tex_bindings[5];
+      SDL_zero(tex_bindings);
+      tex_bindings[0].texture = tex;
+      tex_bindings[0].sampler = state->sampler;
+      {
+        int si;
+        for (si = 0; si < MAX_POINT_LIGHTS; si++) {
+          tex_bindings[si + 1].texture = state->shadow_cubes[si];
+          tex_bindings[si + 1].sampler = state->shadow_sampler;
+        }
+      }
+      SDL_BindGPUFragmentSamplers(pass, 0, tex_bindings, 5);
 
       SDL_GPUBufferBinding vb;
       SDL_zero(vb);
@@ -1347,6 +1514,46 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     }
   }
 
+  /* Create shadow sampler (nearest, clamp-to-edge). */
+  {
+    SDL_GPUSamplerCreateInfo si;
+    SDL_zero(si);
+    si.min_filter = SDL_GPU_FILTER_NEAREST;
+    si.mag_filter = SDL_GPU_FILTER_NEAREST;
+    si.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    si.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    state->shadow_sampler = SDL_CreateGPUSampler(device, &si);
+    if (!state->shadow_sampler) {
+      SDL_Log("Failed to create shadow sampler: %s", SDL_GetError());
+      goto init_fail;
+    }
+  }
+
+  /* Create shadow cube maps (one per light) and shared depth buffer. */
+  {
+    int li;
+    for (li = 0; li < MAX_POINT_LIGHTS; li++) {
+      state->shadow_cubes[li] = create_shadow_cube(device);
+      if (!state->shadow_cubes[li]) goto init_fail;
+    }
+
+    SDL_GPUTextureCreateInfo depth_info;
+    SDL_zero(depth_info);
+    depth_info.type = SDL_GPU_TEXTURETYPE_2D;
+    depth_info.format = SHADOW_DEPTH_FORMAT;
+    depth_info.width = SHADOW_MAP_SIZE;
+    depth_info.height = SHADOW_MAP_SIZE;
+    depth_info.layer_count_or_depth = 1;
+    depth_info.num_levels = 1;
+    depth_info.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+    state->shadow_depth = SDL_CreateGPUTexture(device, &depth_info);
+    if (!state->shadow_depth) {
+      SDL_Log("Failed to create shadow depth texture: %s", SDL_GetError());
+      goto init_fail;
+    }
+  }
+
   /* Load glTF models. */
   if (!setup_model(device, state->white_texture, &state->truck, TRUCK_MODEL_PATH))
     goto init_fail;
@@ -1365,7 +1572,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         scene_vert_dxil, sizeof(scene_vert_dxil), 0, 1);
     SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
         scene_frag_spirv, sizeof(scene_frag_spirv),
-        scene_frag_dxil, sizeof(scene_frag_dxil), 1, 1);
+        scene_frag_dxil, sizeof(scene_frag_dxil), 5, 1);
     if (!vert || !frag) {
       if (vert) SDL_ReleaseGPUShader(device, vert);
       if (frag) SDL_ReleaseGPUShader(device, frag);
@@ -1430,7 +1637,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         grid_vert_dxil, sizeof(grid_vert_dxil), 0, 1);
     SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
         grid_frag_spirv, sizeof(grid_frag_spirv),
-        grid_frag_dxil, sizeof(grid_frag_dxil), 0, 1);
+        grid_frag_dxil, sizeof(grid_frag_dxil), 4, 1);
     if (!vert || !frag) {
       if (vert) SDL_ReleaseGPUShader(device, vert);
       if (frag) SDL_ReleaseGPUShader(device, frag);
@@ -1542,6 +1749,70 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     SDL_ReleaseGPUShader(device, frag);
     if (!state->emissive_pipeline) {
       SDL_Log("Failed to create emissive pipeline: %s", SDL_GetError());
+      goto init_fail;
+    }
+  }
+
+  /* ── Shadow pipeline (renders linear depth to cube map faces) ────────── */
+  {
+    SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
+        shadow_vert_spirv, sizeof(shadow_vert_spirv),
+        shadow_vert_dxil, sizeof(shadow_vert_dxil), 0, 1);
+    SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
+        shadow_frag_spirv, sizeof(shadow_frag_spirv),
+        shadow_frag_dxil, sizeof(shadow_frag_dxil), 0, 1);
+    if (!vert || !frag) {
+      if (vert) SDL_ReleaseGPUShader(device, vert);
+      if (frag) SDL_ReleaseGPUShader(device, frag);
+      goto init_fail;
+    }
+
+    SDL_GPUVertexBufferDescription vb_desc;
+    SDL_zero(vb_desc);
+    vb_desc.slot = 0;
+    vb_desc.pitch = sizeof(ForgeGltfVertex);
+    vb_desc.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+    SDL_GPUVertexAttribute attrs[3];
+    SDL_zero(attrs);
+    attrs[0].location = 0;
+    attrs[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+    attrs[0].offset = offsetof(ForgeGltfVertex, position);
+    attrs[1].location = 1;
+    attrs[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
+    attrs[1].offset = offsetof(ForgeGltfVertex, normal);
+    attrs[2].location = 2;
+    attrs[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    attrs[2].offset = offsetof(ForgeGltfVertex, uv);
+
+    SDL_GPUColorTargetDescription color_desc;
+    SDL_zero(color_desc);
+    color_desc.format = SHADOW_MAP_FORMAT;
+
+    SDL_GPUGraphicsPipelineCreateInfo pi;
+    SDL_zero(pi);
+    pi.vertex_shader = vert;
+    pi.fragment_shader = frag;
+    pi.vertex_input_state.vertex_buffer_descriptions = &vb_desc;
+    pi.vertex_input_state.num_vertex_buffers = 1;
+    pi.vertex_input_state.vertex_attributes = attrs;
+    pi.vertex_input_state.num_vertex_attributes = 3;
+    pi.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pi.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    pi.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pi.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+    pi.depth_stencil_state.enable_depth_test = true;
+    pi.depth_stencil_state.enable_depth_write = true;
+    pi.target_info.color_target_descriptions = &color_desc;
+    pi.target_info.num_color_targets = 1;
+    pi.target_info.depth_stencil_format = SHADOW_DEPTH_FORMAT;
+    pi.target_info.has_depth_stencil_target = true;
+
+    state->shadow_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+    SDL_ReleaseGPUShader(device, vert);
+    SDL_ReleaseGPUShader(device, frag);
+    if (!state->shadow_pipeline) {
+      SDL_Log("Failed to create shadow pipeline: %s", SDL_GetError());
       goto init_fail;
     }
   }
@@ -1728,13 +1999,13 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     /* Toggle individual point lights. */
     if (event->key.key == SDLK_1) {
       state->light_enabled[0] = !state->light_enabled[0];
-      SDL_Log("Light 0 (green): %s", state->light_enabled[0] ? "ON" : "OFF");
+      SDL_Log("Light 0 (cyan): %s", state->light_enabled[0] ? "ON" : "OFF");
     } else if (event->key.key == SDLK_2) {
       state->light_enabled[1] = !state->light_enabled[1];
-      SDL_Log("Light 1 (cool blue): %s", state->light_enabled[1] ? "ON" : "OFF");
+      SDL_Log("Light 1 (orange): %s", state->light_enabled[1] ? "ON" : "OFF");
     } else if (event->key.key == SDLK_3) {
       state->light_enabled[2] = !state->light_enabled[2];
-      SDL_Log("Light 2 (soft red): %s", state->light_enabled[2] ? "ON" : "OFF");
+      SDL_Log("Light 2 (green): %s", state->light_enabled[2] ? "ON" : "OFF");
     } else if (event->key.key == SDLK_4) {
       state->light_enabled[3] = !state->light_enabled[3];
       SDL_Log("Light 3 (magenta): %s", state->light_enabled[3] ? "ON" : "OFF");
@@ -1927,6 +2198,69 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   }
 
   /* ════════════════════════════════════════════════════════════════════
+   * SHADOW PASSES — Render linear depth into cube maps for each light
+   * ════════════════════════════════════════════════════════════════════ */
+  if (state->shadow_pipeline) {
+    mat4 truck_placement_shadow = mat4_identity();
+
+    for (int li = 0; li < MAX_POINT_LIGHTS; li++) {
+      if (lights[li].intensity <= 0.0f) continue;
+
+      vec3 light_pos = vec3_create(
+          lights[li].position[0], lights[li].position[1], lights[li].position[2]);
+      mat4 face_vps[CUBE_FACE_COUNT];
+      build_cube_face_vp(light_pos, face_vps);
+
+      for (int face = 0; face < CUBE_FACE_COUNT; face++) {
+        SDL_GPUColorTargetInfo color_target;
+        SDL_zero(color_target);
+        color_target.texture = state->shadow_cubes[li];
+        color_target.layer_or_depth_plane = (Uint32)face;
+        color_target.load_op = SDL_GPU_LOADOP_CLEAR;
+        color_target.store_op = SDL_GPU_STOREOP_STORE;
+        color_target.clear_color.r = 1.0f; /* max depth = fully lit */
+        color_target.clear_color.g = 0.0f;
+        color_target.clear_color.b = 0.0f;
+        color_target.clear_color.a = 1.0f;
+
+        SDL_GPUDepthStencilTargetInfo depth_target;
+        SDL_zero(depth_target);
+        depth_target.texture = state->shadow_depth;
+        depth_target.load_op = SDL_GPU_LOADOP_CLEAR;
+        depth_target.store_op = SDL_GPU_STOREOP_DONT_CARE;
+        depth_target.clear_depth = 1.0f;
+
+        SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(
+            cmd, &color_target, 1, &depth_target);
+        if (!pass) {
+          SDL_Log("Failed to begin shadow pass (light %d, face %d): %s",
+                  li, face, SDL_GetError());
+          continue;
+        }
+
+        SDL_BindGPUGraphicsPipeline(pass, state->shadow_pipeline);
+
+        /* Draw truck into shadow map. */
+        draw_model_shadow(pass, cmd, &state->truck,
+                          &truck_placement_shadow, &face_vps[face],
+                          lights[li].position);
+
+        /* Draw boxes into shadow map. */
+        for (int bi = 0; bi < state->box_count; bi++) {
+          BoxPlacement *bp = &state->box_placements[bi];
+          mat4 box_placement = mat4_multiply(
+              mat4_translate(bp->position), mat4_rotate_y(bp->y_rotation));
+          draw_model_shadow(pass, cmd, &state->box,
+                            &box_placement, &face_vps[face],
+                            lights[li].position);
+        }
+
+        SDL_EndGPURenderPass(pass);
+      }
+    }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
    * PASS 1 — Render scene to HDR target
    * ════════════════════════════════════════════════════════════════════ */
   {
@@ -1982,8 +2316,21 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
       grid_fu.ambient = GRID_AMBIENT;
       grid_fu.shininess = GRID_SHININESS;
       grid_fu.specular_str = GRID_SPECULAR_STR;
+      grid_fu.shadow_far_plane = SHADOW_FAR_PLANE;
       SDL_memcpy(grid_fu.lights, lights, sizeof(lights));
       SDL_PushGPUFragmentUniformData(cmd, 0, &grid_fu, sizeof(grid_fu));
+
+      /* Bind 4 shadow cube maps for the grid shader. */
+      {
+        SDL_GPUTextureSamplerBinding grid_shadow_bindings[4];
+        SDL_zero(grid_shadow_bindings);
+        int si;
+        for (si = 0; si < MAX_POINT_LIGHTS; si++) {
+          grid_shadow_bindings[si].texture = state->shadow_cubes[si];
+          grid_shadow_bindings[si].sampler = state->shadow_sampler;
+        }
+        SDL_BindGPUFragmentSamplers(pass, 0, grid_shadow_bindings, 4);
+      }
 
       SDL_GPUBufferBinding vb;
       SDL_zero(vb);
@@ -2233,11 +2580,24 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     SDL_ReleaseGPUSampler(state->device, state->hdr_sampler);
   if (state->bloom_sampler)
     SDL_ReleaseGPUSampler(state->device, state->bloom_sampler);
+  if (state->shadow_sampler)
+    SDL_ReleaseGPUSampler(state->device, state->shadow_sampler);
 
   if (state->hdr_target)
     SDL_ReleaseGPUTexture(state->device, state->hdr_target);
   if (state->depth_texture)
     SDL_ReleaseGPUTexture(state->device, state->depth_texture);
+
+  /* Release shadow cube maps and shared depth buffer. */
+  {
+    int li;
+    for (li = 0; li < MAX_POINT_LIGHTS; li++) {
+      if (state->shadow_cubes[li])
+        SDL_ReleaseGPUTexture(state->device, state->shadow_cubes[li]);
+    }
+  }
+  if (state->shadow_depth)
+    SDL_ReleaseGPUTexture(state->device, state->shadow_depth);
 
   release_bloom_mip_chain(state);
 
@@ -2247,6 +2607,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     SDL_ReleaseGPUGraphicsPipeline(state->device, state->upsample_pipeline);
   if (state->downsample_pipeline)
     SDL_ReleaseGPUGraphicsPipeline(state->device, state->downsample_pipeline);
+  if (state->shadow_pipeline)
+    SDL_ReleaseGPUGraphicsPipeline(state->device, state->shadow_pipeline);
   if (state->emissive_pipeline)
     SDL_ReleaseGPUGraphicsPipeline(state->device, state->emissive_pipeline);
   if (state->grid_pipeline)
