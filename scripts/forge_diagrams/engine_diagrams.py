@@ -1503,7 +1503,7 @@ def diagram_stepping_modes():
     ]
 
     # Code block background
-    code_y_top = 9.5
+    code_y_top = 8.5
     code_bg = FancyBboxPatch(
         (code_x, code_y_top - len(code_lines) * line_h - 0.3),
         code_w,
@@ -1577,7 +1577,7 @@ def diagram_stepping_modes():
             "Executes normalize() to completion.\n"
             "Pauses on the NEXT line:\n"
             "  float d = dot(v, n, 3);",
-            8.8,
+            7.8,
         ),
         (
             "Step Into (F11 / step)",
@@ -1585,7 +1585,7 @@ def diagram_stepping_modes():
             "Enters normalize() and pauses\n"
             "at its first line:\n"
             "  float len = dot(v, v, n);",
-            5.5,
+            4.5,
         ),
         (
             "Step Out (Shift+F11 / finish)",
@@ -1593,7 +1593,7 @@ def diagram_stepping_modes():
             "Runs the rest of normalize()\n"
             "and pauses back in main():\n"
             "  float d = dot(v, n, 3);",
-            2.2,
+            1.2,
         ),
     ]
 
