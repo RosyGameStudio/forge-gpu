@@ -6900,96 +6900,112 @@ def diagram_ray_sphere_intersection():
 
 def diagram_scattering_geometry():
     """Single ray march step: sun direction, scatter angle theta, vectors."""
-    fig, ax = plt.subplots(figsize=(10, 7), facecolor=STYLE["bg"])
-    setup_axes(ax, xlim=(-0.5, 2.5), ylim=(-0.5, 2.0), grid=False)
+    fig, ax = plt.subplots(figsize=(10, 6), facecolor=STYLE["bg"])
+    setup_axes(ax, xlim=(-0.8, 3.2), ylim=(-0.2, 2.6), grid=False)
 
-    # Sample point
-    P = np.array([1.0, 0.8])
+    # Sample point P — center of the geometry
+    P = np.array([1.0, 0.7])
     ax.plot(*P, "o", color=STYLE["warn"], markersize=12, zorder=10)
     ax.text(
-        P[0] - 0.15,
-        P[1] - 0.15,
+        P[0],
+        P[1] - 0.22,
         "P",
         color=STYLE["warn"],
         fontsize=14,
         fontweight="bold",
+        ha="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
-    # View ray direction (incoming)
-    view_dir = np.array([-0.7, -0.3])
+    # View ray — incoming from camera (upper-left), arriving at P.
+    # Angled so the label has space above the arrow, away from θ.
+    view_dir = np.array([-0.9, -0.15])
     view_dir = view_dir / np.linalg.norm(view_dir)
+    view_len = 1.1
     ax.annotate(
         "",
         xy=P,
-        xytext=P - view_dir * 0.8,
+        xytext=P - view_dir * view_len,
         arrowprops={"arrowstyle": "->", "color": STYLE["accent1"], "lw": 2.5},
     )
+    # Label above the incoming arrow, well clear of θ
+    view_mid = P - view_dir * 0.65
     ax.text(
-        P[0] - view_dir[0] * 0.5 - 0.2,
-        P[1] - view_dir[1] * 0.5 + 0.1,
+        view_mid[0] - 0.3,
+        view_mid[1] + 0.2,
         "View ray",
         color=STYLE["accent1"],
         fontsize=11,
         fontweight="bold",
+        ha="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
-    # Sun direction
-    sun_dir = np.array([0.5, 0.85])
+    # Sun direction — steep upward to separate from the horizontal scatter
+    sun_dir = np.array([0.35, 0.94])
     sun_dir = sun_dir / np.linalg.norm(sun_dir)
+    sun_len = 1.2
     ax.annotate(
         "",
-        xy=P + sun_dir * 0.9,
+        xy=P + sun_dir * sun_len,
         xytext=P,
         arrowprops={"arrowstyle": "->", "color": STYLE["accent2"], "lw": 2.5},
     )
+    sun_label_pos = P + sun_dir * 0.9
     ax.text(
-        P[0] + sun_dir[0] * 0.7 + 0.08,
-        P[1] + sun_dir[1] * 0.7,
+        sun_label_pos[0] + 0.2,
+        sun_label_pos[1],
         "To Sun",
         color=STYLE["accent2"],
         fontsize=11,
         fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
-    # Scattered direction (same as view ray outgoing)
+    # Scattered direction (= negative view_dir, toward the camera)
     scatter_dir = -view_dir
+    scatter_len = 1.0
     ax.annotate(
         "",
-        xy=P + scatter_dir * 0.7,
+        xy=P + scatter_dir * scatter_len,
         xytext=P,
         arrowprops={"arrowstyle": "->", "color": STYLE["accent4"], "lw": 2, "ls": "--"},
     )
+    scatter_label_pos = P + scatter_dir * 0.75
     ax.text(
-        P[0] + scatter_dir[0] * 0.5 + 0.1,
-        P[1] + scatter_dir[1] * 0.5 - 0.12,
+        scatter_label_pos[0] + 0.15,
+        scatter_label_pos[1] - 0.22,
         "Scattered\nto eye",
         color=STYLE["accent4"],
         fontsize=10,
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
-    # Angle theta arc
+    # Angle θ arc — between sun direction and scattered direction
     angle_sun = np.arctan2(sun_dir[1], sun_dir[0])
     angle_scatter = np.arctan2(scatter_dir[1], scatter_dir[0])
     arc_t = np.linspace(
         min(angle_scatter, angle_sun), max(angle_scatter, angle_sun), 50
     )
-    arc_r = 0.35
+    arc_r = 0.5
     ax.plot(
         P[0] + arc_r * np.cos(arc_t),
         P[1] + arc_r * np.sin(arc_t),
         color=STYLE["warn"],
         lw=2,
     )
+    # θ label at the midpoint of the arc, pushed outward
     mid_angle = (angle_sun + angle_scatter) / 2
     ax.text(
-        P[0] + arc_r * 1.3 * np.cos(mid_angle),
-        P[1] + arc_r * 1.3 * np.sin(mid_angle),
+        P[0] + arc_r * 1.5 * np.cos(mid_angle),
+        P[1] + arc_r * 1.5 * np.sin(mid_angle),
         "\u03b8",
         color=STYLE["warn"],
         fontsize=16,
         fontweight="bold",
         ha="center",
         va="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     ax.set_title(
@@ -7012,7 +7028,7 @@ def diagram_scattering_geometry():
 def diagram_ray_march():
     """Full march along view ray with sample points and transmittance."""
     fig, ax = plt.subplots(figsize=(12, 5), facecolor=STYLE["bg"])
-    setup_axes(ax, xlim=(-0.5, 10.5), ylim=(-1.5, 2.5), grid=False)
+    setup_axes(ax, xlim=(-0.5, 10.5), ylim=(-1.5, 3.0), grid=False)
 
     N = 8  # number of sample points
     x_start, x_end = 0.5, 9.5
@@ -7031,8 +7047,16 @@ def diagram_ray_march():
         color=STYLE["warn"],
         fontsize=10,
         fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
-    ax.text(x_end + 0.1, 0.3, "Atmo\nedge", color=STYLE["accent1"], fontsize=9)
+    ax.text(
+        x_end + 0.1,
+        0.3,
+        "Atmo\nedge",
+        color=STYLE["accent1"],
+        fontsize=9,
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
 
     # Sample points along ray
     xs = np.linspace(x_start, x_end, N)
@@ -7073,14 +7097,7 @@ def diagram_ray_march():
                 mid, -1.2, "\u0394s", color=STYLE["text_dim"], fontsize=10, ha="center"
             )
 
-    # Transmittance bar
-    ax.text(
-        x_start - 0.4,
-        1.8,
-        "Sun transmittance at each sample",
-        color=STYLE["warn"],
-        fontsize=9,
-    )
+    # Transmittance bars — draw bars first, then label above them
     for i, x in enumerate(xs):
         t = np.exp(-i * 0.3)
         ax.barh(
@@ -7091,6 +7108,17 @@ def diagram_ray_march():
             color=STYLE["warn"],
             alpha=0.3 + 0.5 * t,
         )
+
+    # Label placed above the bar row, away from bars
+    ax.text(
+        (x_start + x_end) / 2,
+        2.2,
+        "Sun transmittance at each sample (decreasing along ray)",
+        color=STYLE["warn"],
+        fontsize=9,
+        ha="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
 
     ax.set_title(
         "Ray March \u2014 Accumulating Inscattered Light Along the View Ray",
@@ -7214,12 +7242,14 @@ def diagram_sun_transmittance():
     )
     ax.plot(*P_noon, "o", color=STYLE["accent1"], markersize=8, zorder=10)
     ax.text(
-        0.08,
-        R_G + 0.25,
+        0.35,
+        R_G + 0.42,
         "Noon: short path\nblue sky",
         color=STYLE["accent1"],
         fontsize=10,
         fontweight="bold",
+        ha="left",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # Sunset sample — long path through atmosphere
@@ -7465,12 +7495,13 @@ def diagram_sky_render_pipeline():
         arrowprops={"arrowstyle": "->", "color": STYLE["accent2"], "lw": 2},
     )
     ax.text(
-        5.2,
-        1.0,
+        5.8,
+        1.2,
         "Downsample\n(5 passes)",
         color=STYLE["accent2"],
         fontsize=9,
-        ha="center",
+        ha="left",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # Upsample arrows (going back)
