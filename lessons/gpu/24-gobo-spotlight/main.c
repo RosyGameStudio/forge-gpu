@@ -1092,11 +1092,11 @@ static void generate_box_placements(app_state *state)
 {
     /* Scatter crates in the spotlight's target area. */
     const vec3 positions[BOX_COUNT] = {
-        {  2.0f, 0.5f,  1.0f },
+        { -3.5f, 0.5f,  2.0f },
         { -2.5f, 0.5f,  0.5f },
         {  3.0f, 0.5f, -2.0f },
         { -1.0f, 0.5f, -3.0f },
-        {  0.5f, 1.5f,  1.0f },  /* stacked on first crate */
+        { -3.5f, 1.5f,  2.0f },  /* stacked on first crate */
     };
     const float rotations[BOX_COUNT] = {
         0.3f, 1.1f, 0.7f, 2.0f, 0.9f
