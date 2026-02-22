@@ -83,8 +83,14 @@ static const float3 OZONE_ABSORB = float3(0.650e-3, 1.881e-3, 0.085e-3);
 static const float  OZONE_CENTER = 25.0;  /* peak altitude in km */
 static const float  OZONE_WIDTH  = 15.0;  /* tent half-width in km */
 
-/* Sun angular radius (about 0.53 degrees = 0.00465 radians). */
+/* Sun angular radius — half the ~0.53° angular diameter (0.00465 radians). */
 static const float SUN_ANGULAR_RADIUS = 0.00465;
+
+/* Sun disc rendering parameters. */
+static const float SUN_DISC_MULTIPLIER = 10.0;  /* brightness boost relative to sun_intensity */
+static const float LIMB_DARKENING_U    = 0.6;   /* empirical coefficient for visible spectrum  */
+static const float SUN_EDGE_OUTER      = 1.2;   /* smoothstep outer radius multiplier          */
+static const float SUN_EDGE_INNER      = 0.9;   /* smoothstep inner radius multiplier          */
 
 /* PI constant. */
 static const float PI = 3.14159265358979323846;
@@ -363,7 +369,8 @@ float3 sun_disc(float3 ray_dir, float3 sun_direction, float3 transmittance)
     float angle = acos(clamp(cos_angle, -1.0, 1.0));
 
     /* Smooth edge transition over a small angular range. */
-    float edge = smoothstep(SUN_ANGULAR_RADIUS * 1.2, SUN_ANGULAR_RADIUS * 0.9, angle);
+    float edge = smoothstep(SUN_ANGULAR_RADIUS * SUN_EDGE_OUTER,
+                            SUN_ANGULAR_RADIUS * SUN_EDGE_INNER, angle);
 
     if (edge <= 0.0)
         return float3(0.0, 0.0, 0.0);
@@ -372,11 +379,11 @@ float3 sun_disc(float3 ray_dir, float3 sun_direction, float3 transmittance)
      * r is the fractional radius from disc center (0=center, 1=edge). */
     float r = angle / SUN_ANGULAR_RADIUS;
     float cos_limb = sqrt(max(0.0, 1.0 - r * r));
-    float limb_darkening = 1.0 - 0.6 * (1.0 - cos_limb);
+    float limb_darkening = 1.0 - LIMB_DARKENING_U * (1.0 - cos_limb);
 
     /* The sun's apparent brightness as seen through the atmosphere.
      * We multiply by the view transmittance so the sun dims at sunset. */
-    float3 sun_color = float3(1.0, 1.0, 1.0) * sun_intensity * 10.0
+    float3 sun_color = float3(1.0, 1.0, 1.0) * sun_intensity * SUN_DISC_MULTIPLIER
                      * limb_darkening * edge * transmittance;
 
     return sun_color;

@@ -200,12 +200,7 @@ disc and creates a natural glow halo.
    the ground), but the sun disc is rendered separately and needs its own
    occlusion test.
 
-7. **SDL_AppInit return value** — Return `SDL_APP_CONTINUE`, not
-   `SDL_APP_SUCCESS`. In SDL's callback architecture, `SUCCESS` means
-   "quit successfully" — it terminates the app. Only `CONTINUE` keeps
-   the event loop running.
-
-8. **Ray matrix not updated on resize** — If the window resizes, the
+7. **Ray matrix not updated on resize** — If the window resizes, the
    aspect ratio changes. The ray matrix must be recomputed every frame
    from the current window dimensions.
 

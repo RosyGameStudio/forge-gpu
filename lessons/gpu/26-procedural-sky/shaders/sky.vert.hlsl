@@ -29,7 +29,7 @@
 
 cbuffer SkyVertUniforms : register(b0, space1)
 {
-    float4x4 inv_vp;   /* ray matrix: maps NDC to world-space directions */
+    float4x4 ray_matrix;  /* maps NDC to world-space ray directions */
 };
 
 struct VSOutput
@@ -59,7 +59,7 @@ VSOutput main(uint vertex_id : SV_VertexID)
      * The matrix encodes camera right/up/forward scaled by FOV,
      * so the result is the unnormalized world-space view direction.
      * The fragment shader normalizes it before ray marching. */
-    float4 world_pos = mul(inv_vp, float4(ndc.x, ndc.y, 1.0, 1.0));
+    float4 world_pos = mul(ray_matrix, float4(ndc.x, ndc.y, 1.0, 1.0));
     output.view_ray = world_pos.xyz / world_pos.w;
 
     return output;

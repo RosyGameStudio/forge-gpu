@@ -164,7 +164,7 @@
  * Built from camera basis vectors scaled by FOV/aspect, avoiding the
  * precision loss of inverse VP at planet-centric coordinates. */
 typedef struct SkyVertUniforms {
-  mat4 inv_vp;       /* ray matrix: NDC → world-space direction (64 bytes) */
+  mat4 ray_matrix;   /* NDC → world-space ray direction (64 bytes) */
 } SkyVertUniforms;   /* 64 bytes */
 
 /* Sky fragment uniforms — camera, sun, and march parameters.
@@ -185,7 +185,7 @@ typedef struct SkyFragUniforms {
   int   num_steps;         /* outer ray march step count               */
   float resolution[2];     /* window size in pixels                    */
   int   num_light_steps;   /* inner sun transmittance steps            */
-  float _pad;
+  float _pad;              /* pad to 16-byte alignment          (4 bytes) */
 } SkyFragUniforms;         /* 48 bytes */
 
 /* Bloom downsample uniforms. */
@@ -1004,16 +1004,25 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
   /* Handle window resize — recreate HDR target and bloom chain. */
   if ((Uint32)draw_w != state->hdr_width || (Uint32)draw_h != state->hdr_height) {
-    state->hdr_width = (Uint32)draw_w;
-    state->hdr_height = (Uint32)draw_h;
+    Uint32 new_w = (Uint32)draw_w;
+    Uint32 new_h = (Uint32)draw_h;
 
-    if (state->hdr_target) {
-      SDL_ReleaseGPUTexture(state->device, state->hdr_target);
+    SDL_GPUTexture *new_hdr = create_hdr_target(state->device, new_w, new_h);
+    if (!new_hdr) {
+      SDL_Log("Resize: failed to create HDR target, keeping old size");
+    } else {
+      if (state->hdr_target) {
+        SDL_ReleaseGPUTexture(state->device, state->hdr_target);
+      }
+      state->hdr_target = new_hdr;
+      state->hdr_width = new_w;
+      state->hdr_height = new_h;
+
+      release_bloom_mip_chain(state);
+      if (!create_bloom_mip_chain(state)) {
+        SDL_Log("Resize: failed to create bloom mip chain");
+      }
     }
-    state->hdr_target = create_hdr_target(state->device, state->hdr_width, state->hdr_height);
-
-    release_bloom_mip_chain(state);
-    create_bloom_mip_chain(state);
   }
 
   /* Compute sun direction from elevation and azimuth. */
@@ -1069,7 +1078,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     /* Push vertex uniforms — ray matrix that maps NDC to world-space
      * view directions (replaces inv_vp to avoid float precision loss). */
     SkyVertUniforms vert_u;
-    vert_u.inv_vp = ray_matrix;
+    vert_u.ray_matrix = ray_matrix;
     SDL_PushGPUVertexUniformData(cmd, 0, &vert_u, sizeof(vert_u));
 
     /* Push fragment uniforms — camera, sun, march parameters. */

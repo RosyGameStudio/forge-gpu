@@ -419,24 +419,7 @@ This lesson required several non-obvious fixes during development. Each
 one teaches something about GPU programming and floating-point math that
 goes beyond the atmosphere algorithm itself.
 
-### 1. SDL_AppInit must return SDL_APP_CONTINUE
-
-**Symptom:** The app printed its init message and immediately exited
-with code 0 — no window visible.
-
-**Cause:** `SDL_AppInit` returned `SDL_APP_SUCCESS` instead of
-`SDL_APP_CONTINUE`. In SDL's callback architecture, `SDL_APP_SUCCESS`
-means "quit successfully" — it's a clean exit, not a signal to keep
-running. The app lifecycle worked exactly as told.
-
-**Fix:** Return `SDL_APP_CONTINUE` from `SDL_AppInit`.
-
-**Lesson:** In the SDL callback model, `SDL_APP_SUCCESS` and
-`SDL_APP_FAILURE` both terminate the app. Only `SDL_APP_CONTINUE` keeps
-it running. This is easy to confuse — `SUCCESS` sounds like the right
-thing to return from an init function, but it's actually the quit signal.
-
-### 2. Inverse VP fails at planet-centric coordinates
+### 1. Inverse VP fails at planet-centric coordinates
 
 **Symptom:** The sun disc was invisible and ray directions were wrong.
 Debug output (`ray_dir * 0.5 + 0.5` as color) showed incorrect
@@ -475,7 +458,7 @@ camera is near the origin. But when using planet-centric coordinates
 subtraction becomes catastrophic. The ray matrix approach avoids this
 entirely and is also cheaper (no matrix inverse needed).
 
-### 3. Sun disc visible below the horizon
+### 2. Sun disc visible below the horizon
 
 **Symptom:** When the sun elevation went negative, the sun disc was
 still visible floating below the ground line.
