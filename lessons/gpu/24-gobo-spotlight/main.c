@@ -173,7 +173,11 @@
 
 /* Searchlight placement — the Sketchfab model has a 100x scale baked in,
  * so we counter-scale it to fit the scene (~1 unit tall). */
-#define SEARCHLIGHT_SCALE 0.003f
+#define SEARCHLIGHT_SCALE        0.003f
+#define SEARCHLIGHT_ROTATION_DEG 225.0f  /* face the truck (CW from +Z) */
+#define SEARCHLIGHT_POS_X        6.0f
+#define SEARCHLIGHT_POS_Y        1.0f    /* sits on the ground plane */
+#define SEARCHLIGHT_POS_Z        4.0f
 
 #define BYTES_PER_PIXEL 4
 
@@ -261,113 +265,113 @@ typedef struct GridFragUniforms {
 /* ── GPU-side model types ────────────────────────────────────────────────── */
 
 typedef struct GpuPrimitive {
-    SDL_GPUBuffer *vertex_buffer;
-    SDL_GPUBuffer *index_buffer;
-    Uint32 index_count;
-    int material_index;
-    SDL_GPUIndexElementSize index_type;
-    bool has_uvs;
+    SDL_GPUBuffer *vertex_buffer;          /* GPU vertex data for this primitive */
+    SDL_GPUBuffer *index_buffer;           /* GPU index data for this primitive */
+    Uint32 index_count;                    /* number of indices to draw */
+    int material_index;                    /* index into ModelData.materials (-1 = none) */
+    SDL_GPUIndexElementSize index_type;    /* 16-bit or 32-bit indices */
+    bool has_uvs;                          /* true if vertices carry texture coordinates */
 } GpuPrimitive;
 
 typedef struct GpuMaterial {
-    float base_color[4];
-    SDL_GPUTexture *texture;
-    bool has_texture;
+    float base_color[4];       /* RGBA base color (linear space) */
+    SDL_GPUTexture *texture;   /* diffuse texture (NULL if none) */
+    bool has_texture;          /* true if texture is valid and should be sampled */
 } GpuMaterial;
 
 typedef struct ModelData {
-    ForgeGltfScene scene;
-    GpuPrimitive  *primitives;
-    int            primitive_count;
-    GpuMaterial   *materials;
-    int            material_count;
+    ForgeGltfScene scene;           /* parsed glTF scene (CPU-side) */
+    GpuPrimitive  *primitives;     /* GPU-uploaded primitives array */
+    int            primitive_count; /* number of primitives */
+    GpuMaterial   *materials;      /* GPU-uploaded materials array */
+    int            material_count;  /* number of materials */
 } ModelData;
 
 typedef struct BoxPlacement {
-    vec3  position;
-    float y_rotation;
+    vec3  position;    /* world-space position of the crate */
+    float y_rotation;  /* rotation around Y axis (radians) */
 } BoxPlacement;
 
 /* ── Application state ──────────────────────────────────────────────────── */
 
 typedef struct app_state {
-    SDL_Window    *window;
-    SDL_GPUDevice *device;
+    SDL_Window    *window;   /* application window */
+    SDL_GPUDevice *device;   /* GPU device for all rendering */
 
     /* Pipelines. */
-    SDL_GPUGraphicsPipeline *scene_pipeline;
-    SDL_GPUGraphicsPipeline *grid_pipeline;
-    SDL_GPUGraphicsPipeline *shadow_pipeline;
-    SDL_GPUGraphicsPipeline *tonemap_pipeline;
+    SDL_GPUGraphicsPipeline *scene_pipeline;    /* lit geometry → HDR buffer */
+    SDL_GPUGraphicsPipeline *grid_pipeline;     /* procedural grid → HDR buffer */
+    SDL_GPUGraphicsPipeline *shadow_pipeline;   /* depth-only from spotlight POV */
+    SDL_GPUGraphicsPipeline *tonemap_pipeline;  /* fullscreen HDR → swapchain */
 
     /* HDR render target — floating-point buffer for values above 1.0. */
-    SDL_GPUTexture *hdr_target;
-    SDL_GPUSampler *hdr_sampler;
-    Uint32 hdr_width;
-    Uint32 hdr_height;
+    SDL_GPUTexture *hdr_target;  /* R16G16B16A16_FLOAT color target */
+    SDL_GPUSampler *hdr_sampler; /* linear, clamp — tonemap reads this */
+    Uint32 hdr_width;            /* current HDR target width (pixels) */
+    Uint32 hdr_height;           /* current HDR target height (pixels) */
 
     /* HDR settings. */
-    float  exposure;
-    Uint32 tonemap_mode;
+    float  exposure;     /* brightness multiplier before tone mapping (>0) */
+    Uint32 tonemap_mode; /* 0=clamp, 1=Reinhard, 2=ACES */
 
     /* Bloom — Jimenez dual-filter mip chain. */
-    SDL_GPUGraphicsPipeline *bloom_downsample_pipeline;
-    SDL_GPUGraphicsPipeline *bloom_upsample_pipeline;
-    SDL_GPUTexture *bloom_mips[BLOOM_MIP_COUNT];
-    Uint32          bloom_widths[BLOOM_MIP_COUNT];
-    Uint32          bloom_heights[BLOOM_MIP_COUNT];
-    SDL_GPUSampler *bloom_sampler;
-    float  bloom_threshold;
-    float  bloom_intensity;
+    SDL_GPUGraphicsPipeline *bloom_downsample_pipeline; /* 13-tap + Karis */
+    SDL_GPUGraphicsPipeline *bloom_upsample_pipeline;   /* 9-tap tent, additive */
+    SDL_GPUTexture *bloom_mips[BLOOM_MIP_COUNT];    /* half-res mip chain */
+    Uint32          bloom_widths[BLOOM_MIP_COUNT];  /* width of each mip (px) */
+    Uint32          bloom_heights[BLOOM_MIP_COUNT]; /* height of each mip (px) */
+    SDL_GPUSampler *bloom_sampler;   /* linear, clamp — bilinear essential */
+    float  bloom_threshold;          /* luminance cutoff for bright pixels */
+    float  bloom_intensity;          /* bloom contribution to final (0..1+) */
 
     /* Depth buffer (main render pass). */
-    SDL_GPUTexture *depth_texture;
-    Uint32 depth_width;
-    Uint32 depth_height;
+    SDL_GPUTexture *depth_texture; /* D32_FLOAT, resized with swapchain */
+    Uint32 depth_width;            /* current depth buffer width (pixels) */
+    Uint32 depth_height;           /* current depth buffer height (pixels) */
 
     /* Grid geometry. */
-    SDL_GPUBuffer *grid_vertex_buffer;
-    SDL_GPUBuffer *grid_index_buffer;
+    SDL_GPUBuffer *grid_vertex_buffer; /* 4-vertex XZ plane quad */
+    SDL_GPUBuffer *grid_index_buffer;  /* 6 indices (2 triangles) */
 
     /* Textures and samplers. */
-    SDL_GPUTexture *white_texture;
-    SDL_GPUSampler *sampler;           /* trilinear for diffuse textures */
+    SDL_GPUTexture *white_texture; /* 1x1 placeholder for untextured materials */
+    SDL_GPUSampler *sampler;       /* trilinear + anisotropy for diffuse textures */
 
     /* Shadow map — single 2D depth texture from the spotlight's frustum. */
-    SDL_GPUTexture *shadow_depth_texture;
-    SDL_GPUSampler *shadow_sampler;    /* nearest, clamp-to-edge */
+    SDL_GPUTexture *shadow_depth_texture; /* D32_FLOAT, SHADOW_MAP_SIZE square */
+    SDL_GPUSampler *shadow_sampler;       /* nearest, clamp — manual PCF */
 
     /* Gobo pattern — grayscale texture projected through the spotlight. */
-    SDL_GPUTexture *gobo_texture;
-    SDL_GPUSampler *gobo_sampler;      /* linear, clamp-to-edge */
+    SDL_GPUTexture *gobo_texture;  /* R8G8B8A8_UNORM (linear, not sRGB) */
+    SDL_GPUSampler *gobo_sampler;  /* linear, clamp — smooth projected edges */
 
     /* Spotlight view-projection matrix (static — light doesn't move). */
-    mat4 light_vp;
-    vec3 spot_dir;                     /* normalized spotlight direction */
+    mat4 light_vp;  /* combined light view * projection matrix */
+    vec3 spot_dir;  /* normalized spotlight direction (pos → target) */
 
     /* Models. */
-    ModelData truck;
-    ModelData box;
-    ModelData searchlight;
-    BoxPlacement box_placements[BOX_COUNT];
+    ModelData truck;       /* CesiumMilkTruck at origin */
+    ModelData box;         /* BoxTextured (reused for all crates) */
+    ModelData searchlight; /* Sketchfab searchlight at light source */
+    BoxPlacement box_placements[BOX_COUNT]; /* crate positions and rotations */
 
-    /* Searchlight placement matrix. */
+    /* Searchlight placement matrix (T * R * S). */
     mat4 searchlight_placement;
 
     /* Swapchain format (queried after setting SDR_LINEAR). */
     SDL_GPUTextureFormat swapchain_format;
 
     /* Camera. */
-    vec3  cam_position;
-    float cam_yaw;
-    float cam_pitch;
+    vec3  cam_position;  /* world-space camera position */
+    float cam_yaw;       /* horizontal rotation (radians, 0 = +Z) */
+    float cam_pitch;     /* vertical rotation (radians, clamped ±1.5) */
 
     /* Timing and input. */
-    Uint64 last_ticks;
-    bool   mouse_captured;
+    Uint64 last_ticks;     /* previous frame timestamp (perf counter) */
+    bool   mouse_captured; /* true when FPS mouse look is active */
 
 #ifdef FORGE_CAPTURE
-    ForgeCapture capture;   /* screenshot infrastructure — see note above */
+    ForgeCapture capture;  /* screenshot infrastructure — see note above */
 #endif
 } app_state;
 
@@ -473,6 +477,9 @@ static SDL_GPUBuffer *upload_gpu_buffer(
 
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("Failed to submit upload command buffer: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUBuffer(device, buffer);
+        return NULL;
     }
 
     SDL_ReleaseGPUTransferBuffer(device, xfer);
@@ -1833,8 +1840,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     {
         mat4 scale     = mat4_scale(vec3_create(
             SEARCHLIGHT_SCALE, SEARCHLIGHT_SCALE, SEARCHLIGHT_SCALE));
-        mat4 rotate    = mat4_rotate_y(225.0f * FORGE_DEG2RAD); /* 225 deg CW */
-        mat4 translate = mat4_translate(vec3_create(6.0f, 1.0f, 4.0f));
+        mat4 rotate    = mat4_rotate_y(SEARCHLIGHT_ROTATION_DEG * FORGE_DEG2RAD);
+        mat4 translate = mat4_translate(vec3_create(
+            SEARCHLIGHT_POS_X, SEARCHLIGHT_POS_Y, SEARCHLIGHT_POS_Z));
         /* T * R * S — scale first, then rotate, then translate. */
         state->searchlight_placement = mat4_multiply(
             translate, mat4_multiply(rotate, scale));
@@ -1879,6 +1887,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
 init_fail:
     /* Centralized cleanup for init failures. */
+#ifdef FORGE_CAPTURE
+    forge_capture_destroy(&state->capture, device);
+#endif
     if (state->scene_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(device, state->scene_pipeline);
     if (state->grid_pipeline)
@@ -1944,7 +1955,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
         if (key == SDLK_ESCAPE) {
             if (state->mouse_captured) {
-                SDL_SetWindowRelativeMouseMode(state->window, false);
+                if (!SDL_SetWindowRelativeMouseMode(state->window, false)) {
+                    SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
+                }
                 state->mouse_captured = false;
             } else {
                 return SDL_APP_SUCCESS;
@@ -1954,7 +1967,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     /* Re-capture mouse on click. */
     if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && !state->mouse_captured) {
-        SDL_SetWindowRelativeMouseMode(state->window, true);
+        if (!SDL_SetWindowRelativeMouseMode(state->window, true)) {
+            SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
+        }
         state->mouse_captured = true;
     }
 
@@ -2034,6 +2049,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     if (!SDL_AcquireGPUSwapchainTexture(cmd, state->window,
                                          &swapchain_tex, &sw, &sh)) {
         SDL_Log("SDL_AcquireGPUSwapchainTexture failed: %s", SDL_GetError());
+        SDL_CancelGPUCommandBuffer(cmd);
         return SDL_APP_FAILURE;
     }
     if (!swapchain_tex) {
@@ -2044,13 +2060,19 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     /* ── Ensure depth buffer and HDR target match swapchain size ───── */
+    /* After acquiring the swapchain texture, every error path must submit
+     * the command buffer — SDL_CancelGPUCommandBuffer is not allowed once
+     * a swapchain texture has been acquired. */
     if (!ensure_depth_texture(state, sw, sh)) {
+        SDL_SubmitGPUCommandBuffer(cmd);
         return SDL_APP_FAILURE;
     }
     if (!ensure_hdr_target(state, sw, sh)) {
+        SDL_SubmitGPUCommandBuffer(cmd);
         return SDL_APP_FAILURE;
     }
     if (!ensure_bloom_mips(state, sw, sh)) {
+        SDL_SubmitGPUCommandBuffer(cmd);
         return SDL_APP_FAILURE;
     }
 
@@ -2066,6 +2088,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         /* No color targets — depth-only pass. */
         SDL_GPURenderPass *shadow_pass = SDL_BeginGPURenderPass(
             cmd, NULL, 0, &shadow_depth);
+        if (!shadow_pass) {
+            SDL_Log("SDL_BeginGPURenderPass (shadow) failed: %s", SDL_GetError());
+            SDL_SubmitGPUCommandBuffer(cmd);
+            return SDL_APP_FAILURE;
+        }
 
         SDL_BindGPUGraphicsPipeline(shadow_pass, state->shadow_pipeline);
 
@@ -2105,6 +2132,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         cmd, &color_target, 1, &depth_target);
     if (!pass) {
         SDL_Log("SDL_BeginGPURenderPass failed: %s", SDL_GetError());
+        SDL_SubmitGPUCommandBuffer(cmd);
         return SDL_APP_FAILURE;
     }
 
@@ -2225,6 +2253,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
             SDL_GPURenderPass *bloom_pass = SDL_BeginGPURenderPass(
                 cmd, &bloom_ct, 1, NULL);
+            if (!bloom_pass) {
+                SDL_Log("SDL_BeginGPURenderPass (bloom down %d) failed: %s",
+                        i, SDL_GetError());
+                SDL_SubmitGPUCommandBuffer(cmd);
+                return SDL_APP_FAILURE;
+            }
             SDL_BindGPUGraphicsPipeline(bloom_pass,
                                         state->bloom_downsample_pipeline);
 
@@ -2258,6 +2292,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
             SDL_GPURenderPass *bloom_pass = SDL_BeginGPURenderPass(
                 cmd, &bloom_ct, 1, NULL);
+            if (!bloom_pass) {
+                SDL_Log("SDL_BeginGPURenderPass (bloom up %d) failed: %s",
+                        i, SDL_GetError());
+                SDL_SubmitGPUCommandBuffer(cmd);
+                return SDL_APP_FAILURE;
+            }
             SDL_BindGPUGraphicsPipeline(bloom_pass,
                                         state->bloom_upsample_pipeline);
 
@@ -2284,6 +2324,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             cmd, &tone_ct, 1, NULL);
         if (!tone_pass) {
             SDL_Log("SDL_BeginGPURenderPass (tonemap) failed: %s", SDL_GetError());
+            SDL_SubmitGPUCommandBuffer(cmd);
             return SDL_APP_FAILURE;
         }
 
@@ -2314,7 +2355,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 #ifdef FORGE_CAPTURE
     if (state->capture.mode != FORGE_CAPTURE_NONE) {
         if (!forge_capture_finish_frame(&state->capture, cmd, swapchain_tex)) {
-            SDL_SubmitGPUCommandBuffer(cmd);
+            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+            }
         }
         if (forge_capture_should_quit(&state->capture)) {
             return SDL_APP_SUCCESS;
