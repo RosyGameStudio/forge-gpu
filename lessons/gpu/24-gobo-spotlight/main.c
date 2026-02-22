@@ -25,6 +25,15 @@
 #include <SDL3/SDL_main.h>
 #include <stddef.h> /* offsetof */
 
+/* This is NOT part of the lesson — it's build infrastructure that lets us
+ * programmatically capture screenshots for the README.  Compiled only when
+ * cmake is run with -DFORGE_CAPTURE=ON.  You can ignore these #ifdef blocks
+ * entirely; the lesson works the same with or without them.
+ * See: scripts/capture_lesson.py, common/capture/forge_capture.h */
+#ifdef FORGE_CAPTURE
+#include "capture/forge_capture.h"
+#endif
+
 /* ── Compiled shader bytecodes ──────────────────────────────────────────── */
 
 #include "shaders/compiled/grid_frag_dxil.h"
@@ -356,6 +365,10 @@ typedef struct app_state {
     /* Timing and input. */
     Uint64 last_ticks;
     bool   mouse_captured;
+
+#ifdef FORGE_CAPTURE
+    ForgeCapture capture;   /* screenshot infrastructure — see note above */
+#endif
 } app_state;
 
 /* ── Helper: create shader from embedded bytecode ───────────────────────── */
@@ -1248,9 +1261,6 @@ static void draw_model_shadow(
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
-    (void)argc;
-    (void)argv;
-
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
@@ -1305,6 +1315,20 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     state->window           = window;
     state->device           = device;
     state->swapchain_format = swapchain_format;
+
+#ifdef FORGE_CAPTURE
+    forge_capture_parse_args(&state->capture, argc, argv);
+    if (state->capture.mode != FORGE_CAPTURE_NONE) {
+        if (!forge_capture_init(&state->capture, device, window)) {
+            SDL_Log("Failed to initialise capture");
+            SDL_ReleaseWindowFromGPUDevice(device, window);
+            SDL_DestroyWindow(window);
+            SDL_DestroyGPUDevice(device);
+            SDL_free(state);
+            return SDL_APP_FAILURE;
+        }
+    }
+#endif
 
     /* ── White placeholder texture ──────────────────────────────────── */
     state->white_texture = create_white_texture(device);
@@ -2287,9 +2311,21 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_EndGPURenderPass(tone_pass);
     }
 
-    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
-        SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
+#ifdef FORGE_CAPTURE
+    if (state->capture.mode != FORGE_CAPTURE_NONE) {
+        if (!forge_capture_finish_frame(&state->capture, cmd, swapchain_tex)) {
+            SDL_SubmitGPUCommandBuffer(cmd);
+        }
+        if (forge_capture_should_quit(&state->capture)) {
+            return SDL_APP_SUCCESS;
+        }
+    } else
+#endif
+    {
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+            return SDL_APP_FAILURE;
+        }
     }
 
     return SDL_APP_CONTINUE;
@@ -2302,6 +2338,10 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     (void)result;
     app_state *state = (app_state *)appstate;
     if (!state) return;
+
+#ifdef FORGE_CAPTURE
+    forge_capture_destroy(&state->capture, state->device);
+#endif
 
     free_model_gpu(state->device, &state->truck);
     free_model_gpu(state->device, &state->box);
