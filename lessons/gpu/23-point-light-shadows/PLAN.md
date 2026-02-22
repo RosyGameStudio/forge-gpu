@@ -55,7 +55,8 @@ For each point light, render the scene into a cube depth map:
 3. Use `mat4_perspective(PI/2, 1.0, near, far)` for the 90-degree projection
 4. For each face: set `SDL_GPUDepthStencilTargetInfo.layer = face`,
    push the `light_vp` uniform, draw all shadow casters
-5. Use front-face culling + depth bias to reduce Peter Panning (from Lesson 15)
+5. Use no culling (glTF meshes may not be watertight) and a small
+   fragment-shader bias to prevent shadow acne
 
 ### Fragment shader shadow lookup
 
@@ -79,7 +80,7 @@ projection direction.
 - Fragment shader: output `length(world_pos - light_pos) / far_plane` as depth
   (writes to a custom depth output, or uses linear depth in the color channel
   if needed — investigate SDL3 GPU capabilities for writing custom depth)
-- Rasterizer: front-face culling, depth bias
+- Rasterizer: no culling (open glTF meshes), fragment-shader bias for shadow acne
 
 ### Render pass order
 
