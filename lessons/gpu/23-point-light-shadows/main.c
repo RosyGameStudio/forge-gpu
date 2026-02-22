@@ -22,9 +22,9 @@
  * Controls:
  *   WASD / Space / LShift — Move camera
  *   Mouse                 — Look around
- *   1                     — No tone mapping (clamp)
- *   2                     — Reinhard tone mapping
- *   3                     — ACES filmic tone mapping
+ *   1                     — Toggle light 0 (warm white, orbiting)
+ *   2                     — Toggle light 1 (cool blue)
+ *   3                     — Toggle light 2 (soft red)
  *   =/+                   — Increase exposure
  *   -                     — Decrease exposure
  *   B                     — Toggle bloom on/off
@@ -177,11 +177,6 @@
 #define MIN_EXPOSURE 0.1f
 #define MAX_EXPOSURE 10.0f
 
-/* Tone mapping modes. */
-#define TONEMAP_NONE 0
-#define TONEMAP_REINHARD 1
-#define TONEMAP_ACES 2
-
 /* Frame timing. */
 #define MAX_FRAME_DT 0.1f
 
@@ -290,12 +285,12 @@ typedef struct BloomUpsampleUniforms {
   float _pad[2];
 } BloomUpsampleUniforms; /* 16 bytes */
 
-/* Tone map fragment uniforms. */
+/* Tone map fragment uniforms (matches tonemap.frag.hlsl cbuffer). */
 typedef struct TonemapFragUniforms {
   float exposure;
-  Uint32 tonemap_mode;
   float bloom_intensity;
-  float _pad;
+  float _pad0;
+  float _pad1;
 } TonemapFragUniforms; /* 16 bytes */
 
 /* ── GPU-side model types ─────────────────────────────────────────────────── */
@@ -384,12 +379,14 @@ typedef struct app_state {
 
   /* HDR settings. */
   float exposure;
-  Uint32 tonemap_mode;
 
   /* Bloom settings. */
   bool bloom_enabled;
   float bloom_intensity;
   float bloom_threshold;
+
+  /* Per-light toggles (1/2/3 keys). */
+  bool light_enabled[MAX_POINT_LIGHTS];
 
   /* Point light animation. */
   float light0_angle;
@@ -406,35 +403,34 @@ typedef struct app_state {
 /* ── Helper: fill point light array ───────────────────────────────────────── */
 
 static void fill_lights(const app_state *state, PointLight lights[MAX_POINT_LIGHTS]) {
+  SDL_memset(lights, 0, sizeof(PointLight) * MAX_POINT_LIGHTS);
+
   /* Light 0: warm white, orbiting. */
   lights[0].position[0] = LIGHT0_ORBIT_RADIUS * forge_cosf(state->light0_angle);
   lights[0].position[1] = LIGHT0_ORBIT_HEIGHT;
   lights[0].position[2] = LIGHT0_ORBIT_RADIUS * forge_sinf(state->light0_angle);
-  lights[0].intensity = LIGHT0_INTENSITY;
+  lights[0].intensity = state->light_enabled[0] ? LIGHT0_INTENSITY : 0.0f;
   lights[0].color[0] = LIGHT0_COLOR_R;
   lights[0].color[1] = LIGHT0_COLOR_G;
   lights[0].color[2] = LIGHT0_COLOR_B;
-  lights[0]._pad = 0.0f;
 
   /* Light 1: cool blue, static. */
   lights[1].position[0] = LIGHT1_POS_X;
   lights[1].position[1] = LIGHT1_POS_Y;
   lights[1].position[2] = LIGHT1_POS_Z;
-  lights[1].intensity = LIGHT1_INTENSITY;
+  lights[1].intensity = state->light_enabled[1] ? LIGHT1_INTENSITY : 0.0f;
   lights[1].color[0] = LIGHT1_COLOR_R;
   lights[1].color[1] = LIGHT1_COLOR_G;
   lights[1].color[2] = LIGHT1_COLOR_B;
-  lights[1]._pad = 0.0f;
 
   /* Light 2: soft red, static. */
   lights[2].position[0] = LIGHT2_POS_X;
   lights[2].position[1] = LIGHT2_POS_Y;
   lights[2].position[2] = LIGHT2_POS_Z;
-  lights[2].intensity = LIGHT2_INTENSITY;
+  lights[2].intensity = state->light_enabled[2] ? LIGHT2_INTENSITY : 0.0f;
   lights[2].color[0] = LIGHT2_COLOR_R;
   lights[2].color[1] = LIGHT2_COLOR_G;
   lights[2].color[2] = LIGHT2_COLOR_B;
-  lights[2]._pad = 0.0f;
 }
 
 /* ── Helper: create HDR render target ─────────────────────────────────────── */
@@ -1652,10 +1648,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   state->cam_yaw = CAM_START_YAW_DEG * FORGE_DEG2RAD;
   state->cam_pitch = CAM_START_PITCH_DEG * FORGE_DEG2RAD;
   state->exposure = DEFAULT_EXPOSURE;
-  state->tonemap_mode = TONEMAP_ACES;
   state->bloom_enabled = true;
   state->bloom_intensity = DEFAULT_BLOOM_INTENSITY;
   state->bloom_threshold = DEFAULT_BLOOM_THRESHOLD;
+  state->light_enabled[0] = true;
+  state->light_enabled[1] = true;
+  state->light_enabled[2] = true;
   state->light0_angle = FORGE_PI / 3.0f;
   state->last_ticks = SDL_GetTicks();
 
@@ -1666,7 +1664,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     state->mouse_captured = false;
   }
 
-  SDL_Log("Tone mapping: ACES (press 1/2/3 to switch)");
+  SDL_Log("Lights: 1/2/3 to toggle each light");
   SDL_Log("Exposure: %.1f (+/- to adjust)", state->exposure);
   SDL_Log("Bloom: ON (B toggle, Up/Down intensity, Left/Right threshold)");
 
@@ -1708,16 +1706,16 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
       }
     }
 
-    /* Tone mapping mode. */
+    /* Toggle individual point lights. */
     if (event->key.key == SDLK_1) {
-      state->tonemap_mode = TONEMAP_NONE;
-      SDL_Log("Tone mapping: None (clamp)");
+      state->light_enabled[0] = !state->light_enabled[0];
+      SDL_Log("Light 0 (warm white): %s", state->light_enabled[0] ? "ON" : "OFF");
     } else if (event->key.key == SDLK_2) {
-      state->tonemap_mode = TONEMAP_REINHARD;
-      SDL_Log("Tone mapping: Reinhard");
+      state->light_enabled[1] = !state->light_enabled[1];
+      SDL_Log("Light 1 (cool blue): %s", state->light_enabled[1] ? "ON" : "OFF");
     } else if (event->key.key == SDLK_3) {
-      state->tonemap_mode = TONEMAP_ACES;
-      SDL_Log("Tone mapping: ACES");
+      state->light_enabled[2] = !state->light_enabled[2];
+      SDL_Log("Light 2 (soft red): %s", state->light_enabled[2] ? "ON" : "OFF");
     }
 
     /* Exposure. */
@@ -2151,7 +2149,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
       TonemapFragUniforms tonemap_u;
       SDL_zero(tonemap_u);
       tonemap_u.exposure = state->exposure;
-      tonemap_u.tonemap_mode = state->tonemap_mode;
       tonemap_u.bloom_intensity =
           (bloom_ok && state->bloom_enabled) ? state->bloom_intensity : 0.0f;
       SDL_PushGPUFragmentUniformData(cmd, 0, &tonemap_u, sizeof(tonemap_u));

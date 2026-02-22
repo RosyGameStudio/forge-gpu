@@ -1,16 +1,11 @@
 /*
- * tonemap.frag.hlsl — Tone mapping with bloom compositing
+ * tonemap.frag.hlsl — ACES tone mapping with bloom compositing
  *
  * Samples both the HDR render target and the bloom result, combines
- * them, and tone maps the result to LDR.
+ * them, and tone maps to LDR using the ACES filmic curve.
  *
  * Bloom is added BEFORE tone mapping so that bloom values participate
  * in the same HDR-to-LDR compression — highlights roll off naturally.
- *
- * Operators:
- *   0 — No tone mapping (clamp to [0,1])
- *   1 — Reinhard: x / (x + 1)
- *   2 — ACES filmic (Narkowicz approximation)
  *
  * Gamma: outputs LINEAR values. The sRGB swapchain applies gamma.
  *
@@ -25,10 +20,10 @@ SamplerState bloom_smp     : register(s1, space2);
 
 cbuffer TonemapUniforms : register(b0, space3)
 {
-    float  exposure;         /* scene exposure multiplier */
-    uint   tonemap_mode;     /* 0=clamp, 1=Reinhard, 2=ACES */
-    float  bloom_intensity;  /* bloom contribution strength */
-    float  _pad;
+    float exposure;         /* scene exposure multiplier */
+    float bloom_intensity;  /* bloom contribution strength */
+    float _pad0;
+    float _pad1;
 };
 
 struct PSInput
@@ -37,11 +32,7 @@ struct PSInput
     float2 uv       : TEXCOORD0;
 };
 
-float3 tonemap_reinhard(float3 hdr)
-{
-    return hdr / (hdr + 1.0);
-}
-
+/* ACES filmic tone mapping (Narkowicz approximation). */
 float3 tonemap_aces(float3 hdr)
 {
     float a = 2.51;
@@ -60,23 +51,9 @@ float4 main(PSInput input) : SV_Target
     float3 bloom = bloom_texture.Sample(bloom_smp, input.uv).rgb;
     hdr += bloom * bloom_intensity;
 
-    /* Apply exposure */
+    /* Apply exposure and tone map */
     hdr *= exposure;
-
-    /* Tone map */
-    float3 ldr;
-    if (tonemap_mode == 1)
-    {
-        ldr = tonemap_reinhard(hdr);
-    }
-    else if (tonemap_mode == 2)
-    {
-        ldr = tonemap_aces(hdr);
-    }
-    else
-    {
-        ldr = saturate(hdr);
-    }
+    float3 ldr = tonemap_aces(hdr);
 
     return float4(ldr, 1.0);
 }
