@@ -99,16 +99,16 @@
 #define CAM_START_X 8.0f
 #define CAM_START_Y 6.0f
 #define CAM_START_Z 12.0f
-#define CAM_START_YAW_DEG -150.0f
+#define CAM_START_YAW_DEG 34.0f
 #define CAM_START_PITCH_DEG -20.0f
 
-/* Point lights — 3 colored lights at different positions. */
-#define MAX_POINT_LIGHTS 3
+/* Point lights — 4 colored lights at different positions. */
+#define MAX_POINT_LIGHTS 4
 
-/* Light 0: warm white, orbiting the scene. */
-#define LIGHT0_COLOR_R 1.0f
-#define LIGHT0_COLOR_G 0.9f
-#define LIGHT0_COLOR_B 0.7f
+/* Light 0: green, orbiting the scene. */
+#define LIGHT0_COLOR_R 0.2f
+#define LIGHT0_COLOR_G 1.0f
+#define LIGHT0_COLOR_B 0.2f
 #define LIGHT0_INTENSITY 8.0f
 #define LIGHT0_ORBIT_RADIUS 4.0f
 #define LIGHT0_ORBIT_HEIGHT 3.5f
@@ -132,6 +132,15 @@
 #define LIGHT2_POS_Y 4.0f
 #define LIGHT2_POS_Z -2.0f
 
+/* Light 3: magenta, positioned in front. */
+#define LIGHT3_COLOR_R 1.0f
+#define LIGHT3_COLOR_G 0.1f
+#define LIGHT3_COLOR_B 0.8f
+#define LIGHT3_INTENSITY 6.0f
+#define LIGHT3_POS_X 2.0f
+#define LIGHT3_POS_Y 3.0f
+#define LIGHT3_POS_Z 5.0f
+
 /* Emissive sphere — visible representation of each point light source. */
 #define SPHERE_RADIUS 0.2f
 #define SPHERE_STACKS 12
@@ -142,7 +151,7 @@
 
 /* Scene material defaults. */
 #define MATERIAL_SHININESS 64.0f
-#define MATERIAL_AMBIENT 0.08f
+#define MATERIAL_AMBIENT 0.02f
 #define MATERIAL_SPECULAR_STR 1.0f
 #define MAX_ANISOTROPY 4
 
@@ -189,7 +198,7 @@
 #define GRID_SPACING 1.0f
 #define GRID_LINE_WIDTH 0.02f
 #define GRID_FADE_DISTANCE 40.0f
-#define GRID_AMBIENT 0.15f
+#define GRID_AMBIENT 0.02f
 #define GRID_SHININESS 32.0f
 #define GRID_SPECULAR_STR 0.5f
 
@@ -241,8 +250,8 @@ typedef struct SceneFragUniforms {
   float ambient;                        /* ambient intensity          (4 bytes) */
   float specular_str;                   /* specular strength          (4 bytes) */
   float _pad;                           /* pad to 16-byte boundary    (4 bytes) */
-  PointLight lights[MAX_POINT_LIGHTS];  /* point light array         (96 bytes) */
-} SceneFragUniforms; /* 144 bytes */
+  PointLight lights[MAX_POINT_LIGHTS];  /* point light array        (128 bytes) */
+} SceneFragUniforms; /* 176 bytes */
 
 /* Emissive fragment uniforms — just the emission color. */
 typedef struct EmissiveFragUniforms {
@@ -269,8 +278,8 @@ typedef struct GridFragUniforms {
   float _pad0;                          /* pad to 16 bytes         (4 bytes) */
   float _pad1;                          /*                         (4 bytes) */
   float _pad2;                          /*                         (4 bytes) */
-  PointLight lights[MAX_POINT_LIGHTS];  /* point light array      (96 bytes) */
-} GridFragUniforms;  /* 176 bytes */
+  PointLight lights[MAX_POINT_LIGHTS];  /* point light array     (128 bytes) */
+} GridFragUniforms;  /* 208 bytes */
 
 /* Bloom downsample uniforms. */
 typedef struct BloomDownsampleUniforms {
@@ -431,6 +440,15 @@ static void fill_lights(const app_state *state, PointLight lights[MAX_POINT_LIGH
   lights[2].color[0] = LIGHT2_COLOR_R;
   lights[2].color[1] = LIGHT2_COLOR_G;
   lights[2].color[2] = LIGHT2_COLOR_B;
+
+  /* Light 3: magenta, static. */
+  lights[3].position[0] = LIGHT3_POS_X;
+  lights[3].position[1] = LIGHT3_POS_Y;
+  lights[3].position[2] = LIGHT3_POS_Z;
+  lights[3].intensity = state->light_enabled[3] ? LIGHT3_INTENSITY : 0.0f;
+  lights[3].color[0] = LIGHT3_COLOR_R;
+  lights[3].color[1] = LIGHT3_COLOR_G;
+  lights[3].color[2] = LIGHT3_COLOR_B;
 }
 
 /* ── Helper: create HDR render target ─────────────────────────────────────── */
@@ -1654,6 +1672,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   state->light_enabled[0] = true;
   state->light_enabled[1] = true;
   state->light_enabled[2] = true;
+  state->light_enabled[3] = true;
   state->light0_angle = FORGE_PI / 3.0f;
   state->last_ticks = SDL_GetTicks();
 
@@ -1664,7 +1683,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     state->mouse_captured = false;
   }
 
-  SDL_Log("Lights: 1/2/3 to toggle each light");
+  SDL_Log("Lights: 1/2/3/4 to toggle each light");
   SDL_Log("Exposure: %.1f (+/- to adjust)", state->exposure);
   SDL_Log("Bloom: ON (B toggle, Up/Down intensity, Left/Right threshold)");
 
@@ -1709,13 +1728,16 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     /* Toggle individual point lights. */
     if (event->key.key == SDLK_1) {
       state->light_enabled[0] = !state->light_enabled[0];
-      SDL_Log("Light 0 (warm white): %s", state->light_enabled[0] ? "ON" : "OFF");
+      SDL_Log("Light 0 (green): %s", state->light_enabled[0] ? "ON" : "OFF");
     } else if (event->key.key == SDLK_2) {
       state->light_enabled[1] = !state->light_enabled[1];
       SDL_Log("Light 1 (cool blue): %s", state->light_enabled[1] ? "ON" : "OFF");
     } else if (event->key.key == SDLK_3) {
       state->light_enabled[2] = !state->light_enabled[2];
       SDL_Log("Light 2 (soft red): %s", state->light_enabled[2] ? "ON" : "OFF");
+    } else if (event->key.key == SDLK_4) {
+      state->light_enabled[3] = !state->light_enabled[3];
+      SDL_Log("Light 3 (magenta): %s", state->light_enabled[3] ? "ON" : "OFF");
     }
 
     /* Exposure. */

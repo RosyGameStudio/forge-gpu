@@ -9,7 +9,7 @@
  * from C code. Unused lights have zero intensity and contribute nothing.
  */
 
-#define MAX_POINT_LIGHTS 3
+#define MAX_POINT_LIGHTS 4
 
 struct PointLight
 {
@@ -73,7 +73,7 @@ float4 main(float4 clip_pos : SV_Position, float3 world_pos : TEXCOORD0) : SV_Ta
         L /= d; /* normalize */
 
         /* Quadratic attenuation */
-        float attenuation = 1.0 / (1.0 + 0.09 * d + 0.032 * d * d);
+        float attenuation = 1.0 / (1.0 + 0.35 * d + 0.44 * d * d);
 
         /* Diffuse */
         float NdotL = max(dot(N, L), 0.0);
