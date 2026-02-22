@@ -104,9 +104,9 @@
 #define PITCH_CLAMP 1.5f
 
 /* Camera initial position — elevated, looking at the scene. */
-#define CAM_START_X 8.0f
-#define CAM_START_Y 6.0f
-#define CAM_START_Z 12.0f
+#define CAM_START_X 5.0f
+#define CAM_START_Y 4.0f
+#define CAM_START_Z 8.0f
 #define CAM_START_YAW_DEG 34.0f
 #define CAM_START_PITCH_DEG -20.0f
 
