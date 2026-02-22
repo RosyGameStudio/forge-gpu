@@ -1,8 +1,9 @@
 /*
  * Tone Map Fragment Shader
  *
- * Reads the HDR scene render target, applies exposure scaling, then maps
- * the high-dynamic-range values to [0,1] using one of three operators:
+ * Reads the HDR scene render target and the bloom mip chain result,
+ * combines them, applies exposure scaling, then maps the high-dynamic-range
+ * values to [0,1] using one of three operators:
  *   0 — Clamp (saturate): values above 1.0 are lost
  *   1 — Reinhard: smooth roll-off, maps 0→0 and ∞→1
  *   2 — ACES filmic: S-curve with lifted shadows and rich highlights
@@ -14,15 +15,20 @@
 
 /* HDR scene render target.
  * Fragment samplers use space2 in SDL GPU's HLSL register convention. */
-Texture2D    hdr_texture : register(t0, space2);
-SamplerState hdr_sampler : register(s0, space2);
+Texture2D    hdr_texture   : register(t0, space2);
+SamplerState hdr_sampler   : register(s0, space2);
+
+/* Bloom result — the largest bloom mip after upsample accumulation. */
+Texture2D    bloom_texture : register(t1, space2);
+SamplerState bloom_sampler : register(s1, space2);
 
 /* Tone mapping parameters. */
 cbuffer TonemapUniforms : register(b0, space3)
 {
-    float exposure;       /* brightness multiplier applied before tone mapping */
-    uint  tonemap_mode;   /* 0 = clamp, 1 = Reinhard, 2 = ACES */
-    float2 _pad;
+    float exposure;        /* brightness multiplier applied before tone mapping */
+    uint  tonemap_mode;    /* 0 = clamp, 1 = Reinhard, 2 = ACES */
+    float bloom_intensity; /* bloom contribution (0 = no bloom) */
+    float _pad;
 };
 
 struct PSInput
@@ -59,6 +65,11 @@ float4 main(PSInput input) : SV_Target
 {
     /* Sample the HDR render target. */
     float3 hdr = hdr_texture.Sample(hdr_sampler, input.uv).rgb;
+
+    /* Add bloom contribution — bloom must be combined in HDR space
+     * BEFORE tone mapping so the combined result compresses naturally. */
+    float3 bloom = bloom_texture.Sample(bloom_sampler, input.uv).rgb;
+    hdr += bloom * bloom_intensity;
 
     /* Apply exposure — a multiplier that scales all HDR values before
      * tone mapping.  Higher exposure brightens the image. */

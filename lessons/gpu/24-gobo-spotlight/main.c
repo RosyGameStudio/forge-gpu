@@ -47,6 +47,11 @@
 #include "shaders/compiled/tonemap_vert_dxil.h"
 #include "shaders/compiled/tonemap_vert_spirv.h"
 
+#include "shaders/compiled/bloom_downsample_frag_dxil.h"
+#include "shaders/compiled/bloom_downsample_frag_spirv.h"
+#include "shaders/compiled/bloom_upsample_frag_dxil.h"
+#include "shaders/compiled/bloom_upsample_frag_spirv.h"
+
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
 #define WINDOW_WIDTH  1280
@@ -97,7 +102,7 @@
 
 /* Searchlight glass — blazing HDR emissive so it looks like the bulb is on. */
 #define GLASS_MATERIAL_INDEX  1
-#define GLASS_HDR_BRIGHTNESS  20.0f
+#define GLASS_HDR_BRIGHTNESS  35.0f
 
 /* Shadow map. */
 #define SHADOW_MAP_SIZE   1024
@@ -110,6 +115,11 @@
 #define TONEMAP_CLAMP    0
 #define TONEMAP_REINHARD 1
 #define TONEMAP_ACES     2
+
+/* Bloom — Jimenez dual-filter (SIGGRAPH 2014). */
+#define BLOOM_MIP_COUNT         5     /* half-res mip chain levels */
+#define DEFAULT_BLOOM_THRESHOLD 1.0f  /* luminance cutoff for bright areas */
+#define DEFAULT_BLOOM_INTENSITY 0.5f  /* bloom contribution to final image */
 
 /* Default HDR settings. */
 #define DEFAULT_EXPOSURE    1.0f
@@ -195,10 +205,24 @@ typedef struct ShadowVertUniforms {
 
 /* Tone map fragment uniforms — matches tonemap.frag.hlsl cbuffer. */
 typedef struct TonemapFragUniforms {
-    float  exposure;     /* exposure multiplier     (4 bytes) */
-    Uint32 tonemap_mode; /* 0=clamp, 1=Reinh, 2=AC (4 bytes) */
-    float  _pad[2];      /* pad to 16 bytes         (8 bytes) */
+    float  exposure;        /* exposure multiplier       (4 bytes) */
+    Uint32 tonemap_mode;    /* 0=clamp, 1=Reinh, 2=ACES (4 bytes) */
+    float  bloom_intensity; /* bloom contribution        (4 bytes) */
+    float  _pad;            /* pad to 16 bytes           (4 bytes) */
 } TonemapFragUniforms;
+
+/* Bloom downsample uniforms — matches bloom_downsample.frag.hlsl cbuffer. */
+typedef struct BloomDownsampleUniforms {
+    float texel_size[2]; /* 1/source_width, 1/source_height (8 bytes) */
+    float threshold;     /* brightness cutoff (first pass)  (4 bytes) */
+    float use_karis;     /* 1.0 first pass, 0.0 rest        (4 bytes) */
+} BloomDownsampleUniforms;
+
+/* Bloom upsample uniforms — matches bloom_upsample.frag.hlsl cbuffer. */
+typedef struct BloomUpsampleUniforms {
+    float texel_size[2]; /* 1/source_width, 1/source_height (8 bytes) */
+    float _pad[2];       /* pad to 16 bytes                 (8 bytes) */
+} BloomUpsampleUniforms;
 
 /* Grid vertex uniforms — one VP matrix. */
 typedef struct GridVertUniforms {
@@ -276,6 +300,16 @@ typedef struct app_state {
     /* HDR settings. */
     float  exposure;
     Uint32 tonemap_mode;
+
+    /* Bloom — Jimenez dual-filter mip chain. */
+    SDL_GPUGraphicsPipeline *bloom_downsample_pipeline;
+    SDL_GPUGraphicsPipeline *bloom_upsample_pipeline;
+    SDL_GPUTexture *bloom_mips[BLOOM_MIP_COUNT];
+    Uint32          bloom_widths[BLOOM_MIP_COUNT];
+    Uint32          bloom_heights[BLOOM_MIP_COUNT];
+    SDL_GPUSampler *bloom_sampler;
+    float  bloom_threshold;
+    float  bloom_intensity;
 
     /* Depth buffer (main render pass). */
     SDL_GPUTexture *depth_texture;
@@ -978,6 +1012,60 @@ static bool ensure_hdr_target(app_state *state, Uint32 w, Uint32 h)
     return true;
 }
 
+/* ── Helper: (re)create bloom mip chain on resize ───────────────────────── */
+
+static bool ensure_bloom_mips(app_state *state, Uint32 hdr_w, Uint32 hdr_h)
+{
+    /* Check if mip 0 already matches the expected size. */
+    Uint32 expected_w = hdr_w / 2;
+    Uint32 expected_h = hdr_h / 2;
+    if (state->bloom_mips[0] && state->bloom_widths[0] == expected_w &&
+        state->bloom_heights[0] == expected_h) {
+        return true;
+    }
+
+    /* Release old mips. */
+    for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+        if (state->bloom_mips[i]) {
+            SDL_ReleaseGPUTexture(state->device, state->bloom_mips[i]);
+            state->bloom_mips[i] = NULL;
+        }
+    }
+
+    /* Create new mip chain at half-resolution steps. */
+    Uint32 w = hdr_w / 2;
+    Uint32 h = hdr_h / 2;
+    for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+        SDL_GPUTextureCreateInfo ti;
+        SDL_zero(ti);
+        ti.type                 = SDL_GPU_TEXTURETYPE_2D;
+        ti.format               = HDR_FORMAT;
+        ti.width                = w;
+        ti.height               = h;
+        ti.layer_count_or_depth = 1;
+        ti.num_levels           = 1;
+        /* COLOR_TARGET: bloom passes render into it.
+         * SAMPLER: subsequent passes read from it. */
+        ti.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET
+                 | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+        state->bloom_mips[i] = SDL_CreateGPUTexture(state->device, &ti);
+        if (!state->bloom_mips[i]) {
+            SDL_Log("Failed to create bloom mip %d: %s", i, SDL_GetError());
+            return false;
+        }
+        state->bloom_widths[i]  = w;
+        state->bloom_heights[i] = h;
+
+        w /= 2;
+        h /= 2;
+        if (w < 1) w = 1;
+        if (h < 1) h = 1;
+    }
+
+    return true;
+}
+
 /* ── Helper: generate box placements ────────────────────────────────────── */
 
 static void generate_box_placements(app_state *state)
@@ -1403,10 +1491,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
             tonemap_vert_spirv, sizeof(tonemap_vert_spirv),
             tonemap_vert_dxil, sizeof(tonemap_vert_dxil), 0, 0);
-        /* 1 sampler (HDR texture), 1 uniform buffer (exposure + mode). */
+        /* 2 samplers (HDR + bloom), 1 uniform buffer (exposure + mode + bloom). */
         SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
             tonemap_frag_spirv, sizeof(tonemap_frag_spirv),
-            tonemap_frag_dxil, sizeof(tonemap_frag_dxil), 1, 1);
+            tonemap_frag_dxil, sizeof(tonemap_frag_dxil), 2, 1);
         if (!vert || !frag) {
             if (vert) SDL_ReleaseGPUShader(device, vert);
             if (frag) SDL_ReleaseGPUShader(device, frag);
@@ -1505,6 +1593,97 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         }
     }
 
+    /* ── Bloom downsample pipeline (fullscreen quad, no depth) ─────── */
+    {
+        /* Reuse the tonemap vertex shader — same fullscreen quad from SV_VertexID. */
+        SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
+            tonemap_vert_spirv, sizeof(tonemap_vert_spirv),
+            tonemap_vert_dxil, sizeof(tonemap_vert_dxil), 0, 0);
+        /* 1 sampler (source texture), 1 uniform buffer (texel_size + threshold). */
+        SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
+            bloom_downsample_frag_spirv, sizeof(bloom_downsample_frag_spirv),
+            bloom_downsample_frag_dxil, sizeof(bloom_downsample_frag_dxil), 1, 1);
+        if (!vert || !frag) {
+            if (vert) SDL_ReleaseGPUShader(device, vert);
+            if (frag) SDL_ReleaseGPUShader(device, frag);
+            goto init_fail;
+        }
+
+        /* No blending — downsample writes directly to a cleared target. */
+        SDL_GPUColorTargetDescription color_desc;
+        SDL_zero(color_desc);
+        color_desc.format = HDR_FORMAT;
+
+        SDL_GPUGraphicsPipelineCreateInfo pi;
+        SDL_zero(pi);
+        pi.vertex_shader   = vert;
+        pi.fragment_shader = frag;
+        pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+        pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        pi.depth_stencil_state.enable_depth_test  = false;
+        pi.depth_stencil_state.enable_depth_write = false;
+        pi.target_info.color_target_descriptions  = &color_desc;
+        pi.target_info.num_color_targets          = 1;
+        pi.target_info.has_depth_stencil_target   = false;
+
+        state->bloom_downsample_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+        SDL_ReleaseGPUShader(device, vert);
+        SDL_ReleaseGPUShader(device, frag);
+        if (!state->bloom_downsample_pipeline) {
+            SDL_Log("Failed to create bloom downsample pipeline: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
+    /* ── Bloom upsample pipeline (additive blend for accumulation) ── */
+    {
+        SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
+            tonemap_vert_spirv, sizeof(tonemap_vert_spirv),
+            tonemap_vert_dxil, sizeof(tonemap_vert_dxil), 0, 0);
+        /* 1 sampler (source mip), 1 uniform buffer (texel_size). */
+        SDL_GPUShader *frag = create_shader(device, SDL_GPU_SHADERSTAGE_FRAGMENT,
+            bloom_upsample_frag_spirv, sizeof(bloom_upsample_frag_spirv),
+            bloom_upsample_frag_dxil, sizeof(bloom_upsample_frag_dxil), 1, 1);
+        if (!vert || !frag) {
+            if (vert) SDL_ReleaseGPUShader(device, vert);
+            if (frag) SDL_ReleaseGPUShader(device, frag);
+            goto init_fail;
+        }
+
+        /* Additive blend (ONE + ONE) — the upsampled result accumulates
+         * on top of the existing downsample data in each mip level. */
+        SDL_GPUColorTargetDescription color_desc;
+        SDL_zero(color_desc);
+        color_desc.format = HDR_FORMAT;
+        color_desc.blend_state.enable_blend         = true;
+        color_desc.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+        color_desc.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+        color_desc.blend_state.color_blend_op        = SDL_GPU_BLENDOP_ADD;
+        color_desc.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+        color_desc.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+        color_desc.blend_state.alpha_blend_op        = SDL_GPU_BLENDOP_ADD;
+
+        SDL_GPUGraphicsPipelineCreateInfo pi;
+        SDL_zero(pi);
+        pi.vertex_shader   = vert;
+        pi.fragment_shader = frag;
+        pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+        pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        pi.depth_stencil_state.enable_depth_test  = false;
+        pi.depth_stencil_state.enable_depth_write = false;
+        pi.target_info.color_target_descriptions  = &color_desc;
+        pi.target_info.num_color_targets          = 1;
+        pi.target_info.has_depth_stencil_target   = false;
+
+        state->bloom_upsample_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+        SDL_ReleaseGPUShader(device, vert);
+        SDL_ReleaseGPUShader(device, frag);
+        if (!state->bloom_upsample_pipeline) {
+            SDL_Log("Failed to create bloom upsample pipeline: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
     /* ── Grid geometry (flat quad on XZ plane) ──────────────────────── */
     {
         float verts[] = {
@@ -1595,6 +1774,23 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         }
     }
 
+    /* ── Bloom sampler (linear, clamp — bilinear filtering is essential) ── */
+    {
+        SDL_GPUSamplerCreateInfo si;
+        SDL_zero(si);
+        si.min_filter     = SDL_GPU_FILTER_LINEAR;
+        si.mag_filter     = SDL_GPU_FILTER_LINEAR;
+        si.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+        state->bloom_sampler = SDL_CreateGPUSampler(device, &si);
+        if (!state->bloom_sampler) {
+            SDL_Log("Failed to create bloom sampler: %s", SDL_GetError());
+            goto init_fail;
+        }
+    }
+
     /* ── Load gobo pattern texture ─────────────────────────────────── */
     {
         const char *base = SDL_GetBasePath();
@@ -1635,9 +1831,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         state->spot_dir = vec3_normalize(vec3_sub(spot_target, spot_pos));
     }
 
-    /* ── HDR defaults ──────────────────────────────────────────────── */
-    state->exposure     = DEFAULT_EXPOSURE;
-    state->tonemap_mode = DEFAULT_TONEMAP;
+    /* ── HDR + bloom defaults ──────────────────────────────────────── */
+    state->exposure        = DEFAULT_EXPOSURE;
+    state->tonemap_mode    = DEFAULT_TONEMAP;
+    state->bloom_threshold = DEFAULT_BLOOM_THRESHOLD;
+    state->bloom_intensity = DEFAULT_BLOOM_INTENSITY;
 
     /* ── Camera initial state ───────────────────────────────────────── */
     state->cam_position = vec3_create(CAM_START_X, CAM_START_Y, CAM_START_Z);
@@ -1665,6 +1863,10 @@ init_fail:
         SDL_ReleaseGPUGraphicsPipeline(device, state->shadow_pipeline);
     if (state->tonemap_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(device, state->tonemap_pipeline);
+    if (state->bloom_downsample_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(device, state->bloom_downsample_pipeline);
+    if (state->bloom_upsample_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(device, state->bloom_upsample_pipeline);
     if (state->grid_vertex_buffer)
         SDL_ReleaseGPUBuffer(device, state->grid_vertex_buffer);
     if (state->grid_index_buffer)
@@ -1677,6 +1879,8 @@ init_fail:
         SDL_ReleaseGPUSampler(device, state->gobo_sampler);
     if (state->hdr_sampler)
         SDL_ReleaseGPUSampler(device, state->hdr_sampler);
+    if (state->bloom_sampler)
+        SDL_ReleaseGPUSampler(device, state->bloom_sampler);
     if (state->white_texture)
         SDL_ReleaseGPUTexture(device, state->white_texture);
     if (state->shadow_depth_texture)
@@ -1687,6 +1891,10 @@ init_fail:
         SDL_ReleaseGPUTexture(device, state->hdr_target);
     if (state->depth_texture)
         SDL_ReleaseGPUTexture(device, state->depth_texture);
+    for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+        if (state->bloom_mips[i])
+            SDL_ReleaseGPUTexture(device, state->bloom_mips[i]);
+    }
     free_model_gpu(device, &state->truck);
     free_model_gpu(device, &state->box);
     free_model_gpu(device, &state->searchlight);
@@ -1816,6 +2024,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_FAILURE;
     }
     if (!ensure_hdr_target(state, sw, sh)) {
+        return SDL_APP_FAILURE;
+    }
+    if (!ensure_bloom_mips(state, sw, sh)) {
         return SDL_APP_FAILURE;
     }
 
@@ -1964,6 +2175,79 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     SDL_EndGPURenderPass(pass);
 
+    /* ── Bloom downsample — extract bright areas and progressively blur ── */
+    {
+        BloomDownsampleUniforms ds_u;
+        for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+            /* Source is HDR target for first pass, previous mip for the rest. */
+            SDL_GPUTexture *src = (i == 0) ? state->hdr_target
+                                           : state->bloom_mips[i - 1];
+            Uint32 src_w = (i == 0) ? state->hdr_width
+                                    : state->bloom_widths[i - 1];
+            Uint32 src_h = (i == 0) ? state->hdr_height
+                                    : state->bloom_heights[i - 1];
+
+            ds_u.texel_size[0] = 1.0f / (float)src_w;
+            ds_u.texel_size[1] = 1.0f / (float)src_h;
+            ds_u.threshold     = state->bloom_threshold;
+            ds_u.use_karis     = (i == 0) ? 1.0f : 0.0f;
+
+            /* Render to bloom_mips[i], CLEAR load op. */
+            SDL_GPUColorTargetInfo bloom_ct;
+            SDL_zero(bloom_ct);
+            bloom_ct.texture  = state->bloom_mips[i];
+            bloom_ct.load_op  = SDL_GPU_LOADOP_CLEAR;
+            bloom_ct.store_op = SDL_GPU_STOREOP_STORE;
+
+            SDL_GPURenderPass *bloom_pass = SDL_BeginGPURenderPass(
+                cmd, &bloom_ct, 1, NULL);
+            SDL_BindGPUGraphicsPipeline(bloom_pass,
+                                        state->bloom_downsample_pipeline);
+
+            SDL_GPUTextureSamplerBinding src_bind = {
+                .texture = src, .sampler = state->bloom_sampler
+            };
+            SDL_BindGPUFragmentSamplers(bloom_pass, 0, &src_bind, 1);
+            SDL_PushGPUFragmentUniformData(cmd, 0, &ds_u, sizeof(ds_u));
+            SDL_DrawGPUPrimitives(bloom_pass, FULLSCREEN_QUAD_VERTS, 1, 0, 0);
+            SDL_EndGPURenderPass(bloom_pass);
+        }
+    }
+
+    /* ── Bloom upsample — progressively add back detail ──────────── */
+    {
+        BloomUpsampleUniforms us_u;
+        SDL_zero(us_u);
+        for (int i = BLOOM_MIP_COUNT - 2; i >= 0; i--) {
+            /* Source is the smaller (i+1) mip. */
+            us_u.texel_size[0] = 1.0f / (float)state->bloom_widths[i + 1];
+            us_u.texel_size[1] = 1.0f / (float)state->bloom_heights[i + 1];
+
+            /* Render to bloom_mips[i], LOAD to preserve downsample data.
+             * The additive blend state on the pipeline accumulates the
+             * upsampled result on top. */
+            SDL_GPUColorTargetInfo bloom_ct;
+            SDL_zero(bloom_ct);
+            bloom_ct.texture  = state->bloom_mips[i];
+            bloom_ct.load_op  = SDL_GPU_LOADOP_LOAD;
+            bloom_ct.store_op = SDL_GPU_STOREOP_STORE;
+
+            SDL_GPURenderPass *bloom_pass = SDL_BeginGPURenderPass(
+                cmd, &bloom_ct, 1, NULL);
+            SDL_BindGPUGraphicsPipeline(bloom_pass,
+                                        state->bloom_upsample_pipeline);
+
+            SDL_GPUTextureSamplerBinding src_bind = {
+                .texture = state->bloom_mips[i + 1],
+                .sampler = state->bloom_sampler
+            };
+            SDL_BindGPUFragmentSamplers(bloom_pass, 0, &src_bind, 1);
+            SDL_PushGPUFragmentUniformData(cmd, 0, &us_u, sizeof(us_u));
+            SDL_DrawGPUPrimitives(bloom_pass, FULLSCREEN_QUAD_VERTS, 1, 0, 0);
+            SDL_EndGPURenderPass(bloom_pass);
+        }
+    }
+
     /* ── Tone map pass — compress HDR → swapchain ─────────────────── */
     {
         SDL_GPUColorTargetInfo tone_ct;
@@ -1981,17 +2265,20 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
         SDL_BindGPUGraphicsPipeline(tone_pass, state->tonemap_pipeline);
 
-        /* Bind the HDR render target as a texture for sampling. */
-        SDL_GPUTextureSamplerBinding hdr_binding;
-        hdr_binding.texture = state->hdr_target;
-        hdr_binding.sampler = state->hdr_sampler;
-        SDL_BindGPUFragmentSamplers(tone_pass, 0, &hdr_binding, 1);
+        /* Bind the HDR render target and bloom result as textures. */
+        SDL_GPUTextureSamplerBinding tone_binds[2];
+        tone_binds[0] = (SDL_GPUTextureSamplerBinding){
+            .texture = state->hdr_target, .sampler = state->hdr_sampler };
+        tone_binds[1] = (SDL_GPUTextureSamplerBinding){
+            .texture = state->bloom_mips[0], .sampler = state->bloom_sampler };
+        SDL_BindGPUFragmentSamplers(tone_pass, 0, tone_binds, 2);
 
-        /* Push tone map uniforms (exposure and operator selection). */
+        /* Push tone map uniforms (exposure, operator, bloom contribution). */
         TonemapFragUniforms tone_u;
         SDL_zero(tone_u);
-        tone_u.exposure     = state->exposure;
-        tone_u.tonemap_mode = state->tonemap_mode;
+        tone_u.exposure        = state->exposure;
+        tone_u.tonemap_mode    = state->tonemap_mode;
+        tone_u.bloom_intensity = state->bloom_intensity;
         SDL_PushGPUFragmentUniformData(cmd, 0, &tone_u, sizeof(tone_u));
 
         /* No vertex buffer — positions generated from SV_VertexID. */
@@ -2028,6 +2315,10 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->shadow_pipeline);
     if (state->tonemap_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->tonemap_pipeline);
+    if (state->bloom_downsample_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(state->device, state->bloom_downsample_pipeline);
+    if (state->bloom_upsample_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(state->device, state->bloom_upsample_pipeline);
     if (state->grid_vertex_buffer)
         SDL_ReleaseGPUBuffer(state->device, state->grid_vertex_buffer);
     if (state->grid_index_buffer)
@@ -2040,6 +2331,10 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
         SDL_ReleaseGPUTexture(state->device, state->gobo_texture);
     if (state->hdr_target)
         SDL_ReleaseGPUTexture(state->device, state->hdr_target);
+    for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
+        if (state->bloom_mips[i])
+            SDL_ReleaseGPUTexture(state->device, state->bloom_mips[i]);
+    }
     if (state->sampler)
         SDL_ReleaseGPUSampler(state->device, state->sampler);
     if (state->shadow_sampler)
@@ -2048,6 +2343,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
         SDL_ReleaseGPUSampler(state->device, state->gobo_sampler);
     if (state->hdr_sampler)
         SDL_ReleaseGPUSampler(state->device, state->hdr_sampler);
+    if (state->bloom_sampler)
+        SDL_ReleaseGPUSampler(state->device, state->bloom_sampler);
     if (state->depth_texture)
         SDL_ReleaseGPUTexture(state->device, state->depth_texture);
 
