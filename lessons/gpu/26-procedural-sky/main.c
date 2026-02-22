@@ -64,7 +64,7 @@
 
 /* ── Compiled shader bytecodes ────────────────────────────────────────────── */
 
-/* Sky shaders — fullscreen quad vertex (inv_vp ray) + atmosphere fragment */
+/* Sky shaders — fullscreen quad vertex (ray matrix) + atmosphere fragment */
 #include "shaders/compiled/sky_vert_spirv.h"
 #include "shaders/compiled/sky_vert_dxil.h"
 #include "shaders/compiled/sky_frag_spirv.h"
@@ -521,14 +521,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
   /* Step 11 — Create the sky pipeline.
    * Renders to the HDR target.  No vertex buffer — fullscreen quad via
-   * SV_VertexID.  The sky vertex shader has 1 uniform buffer (inv_vp),
+   * SV_VertexID.  The sky vertex shader has 1 uniform buffer (ray_matrix),
    * the fragment shader has 1 uniform buffer (camera + sun + march). */
   {
     SDL_GPUShader *vert = create_shader(
         device, SDL_GPU_SHADERSTAGE_VERTEX,
         sky_vert_spirv, sizeof(sky_vert_spirv),
         sky_vert_dxil, sizeof(sky_vert_dxil),
-        0, 1); /* 0 samplers, 1 uniform buffer (inv_vp) */
+        0, 1); /* 0 samplers, 1 uniform buffer (ray_matrix) */
 
     SDL_GPUShader *frag = create_shader(
         device, SDL_GPU_SHADERSTAGE_FRAGMENT,
