@@ -1462,10 +1462,10 @@ def diagram_debugger_workflow():
 # ---------------------------------------------------------------------------
 def diagram_stepping_modes():
     """Visualize step over, step into, and step out with a call hierarchy."""
-    fig, ax = plt.subplots(figsize=(12, 8), facecolor=STYLE["bg"])
+    fig, ax = plt.subplots(figsize=(12, 9), facecolor=STYLE["bg"])
     ax.set_facecolor(STYLE["bg"])
     ax.set_xlim(-1, 23)
-    ax.set_ylim(-1, 11)
+    ax.set_ylim(-2, 12.5)
     ax.set_aspect("equal")
     ax.axis("off")
 
@@ -1473,7 +1473,7 @@ def diagram_stepping_modes():
 
     ax.text(
         11,
-        10.5,
+        12.0,
         "Stepping Modes Compared",
         color=STYLE["text"],
         fontsize=16,
@@ -1503,7 +1503,7 @@ def diagram_stepping_modes():
     ]
 
     # Code block background
-    code_y_top = 8.5
+    code_y_top = 9.5
     code_bg = FancyBboxPatch(
         (code_x, code_y_top - len(code_lines) * line_h - 0.3),
         code_w,
@@ -1577,7 +1577,7 @@ def diagram_stepping_modes():
             "Executes normalize() to completion.\n"
             "Pauses on the NEXT line:\n"
             "  float d = dot(v, n, 3);",
-            8.2,
+            8.8,
         ),
         (
             "Step Into (F11 / step)",
@@ -1585,7 +1585,7 @@ def diagram_stepping_modes():
             "Enters normalize() and pauses\n"
             "at its first line:\n"
             "  float len = dot(v, v, n);",
-            5.2,
+            5.5,
         ),
         (
             "Step Out (Shift+F11 / finish)",
