@@ -532,21 +532,23 @@ static void demo_finding_a_crash(void)
  */
 
 /* Calculates the average brightness of an array of pixel values (0-255).
- * Contains a logic error: integer division truncates the result. */
+ * Deliberately uses integer division to demonstrate truncation as a
+ * teaching point — the debugger lets you see where precision is lost. */
 static int calculate_average_brightness(const int *pixels, int count)
 {
     int sum = 0;
     for (int i = 0; i < count; i++) {
         sum += pixels[i];
     }
-    /* BUG: integer division truncates.  With pixels = {200, 150, 180, 220, 170},
-     * sum = 920, count = 5, so 920 / 5 = 184 (correct here by coincidence).
-     * But with {201, 150, 180, 220, 170}, sum = 921, 921/5 = 184 (truncated
-     * from 184.2).
+    /* Integer division truncates: with pixels = {201, 150, 180, 220, 170},
+     * sum = 921, count = 5, so 921 / 5 = 184 — the true average 184.2 is
+     * silently truncated to 184.  A debugger lets you print 'sum' and
+     * 'count' at this line to verify the calculation yourself.
      *
-     * More importantly, if we accidentally wrote 'sum / (count + 1)' — an
-     * off-by-one — the result would be 153 instead of 184.  The debugger
-     * lets you watch 'sum' accumulate and verify the divisor. */
+     * A more serious bug: if you accidentally wrote 'sum / (count + 1)' —
+     * an off-by-one in the divisor — the result would be 153 instead of
+     * 184.  The debugger lets you watch 'sum' accumulate and inspect the
+     * divisor to catch exactly this kind of mistake. */
     return sum / count;
 }
 
@@ -583,15 +585,16 @@ static void demo_finding_a_logic_error(void)
     SDL_Log("each iteration, checking the running total at each step.");
     SDL_Log(" ");
 
-    /* Example 1: average brightness */
-    int pixels[] = {200, 150, 180, 220, 170};
+    /* Example 1: average brightness — pixel values deliberately sum to 921,
+     * which is NOT a multiple of 5, so integer division truncates. */
+    int pixels[] = {201, 150, 180, 220, 170};
     int pixel_count = 5;
     int average = calculate_average_brightness(pixels, pixel_count);
 
-    SDL_Log("Example 1: average brightness of {200, 150, 180, 220, 170}");
+    SDL_Log("Example 1: average brightness of {201, 150, 180, 220, 170}");
     SDL_Log(" ");
-    SDL_Log("  Expected: (200 + 150 + 180 + 220 + 170) / 5 = 184");
-    SDL_Log("  Got:      %d", average);
+    SDL_Log("  True average: (201 + 150 + 180 + 220 + 170) / 5 = 184.2");
+    SDL_Log("  Got (int):    %d  (truncated from 184.2)", average);
     SDL_Log(" ");
 
     SDL_Log("Debugging approach:");
@@ -615,7 +618,8 @@ static void demo_finding_a_logic_error(void)
     }
 
     SDL_Log(" ");
-    SDL_Log("  Final: sum=%d / count=%d = %d", sum, pixel_count, sum / pixel_count);
+    SDL_Log("  Final: sum=%d / count=%d = %d (true: %.1f — truncated)",
+            sum, pixel_count, sum / pixel_count, (float)sum / pixel_count);
     SDL_Log(" ");
 
     /* Example 2: box blur */
