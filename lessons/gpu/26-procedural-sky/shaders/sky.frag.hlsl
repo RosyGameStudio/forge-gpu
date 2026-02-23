@@ -193,22 +193,15 @@ float2 transmittance_params_to_uv(float view_height, float cos_zenith)
     float H = sqrt(R_ATMO * R_ATMO - R_GROUND * R_GROUND);
     float rho = sqrt(max(0.0, view_height * view_height - R_GROUND * R_GROUND));
 
-    /* Compute the ray distance to the atmosphere boundary. */
-    float sin_zenith = sqrt(max(0.0, 1.0 - cos_zenith * cos_zenith));
-    float3 ro = float3(0.0, view_height, 0.0);
-    float3 rd = float3(sin_zenith, cos_zenith, 0.0);
-
-    float t_near, t_far;
-    ray_sphere_intersect(ro, rd, R_ATMO, t_near, t_far);
-    float d = t_far;
-
-    /* If the ray hits ground, use the ground distance. */
-    float t_gnd_near, t_gnd_far;
-    if (ray_sphere_intersect(ro, rd, R_GROUND, t_gnd_near, t_gnd_far))
-    {
-        if (t_gnd_near > 0.0)
-            d = t_gnd_near;
-    }
+    /* Compute the ray distance to the atmosphere boundary using the
+     * quadratic formula directly.  This must NOT clip to the ground —
+     * the UV parameterization always uses the atmosphere sphere distance
+     * to match the inverse mapping in the compute shader.  Earth shadow
+     * is handled separately in the atmosphere() loop. */
+    float discriminant = view_height * view_height
+        * (cos_zenith * cos_zenith - 1.0) + R_ATMO * R_ATMO;
+    float d = max(0.0, -view_height * cos_zenith
+        + sqrt(max(0.0, discriminant)));
 
     float d_min = R_ATMO - view_height;
     float d_max = rho + H;
@@ -307,6 +300,20 @@ float3 atmosphere(float3 ray_origin, float3 ray_dir, out float3 transmittance_ou
         float cos_sun_zenith = dot(normalize(pos), sun_dir);
         float3 sun_trans = sample_transmittance(sample_height, cos_sun_zenith);
 
+        /* Earth shadow: check if the sun is blocked by the planet at this
+         * sample point.  Without this, points in the planet's shadow would
+         * still contribute inscattered sunlight, diluting the warm Rayleigh
+         * sunset colors with incorrect blue light. */
+        float t_shadow_near, t_shadow_far;
+        bool sun_blocked = ray_sphere_intersect(
+            pos, sun_dir, R_GROUND, t_shadow_near, t_shadow_far);
+        float earth_shadow = (sun_blocked && t_shadow_near >= 0.0) ? 0.0 : 1.0;
+
+        /* Smooth transition near the terminator.  Without this, the shadow
+         * boundary would be a hard edge causing visible artifacts.
+         * The fade covers ~2.9 degrees around the local horizon. */
+        earth_shadow *= saturate(cos_sun_zenith * 10.0 + 0.5);
+
         /* Separate Rayleigh and Mie for phase weighting. */
         float altitude = sample_height - R_GROUND;
         float rho_r = exp(-altitude / RAYLEIGH_H);
@@ -322,8 +329,11 @@ float3 atmosphere(float3 ray_origin, float3 ray_dir, out float3 transmittance_ou
         float3 ms = sample_multiscatter(altitude, cos_sun_zenith);
 
         /* Combined inscattered radiance:
-         * single scatter (phase-weighted) + multi-scatter (isotropic). */
-        float3 S = (scatter_r + scatter_m) * sun_trans * sun_intensity
+         * Single scatter is multiplied by earth_shadow -- no direct
+         * sunlight reaches points in the planet's shadow.
+         * Multi-scatter is NOT shadowed -- it's already integrated
+         * over the full sphere of directions in the LUT. */
+        float3 S = (scatter_r + scatter_m) * sun_trans * earth_shadow * sun_intensity
                  + ms * med.scatter * sun_intensity;
 
         /* Beer-Lambert: transmittance decreases exponentially. */

@@ -153,23 +153,14 @@ float3 sample_transmittance_lut(float view_height, float cos_zenith)
     float d_min = R_ATMO - view_height;
     float d_max = rho + H;
 
-    /* Compute d (distance to atmosphere boundary or ground) via
-     * ray-sphere intersection from cos_zenith. */
-    float sin_zenith = sqrt(max(0.0, 1.0 - cos_zenith * cos_zenith));
-    float3 ro = float3(0.0, view_height, 0.0);
-    float3 rd = float3(sin_zenith, cos_zenith, 0.0);
-
-    float t_near, t_far;
-    ray_sphere_intersect(ro, rd, R_ATMO, t_near, t_far);
-    float d = t_far;
-
-    /* Check ground intersection -- if the ray hits ground, use that distance. */
-    float t_gnd_near, t_gnd_far;
-    if (ray_sphere_intersect(ro, rd, R_GROUND, t_gnd_near, t_gnd_far))
-    {
-        if (t_gnd_near >= 0.0)
-            d = t_gnd_near;
-    }
+    /* Compute d (distance to atmosphere boundary) using the quadratic
+     * formula directly.  Must NOT clip to ground — the UV parameterization
+     * always uses the atmosphere sphere distance to match the inverse
+     * mapping in the transmittance compute shader. */
+    float discriminant = view_height * view_height
+        * (cos_zenith * cos_zenith - 1.0) + R_ATMO * R_ATMO;
+    float d = max(0.0, -view_height * cos_zenith
+        + sqrt(max(0.0, discriminant)));
 
     float x_mu = (d_max > d_min) ? (d - d_min) / (d_max - d_min) : 0.0;
     float x_r = (H > 0.0) ? rho / H : 0.0;

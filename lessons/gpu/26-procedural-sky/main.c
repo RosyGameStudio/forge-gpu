@@ -167,7 +167,8 @@
 /* Capture mode — fixed sun angle for consistent screenshots.
  * Low elevation shows warm scattering, bloom halo, and orange horizon. */
 #define CAPTURE_SUN_ELEVATION 0.07f /* ~4 degrees — low sun for sunset scattering  */
-#define CAPTURE_SUN_AZIMUTH   4.71f /* 3π/2 — directly in front of camera (-Z)    */
+#define CAPTURE_SUN_AZIMUTH   3.08f /* match orbit start angle                     */
+#define CAPTURE_CAM_YAW       1.63f /* face the sun at azimuth 3.08                */
 
 /* Frame timing. */
 #define MAX_FRAME_DT 0.1f
@@ -951,13 +952,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
   /* Step 18 — Initialize camera and sun state. */
   state->cam_position = (vec3){ CAM_START_X, CAM_START_Y, CAM_START_Z };
-  state->cam_yaw = 0.0f;
+  state->cam_yaw = 1.63f;  /* face the sun at orbit_angle 3.08 */
   state->cam_pitch = 0.0f;
 
   state->sun_elevation = SUN_ELEVATION_DEFAULT;
   state->sun_azimuth = SUN_AZIMUTH_DEFAULT;
   state->sun_auto = true;
-  state->sun_orbit_angle = SUN_ELEVATION_DEFAULT; /* start orbit at default elevation */
+  state->sun_orbit_angle = 3.08f; /* near π — sun ~4° above horizon, setting */
 
   state->exposure = DEFAULT_EXPOSURE;
   state->tonemap_mode = TONEMAP_ACES;
@@ -978,6 +979,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   if (state->capture.mode != FORGE_CAPTURE_NONE) {
     state->sun_elevation = CAPTURE_SUN_ELEVATION;
     state->sun_azimuth = CAPTURE_SUN_AZIMUTH;
+    state->cam_yaw = CAPTURE_CAM_YAW;
     state->sun_auto = false;
     forge_capture_init(&state->capture, state->device, state->window);
   }
