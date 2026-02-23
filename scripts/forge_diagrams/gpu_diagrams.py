@@ -7187,10 +7187,10 @@ def diagram_phase_functions():
         theta, rayleigh / rayleigh.max(), color=STYLE["accent1"], lw=2, label="Rayleigh"
     )
     ax2.plot(theta, mie / mie.max(), color=STYLE["accent2"], lw=2, label="Mie (g=0.8)")
-    ax2.set_theta_zero_location("E")
-    ax2.set_theta_direction(-1)
+    ax2.set_theta_zero_location("E")  # type: ignore[attr-defined]
+    ax2.set_theta_direction(-1)  # type: ignore[attr-defined]
     ax2.tick_params(colors=STYLE["axis"], labelsize=8)
-    ax2.set_rlabel_position(135)
+    ax2.set_rlabel_position(135)  # type: ignore[attr-defined]
     ax2.grid(True, color=STYLE["grid"], alpha=0.3)
     ax2.spines["polar"].set_color(STYLE["grid"])
     ax2.set_title(
