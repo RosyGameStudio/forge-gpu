@@ -478,8 +478,21 @@ implement the bilateral variant.
 
 ![Composite display modes](assets/composite_modes.png)
 
-The final pass reads the blurred AO factor and the scene color from the
-geometry pass, and combines them:
+The composite pass is what actually puts pixels on screen. Unlike the earlier
+passes that render into off-screen textures, this pass targets the **swapchain
+texture** — the image that SDL presents to the window:
+
+```c
+comp_ct.texture  = swapchain_tex;   /* render directly to the screen */
+comp_ct.store_op = SDL_GPU_STOREOP_STORE;
+SDL_BeginGPURenderPass(cmd, &comp_ct, 1, NULL);
+```
+
+There is no special "final output" designation in SDL's GPU API. Whichever
+render pass uses the swapchain texture as its color target is the one whose
+output appears on screen. Here, the composite pass draws a fullscreen quad
+that samples the scene color and blurred AO as input textures, and writes
+the combined result to the swapchain:
 
 ```hlsl
 final_color = scene_color * ao;

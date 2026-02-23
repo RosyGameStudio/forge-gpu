@@ -7663,7 +7663,7 @@ def diagram_ssao_render_pipeline():
     outputs = [
         (1.0, 4.3, "shadow_depth\nD32_FLOAT\n2048\u00d72048", STYLE["accent4"]),
         (3.8, 3.1, "scene_color\nR8G8B8A8", STYLE["accent1"]),
-        (3.8, 1.8, "view_normals\nR16G16_FLOAT", STYLE["accent1"]),
+        (3.8, 1.8, "view_normals\nR16G16B16A16_FLOAT", STYLE["accent1"]),
         (3.8, 0.5, "scene_depth\nD32_FLOAT", STYLE["accent1"]),
         (6.6, 4.3, "ssao_raw\nR8_UNORM", STYLE["accent2"]),
         (9.4, 4.3, "ssao_blurred\nR8_UNORM", STYLE["accent3"]),
@@ -8469,16 +8469,30 @@ def diagram_occlusion_test():
     """How a single SSAO sample is tested: project, depth compare, range check."""
     fig = plt.figure(figsize=(10, 7), facecolor=STYLE["bg"])
     ax = fig.add_subplot(111)
-    setup_axes(ax, xlim=(-0.5, 8.5), ylim=(-1.5, 5.5), grid=False, aspect=None)
+    setup_axes(ax, xlim=(-0.5, 10.0), ylim=(-0.5, 5.8), grid=False, aspect=None)
 
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
-    # Camera at left
-    cam_x, cam_y = 0.5, 2.5
+    # ---- Geometry: floor + step block ----
+    floor_y = 0.5
+    step_left, step_right, step_top = 3.0, 4.0, 2.5
+
+    # Filled cross-section (floor extends full width, step rises in the middle)
+    geom_x = [-0.5, -0.5, step_left, step_left, step_right, step_right, 10.0, 10.0]
+    geom_y = [-0.5, floor_y, floor_y, step_top, step_top, floor_y, floor_y, -0.5]
+    ax.fill(geom_x, geom_y, color=STYLE["surface"], alpha=0.7, zorder=1)
+
+    # Visible surface outline
+    outline_x = [-0.5, step_left, step_left, step_right, step_right, 10.0]
+    outline_y = [floor_y, floor_y, step_top, step_top, floor_y, floor_y]
+    ax.plot(outline_x, outline_y, "-", color=STYLE["text_dim"], lw=2, zorder=2)
+
+    # ---- Camera ----
+    cam_x, cam_y = 0.5, 4.5
     ax.plot(cam_x, cam_y, "s", color=STYLE["text"], markersize=12, zorder=6)
     ax.text(
         cam_x,
-        cam_y + 0.4,
+        cam_y + 0.3,
         "camera",
         color=STYLE["text"],
         fontsize=9,
@@ -8488,21 +8502,8 @@ def diagram_occlusion_test():
         zorder=5,
     )
 
-    # Scene surface (cross-section) — a curved surface with a crevice
-    surface_x = np.array([3.0, 4.0, 4.5, 5.0, 5.0, 5.5, 6.0, 7.0, 8.0])
-    surface_y = np.array([1.0, 1.2, 2.5, 2.5, 1.0, 1.0, 1.3, 1.5, 1.8])
-    ax.fill_between(
-        surface_x,
-        [-1.5] * len(surface_x),
-        surface_y,
-        color=STYLE["surface"],
-        alpha=0.6,
-        zorder=1,
-    )
-    ax.plot(surface_x, surface_y, "-", color=STYLE["text_dim"], lw=2, zorder=2)
-
-    # Fragment point P on the surface
-    px, py = 5.5, 1.0
+    # ---- Fragment P on the floor just past the step ----
+    px, py = 4.5, 0.5
     ax.plot(px, py, "o", color=STYLE["warn"], markersize=10, zorder=6)
     ax.text(
         px,
@@ -8517,7 +8518,7 @@ def diagram_occlusion_test():
         zorder=5,
     )
 
-    # Normal at P
+    # Normal at P (pointing up from the floor)
     draw_vector(
         ax,
         (px, py),
@@ -8528,12 +8529,19 @@ def diagram_occlusion_test():
         lw=2.5,
     )
 
-    # Sample point S1 (occluded — behind the wall at 5.0, 2.5)
-    s1x, s1y = 5.0, 1.8
+    # ---- Hemisphere arc (dashed) showing the sampling region above P ----
+    hemisphere_r = 2.0
+    theta = np.linspace(0, np.pi, 60)
+    arc_x = px + hemisphere_r * np.cos(theta)
+    arc_y = py + hemisphere_r * np.sin(theta)
+    ax.plot(arc_x, arc_y, "--", color=STYLE["text_dim"], lw=1, alpha=0.5, zorder=3)
+
+    # ---- S1: occluded sample (toward the step) ----
+    s1x, s1y = 3.5, 2.0
     ax.plot(s1x, s1y, "D", color=STYLE["accent2"], markersize=8, zorder=6)
     ax.text(
-        s1x - 0.35,
-        s1y + 0.15,
+        s1x - 0.3,
+        s1y + 0.55,
         "S\u2081",
         color=STYLE["accent2"],
         fontsize=10,
@@ -8544,33 +8552,50 @@ def diagram_occlusion_test():
         zorder=5,
     )
 
-    # Dashed line from camera through S1 to depth buffer hit
-    ax.plot([cam_x, s1x], [cam_y, s1y], ":", color=STYLE["accent2"], lw=1, alpha=0.5)
-    # The stored surface at that screen position is at 2.5 (the wall)
+    # Dotted line from P to S1 (hemisphere sample direction)
     ax.plot(
-        s1x,
-        2.5,
+        [px, s1x], [py, s1y], ":", color=STYLE["text_dim"], lw=1, alpha=0.4, zorder=3
+    )
+
+    # Camera projection ray through S1 → hits step front face at x = 3.0
+    # Ray dir: (3.0, -2.5); at x=3.0 ⇒ t=5/6, y = 4.5 − 2.5·(5/6) ≈ 2.417
+    hit1_x = 3.0
+    hit1_y = cam_y + (s1y - cam_y) * (hit1_x - cam_x) / (s1x - cam_x)
+    ax.plot(
+        [cam_x, hit1_x],
+        [cam_y, hit1_y],
+        "--",
+        color=STYLE["accent2"],
+        lw=1.2,
+        alpha=0.6,
+        zorder=3,
+    )
+    ax.plot(
+        hit1_x,
+        hit1_y,
         "x",
         color=STYLE["accent2"],
         markersize=10,
-        markeredgewidth=2,
+        markeredgewidth=2.5,
         zorder=6,
     )
     ax.text(
-        s1x + 0.3,
-        2.7,
+        hit1_x - 0.15,
+        hit1_y - 0.35,
         "depth buffer\nsurface",
         color=STYLE["accent2"],
-        fontsize=8,
-        ha="left",
-        va="center",
+        fontsize=7,
+        ha="right",
+        va="top",
         path_effects=stroke,
         zorder=5,
     )
+
+    # Annotation: OCCLUDED — step face is closer to camera than S1
     ax.annotate(
-        "OCCLUDED\nstored Z > sample Z",
-        xy=(s1x, 2.0),
-        xytext=(2.5, 4.0),
+        "OCCLUDED\nstored surface closer\nto camera",
+        xy=(s1x, s1y),
+        xytext=(1.8, 3.5),
         color=STYLE["accent2"],
         fontsize=9,
         fontweight="bold",
@@ -8584,12 +8609,12 @@ def diagram_occlusion_test():
         zorder=5,
     )
 
-    # Sample point S2 (not occluded — open space)
-    s2x, s2y = 6.2, 1.8
+    # ---- S2: not occluded sample (away from the step, open air) ----
+    s2x, s2y = 6.0, 1.8
     ax.plot(s2x, s2y, "D", color=STYLE["accent1"], markersize=8, zorder=6)
     ax.text(
         s2x + 0.35,
-        s2y + 0.15,
+        s2y + 0.55,
         "S\u2082",
         color=STYLE["accent1"],
         fontsize=10,
@@ -8600,11 +8625,51 @@ def diagram_occlusion_test():
         zorder=5,
     )
 
-    # The stored depth at that position is farther — surface at 1.3
+    # Dotted line from P to S2 (hemisphere sample direction)
+    ax.plot(
+        [px, s2x], [py, s2y], ":", color=STYLE["text_dim"], lw=1, alpha=0.4, zorder=3
+    )
+
+    # Camera projection ray through S2 → clears step, hits floor at y = 0.5
+    # Ray dir: (5.5, -2.7); at y=0.5 ⇒ t=4/2.7, x = 0.5 + 5.5·(4/2.7) ≈ 8.648
+    hit2_y = floor_y
+    t2 = (hit2_y - cam_y) / (s2y - cam_y)
+    hit2_x = cam_x + (s2x - cam_x) * t2
+    ax.plot(
+        [cam_x, hit2_x],
+        [cam_y, hit2_y],
+        "--",
+        color=STYLE["accent1"],
+        lw=1.2,
+        alpha=0.6,
+        zorder=3,
+    )
+    ax.plot(
+        hit2_x,
+        hit2_y,
+        "x",
+        color=STYLE["accent1"],
+        markersize=10,
+        markeredgewidth=2.5,
+        zorder=6,
+    )
+    ax.text(
+        hit2_x + 0.15,
+        hit2_y + 0.3,
+        "depth buffer\nsurface",
+        color=STYLE["accent1"],
+        fontsize=7,
+        ha="left",
+        va="bottom",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Annotation: NOT OCCLUDED — floor is farther from camera than S2
     ax.annotate(
-        "NOT OCCLUDED\nstored Z < sample Z",
-        xy=(s2x, 1.5),
-        xytext=(7.5, 4.0),
+        "NOT OCCLUDED\nstored surface farther\nfrom camera",
+        xy=(s2x, s2y),
+        xytext=(8.2, 3.5),
         color=STYLE["accent1"],
         fontsize=9,
         fontweight="bold",
