@@ -6,8 +6,6 @@ The result darkens crevices, corners, and contact areas where light is naturally
 blocked by nearby geometry — adding depth and grounding to a scene without
 expensive global illumination.
 
-![SSAO](assets/screenshot.png)
-
 ## What you will learn
 
 - How SSAO works: hemisphere kernel sampling in view space
@@ -17,6 +15,10 @@ expensive global illumination.
 - Box blur to smooth the noise tile pattern
 - Compositing the AO factor with the lit scene
 - Interleaved Gradient Noise (IGN) for dithering and jitter
+
+## Result
+
+![SSAO](assets/screenshot.png)
 
 ## Prerequisites
 
@@ -170,33 +172,13 @@ pipeline. From here you could explore:
 The [`ssao` skill](../../../.claude/skills/ssao/SKILL.md) can add SSAO to any
 SDL3 GPU project — invoke it with `/ssao` in Claude Code.
 
-## Exercises
-
-1. **Adjust the radius** — change `SSAO_RADIUS` from 0.5 to 1.0 or 2.0 and
-   observe how the occlusion spreads. Larger radii catch more geometry but lose
-   fine detail.
-
-2. **Reduce the kernel size** — try 16 or 32 samples instead of 64. Notice the
-   increased noise and how the blur helps hide it.
-
-3. **Try a bilateral blur** — replace the box blur with a bilateral filter that
-   preserves edges by comparing depth/normal similarity between samples. This
-   prevents the AO from bleeding across object boundaries.
-
-4. **Power the AO** — in the composite shader, try `pow(ao, 2.0)` to increase
-   the contrast of the occlusion effect.
-
-5. **Half-resolution SSAO** — render the SSAO pass at half resolution and
-   upsample for the composite. This roughly quarters the cost of the most
-   expensive pass.
-
 ## Further reading
 
 - [John Chapman — SSAO Tutorial](https://john-chapman-graphics.blogspot.com/2013/01/ssao-tutorial.html)
   — the hemisphere kernel approach used in this lesson
 - [LearnOpenGL — SSAO](https://learnopengl.com/Advanced-Lighting/SSAO)
   — detailed walkthrough with OpenGL code
-- Jimenez et al., "Next Generation Post Processing in Call of Duty: Advanced
+- Jimenez et al., "Next-Generation Post Processing in Call of Duty: Advanced
   Warfare" (SIGGRAPH 2014) — IGN dithering technique
 - Crytek, "Finding Next Gen" (SIGGRAPH 2007) — original SSAO paper
 
@@ -223,3 +205,23 @@ cmake --build build --config Debug --target 27-ssao
 | `shaders/ssao.frag.hlsl` | Hemisphere kernel SSAO |
 | `shaders/blur.frag.hlsl` | 4x4 box blur |
 | `shaders/composite.frag.hlsl` | Scene color * AO; mode switching |
+
+## Exercises
+
+1. **Adjust the radius** — change `SSAO_RADIUS` from 0.5 to 1.0 or 2.0 and
+   observe how the occlusion spreads. Larger radii catch more geometry but lose
+   fine detail.
+
+2. **Reduce the kernel size** — try 16 or 32 samples instead of 64. Notice the
+   increased noise and how the blur helps hide it.
+
+3. **Try a bilateral blur** — replace the box blur with a bilateral filter that
+   preserves edges by comparing depth/normal similarity between samples. This
+   prevents the AO from bleeding across object boundaries.
+
+4. **Power the AO** — in the composite shader, try `pow(ao, 2.0)` to increase
+   the contrast of the occlusion effect.
+
+5. **Half-resolution SSAO** — render the SSAO pass at half resolution and
+   upsample for the composite. This roughly quarters the cost of the most
+   expensive pass.

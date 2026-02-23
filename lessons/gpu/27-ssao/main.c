@@ -156,6 +156,17 @@
 #define MODE_WITH_AO    1
 #define MODE_NO_AO      2
 
+/* SSAO kernel generation. */
+#define SSAO_DEFAULT_SEED   12345u
+#define SSAO_EPSILON        0.0001f
+#define SSAO_SCALE_START    0.1f
+#define SSAO_SCALE_RANGE    0.9f
+#define SSAO_SCALE_MIN      0.01f
+
+/* Noise texture generation. */
+#define NOISE_DEFAULT_SEED  67890u
+#define NOISE_EPSILON       0.0001f
+
 /* ── Uniform structures ─────────────────────────────────────────────── */
 
 /* Scene vertex uniforms — pushed per draw call. */
@@ -800,7 +811,7 @@ static bool setup_model(SDL_GPUDevice *device, ModelData *model, const char *pat
 
 static void generate_ssao_kernel(float *kernel)
 {
-    uint32_t seed = 12345;
+    uint32_t seed = SSAO_DEFAULT_SEED;
 
     for (int i = 0; i < SSAO_KERNEL_SIZE; i++) {
         /* Generate random point in unit hemisphere (+Z up). */
@@ -813,22 +824,22 @@ static void generate_ssao_kernel(float *kernel)
 
         /* Normalize to get a direction on the hemisphere surface. */
         float len = SDL_sqrtf(x * x + y * y + z * z);
-        if (len < 0.0001f) len = 1.0f;
+        if (len < SSAO_EPSILON) len = 1.0f;
         x /= len;
         y /= len;
         z /= len;
 
         /* Scale with quadratic falloff — concentrate samples near surface.
-         * scale = lerp(0.1, 1.0, (i/64)^2) */
+         * scale = lerp(SSAO_SCALE_START, 1.0, (i/SSAO_KERNEL_SIZE)^2) */
         float t = (float)i / (float)SSAO_KERNEL_SIZE;
-        float scale = 0.1f + 0.9f * t * t;
+        float scale = SSAO_SCALE_START + SSAO_SCALE_RANGE * t * t;
 
         /* Apply random length within [0,1] * scale to distribute inside
          * the hemisphere volume, not just on the surface. */
         seed = forge_hash_pcg(seed);
         float r = forge_hash_to_float(seed);
         scale *= r;
-        if (scale < 0.01f) scale = 0.01f;
+        if (scale < SSAO_SCALE_MIN) scale = SSAO_SCALE_MIN;
 
         kernel[i * 4 + 0] = x * scale;
         kernel[i * 4 + 1] = y * scale;
@@ -843,7 +854,7 @@ static SDL_GPUTexture *create_noise_texture(SDL_GPUDevice *device)
 {
     /* Generate 4x4 random rotation vectors in XY plane. */
     float noise_data[NOISE_TEX_SIZE * NOISE_TEX_SIZE * 4];
-    uint32_t seed = 67890;
+    uint32_t seed = NOISE_DEFAULT_SEED;
 
     for (int i = 0; i < NOISE_TEX_SIZE * NOISE_TEX_SIZE; i++) {
         seed = forge_hash_pcg(seed);
@@ -853,7 +864,7 @@ static SDL_GPUTexture *create_noise_texture(SDL_GPUDevice *device)
 
         /* Normalize to unit length in XY. */
         float len = SDL_sqrtf(x * x + y * y);
-        if (len < 0.0001f) { x = 1.0f; y = 0.0f; len = 1.0f; }
+        if (len < NOISE_EPSILON) { x = 1.0f; y = 0.0f; len = 1.0f; }
         x /= len;
         y /= len;
 
@@ -863,7 +874,7 @@ static SDL_GPUTexture *create_noise_texture(SDL_GPUDevice *device)
         noise_data[i * 4 + 3] = 0.0f;
     }
 
-    /* Create R16G16B16A16_FLOAT texture. */
+    /* Create R32G32B32A32_FLOAT texture. */
     SDL_GPUTextureCreateInfo tex_info;
     SDL_zero(tex_info);
     tex_info.type                = SDL_GPU_TEXTURETYPE_2D;
@@ -1145,16 +1156,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     state->use_ign_jitter   = true;
     state->use_dither       = true;
 
+    /* Set appstate early so SDL_AppQuit can clean up on init failure. */
+    *appstate = state;
+
 #ifdef FORGE_CAPTURE
     forge_capture_parse_args(&state->capture, argc, argv);
     if (state->capture.mode != FORGE_CAPTURE_NONE) {
         if (!forge_capture_init(&state->capture, device, window)) {
             SDL_Log("Failed to initialise capture");
-            SDL_ReleaseWindowFromGPUDevice(device, window);
-            SDL_DestroyWindow(window);
-            SDL_DestroyGPUDevice(device);
-            SDL_free(state);
-            return SDL_APP_FAILURE;
+            goto init_fail;
         }
     }
 #else
@@ -1238,6 +1248,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* ── Load models ────────────────────────────────────────────── */
     {
         const char *base = SDL_GetBasePath();
+        if (!base) {
+            SDL_Log("SDL_GetBasePath failed: %s", SDL_GetError());
+            goto init_fail;
+        }
         char path[512];
 
         SDL_snprintf(path, sizeof(path), "%s%s", base, TRUCK_MODEL_PATH);
@@ -1707,64 +1721,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     if (!SDL_SetWindowRelativeMouseMode(window, true)) {
         SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
+        goto init_fail;
     }
     state->mouse_captured = true;
 
     state->last_ticks = SDL_GetPerformanceCounter();
 
-    *appstate = state;
     return SDL_APP_CONTINUE;
 
 init_fail:
-#ifdef FORGE_CAPTURE
-    forge_capture_destroy(&state->capture, device);
-#endif
-    if (state->shadow_pipeline)
-        SDL_ReleaseGPUGraphicsPipeline(device, state->shadow_pipeline);
-    if (state->scene_pipeline)
-        SDL_ReleaseGPUGraphicsPipeline(device, state->scene_pipeline);
-    if (state->grid_pipeline)
-        SDL_ReleaseGPUGraphicsPipeline(device, state->grid_pipeline);
-    if (state->ssao_pipeline)
-        SDL_ReleaseGPUGraphicsPipeline(device, state->ssao_pipeline);
-    if (state->blur_pipeline)
-        SDL_ReleaseGPUGraphicsPipeline(device, state->blur_pipeline);
-    if (state->composite_pipeline)
-        SDL_ReleaseGPUGraphicsPipeline(device, state->composite_pipeline);
-    if (state->grid_vertex_buffer)
-        SDL_ReleaseGPUBuffer(device, state->grid_vertex_buffer);
-    if (state->grid_index_buffer)
-        SDL_ReleaseGPUBuffer(device, state->grid_index_buffer);
-    if (state->sampler)
-        SDL_ReleaseGPUSampler(device, state->sampler);
-    if (state->nearest_clamp)
-        SDL_ReleaseGPUSampler(device, state->nearest_clamp);
-    if (state->nearest_repeat)
-        SDL_ReleaseGPUSampler(device, state->nearest_repeat);
-    if (state->linear_clamp)
-        SDL_ReleaseGPUSampler(device, state->linear_clamp);
-    if (state->white_texture)
-        SDL_ReleaseGPUTexture(device, state->white_texture);
-    if (state->shadow_depth)
-        SDL_ReleaseGPUTexture(device, state->shadow_depth);
-    if (state->scene_color)
-        SDL_ReleaseGPUTexture(device, state->scene_color);
-    if (state->view_normals)
-        SDL_ReleaseGPUTexture(device, state->view_normals);
-    if (state->scene_depth)
-        SDL_ReleaseGPUTexture(device, state->scene_depth);
-    if (state->ssao_raw)
-        SDL_ReleaseGPUTexture(device, state->ssao_raw);
-    if (state->ssao_blurred)
-        SDL_ReleaseGPUTexture(device, state->ssao_blurred);
-    if (state->noise_texture)
-        SDL_ReleaseGPUTexture(device, state->noise_texture);
-    free_model_gpu(device, &state->truck);
-    free_model_gpu(device, &state->box);
-    SDL_free(state);
-    SDL_ReleaseWindowFromGPUDevice(device, window);
-    SDL_DestroyWindow(window);
-    SDL_DestroyGPUDevice(device);
+    /* SDL_AppQuit is called even when SDL_AppInit returns failure, and
+     * *appstate was set right after allocation, so SDL_AppQuit handles
+     * all resource cleanup via its NULL-checked release sequence. */
     return SDL_APP_FAILURE;
 }
 
@@ -1786,6 +1754,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
                 if (!SDL_SetWindowRelativeMouseMode(state->window, false)) {
                     SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s",
                             SDL_GetError());
+                    return SDL_APP_FAILURE;
                 }
                 state->mouse_captured = false;
             } else {
@@ -1809,6 +1778,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && !state->mouse_captured) {
         if (!SDL_SetWindowRelativeMouseMode(state->window, true)) {
             SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
+            return SDL_APP_FAILURE;
         }
         state->mouse_captured = true;
     }
@@ -1896,6 +1866,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     if (!swapchain_tex) {
         if (!SDL_SubmitGPUCommandBuffer(cmd)) {
             SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+            return SDL_APP_FAILURE;
         }
         return SDL_APP_CONTINUE;
     }
@@ -2184,6 +2155,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         if (!forge_capture_finish_frame(&state->capture, cmd, swapchain_tex)) {
             if (!SDL_SubmitGPUCommandBuffer(cmd)) {
                 SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+                return SDL_APP_FAILURE;
             }
         }
         if (forge_capture_should_quit(&state->capture)) {

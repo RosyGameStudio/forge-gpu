@@ -48,16 +48,11 @@ ti.usage  = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET |
             SDL_GPU_TEXTUREUSAGE_SAMPLER;
 ```
 
-### Pipeline setup (MRT geometry pass)
+### Pipeline setup
 
-```c
-SDL_GPUColorTargetDescription color_descs[2];
-SDL_zero(color_descs);
-color_descs[0].format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;  /* color */
-color_descs[1].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT; /* normals */
-pi.target_info.color_target_descriptions = color_descs;
-pi.target_info.num_color_targets         = 2;
-```
+Set `num_color_targets = 2` on the MRT geometry pipeline (color + normals).
+The three fullscreen-quad pipelines (SSAO, blur, composite) use no vertex
+buffer and no depth test — see existing pipeline patterns from earlier lessons.
 
 ### SSAO kernel generation
 
