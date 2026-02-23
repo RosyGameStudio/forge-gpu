@@ -156,6 +156,9 @@
 #define MODE_WITH_AO    1
 #define MODE_NO_AO      2
 
+/* Light direction degeneracy — skip if light is nearly parallel to up. */
+#define PARALLEL_THRESHOLD 0.99f
+
 /* SSAO kernel generation. */
 #define SSAO_DEFAULT_SEED   12345u
 #define SSAO_EPSILON        0.0001f
@@ -433,6 +436,15 @@ static SDL_GPUBuffer *upload_gpu_buffer(
     }
 
     SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+    if (!copy) {
+        SDL_Log("Failed to begin copy pass for upload: %s", SDL_GetError());
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUBuffer(device, buffer);
+        return NULL;
+    }
 
     SDL_GPUTransferBufferLocation src;
     SDL_zero(src);
@@ -542,6 +554,15 @@ static SDL_GPUTexture *load_texture(SDL_GPUDevice *device, const char *path)
     }
 
     SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+    if (!copy) {
+        SDL_Log("Failed to begin copy pass for texture upload: %s", SDL_GetError());
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUTexture(device, tex);
+        return NULL;
+    }
 
     SDL_GPUTextureTransferInfo src;
     SDL_zero(src);
@@ -622,6 +643,15 @@ static SDL_GPUTexture *create_white_texture(SDL_GPUDevice *device)
     }
 
     SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+    if (!copy) {
+        SDL_Log("Failed to begin copy pass for white texture: %s", SDL_GetError());
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUTexture(device, tex);
+        return NULL;
+    }
 
     SDL_GPUTextureTransferInfo src;
     SDL_zero(src);
@@ -924,6 +954,15 @@ static SDL_GPUTexture *create_noise_texture(SDL_GPUDevice *device)
     }
 
     SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+    if (!copy) {
+        SDL_Log("Failed to begin copy pass for noise texture: %s", SDL_GetError());
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUTexture(device, tex);
+        return NULL;
+    }
 
     SDL_GPUTextureTransferInfo src;
     SDL_zero(src);
@@ -1308,9 +1347,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.rasterizer_state.cull_mode      = SDL_GPU_CULLMODE_FRONT;
         pi.rasterizer_state.front_face     = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
         pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        /* Depth-only: write closest fragments for shadow comparison. */
         pi.depth_stencil_state.compare_op       = SDL_GPU_COMPAREOP_LESS;
         pi.depth_stencil_state.enable_depth_test  = true;
         pi.depth_stencil_state.enable_depth_write = true;
+        /* No color output — this pass only produces the shadow depth map. */
         pi.target_info.num_color_targets        = 0;
         pi.target_info.depth_stencil_format     = SHADOW_DEPTH_FMT;
         pi.target_info.has_depth_stencil_target = true;
@@ -1360,7 +1401,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         /* MRT: Target 0 = scene color, Target 1 = view normals. */
         SDL_GPUColorTargetDescription color_descs[2];
         SDL_zero(color_descs);
+        /* LDR scene color — sufficient for non-HDR forward shading. */
         color_descs[0].format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+        /* Float16 preserves negative view-space normals without clamping. */
         color_descs[1].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
 
         SDL_GPUGraphicsPipelineCreateInfo pi;
@@ -1372,14 +1415,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.vertex_input_state.vertex_attributes          = attrs;
         pi.vertex_input_state.num_vertex_attributes      = 3;
         pi.primitive_type                  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+        /* Back-face cull for solid closed meshes. */
         pi.rasterizer_state.cull_mode      = SDL_GPU_CULLMODE_BACK;
         pi.rasterizer_state.front_face     = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
         pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        /* Standard depth test so geometry occludes correctly. */
         pi.depth_stencil_state.compare_op       = SDL_GPU_COMPAREOP_LESS;
         pi.depth_stencil_state.enable_depth_test  = true;
         pi.depth_stencil_state.enable_depth_write = true;
         pi.target_info.color_target_descriptions  = color_descs;
         pi.target_info.num_color_targets          = 2;
+        /* 32-bit depth gives SSAO enough precision to reconstruct positions. */
         pi.target_info.depth_stencil_format       = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
         pi.target_info.has_depth_stencil_target   = true;
 
@@ -1434,8 +1480,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.vertex_input_state.vertex_attributes          = &attr;
         pi.vertex_input_state.num_vertex_attributes      = 1;
         pi.primitive_type                  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+        /* No culling — grid quad is visible from above and below. */
         pi.rasterizer_state.cull_mode      = SDL_GPU_CULLMODE_NONE;
         pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        /* Depth-tested so grid occludes with scene geometry. */
         pi.depth_stencil_state.compare_op       = SDL_GPU_COMPAREOP_LESS;
         pi.depth_stencil_state.enable_depth_test  = true;
         pi.depth_stencil_state.enable_depth_write = true;
@@ -1470,6 +1518,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
         SDL_GPUColorTargetDescription color_desc;
         SDL_zero(color_desc);
+        /* Single-channel: AO is a grayscale [0,1] occlusion factor. */
         color_desc.format = SDL_GPU_TEXTUREFORMAT_R8_UNORM;
 
         SDL_GPUGraphicsPipelineCreateInfo pi;
@@ -1478,6 +1527,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.fragment_shader = frag;
         pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
         pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        /* Fullscreen post-process — no geometry depth needed. */
         pi.depth_stencil_state.enable_depth_test  = false;
         pi.depth_stencil_state.enable_depth_write = false;
         pi.target_info.color_target_descriptions  = &color_desc;
@@ -1510,6 +1560,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
         SDL_GPUColorTargetDescription color_desc;
         SDL_zero(color_desc);
+        /* Matches SSAO output — blur stays single-channel R8. */
         color_desc.format = SDL_GPU_TEXTUREFORMAT_R8_UNORM;
 
         SDL_GPUGraphicsPipelineCreateInfo pi;
@@ -1518,6 +1569,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.fragment_shader = frag;
         pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
         pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        /* Fullscreen post-process — no geometry depth needed. */
         pi.depth_stencil_state.enable_depth_test  = false;
         pi.depth_stencil_state.enable_depth_write = false;
         pi.target_info.color_target_descriptions  = &color_desc;
@@ -1550,6 +1602,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
         SDL_GPUColorTargetDescription color_desc;
         SDL_zero(color_desc);
+        /* Must match the window swapchain for final presentation. */
         color_desc.format = swapchain_format;
 
         SDL_GPUGraphicsPipelineCreateInfo pi;
@@ -1558,6 +1611,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.fragment_shader = frag;
         pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
         pi.rasterizer_state.fill_mode      = SDL_GPU_FILLMODE_FILL;
+        /* Final blit to swapchain — no depth involvement. */
         pi.depth_stencil_state.enable_depth_test  = false;
         pi.depth_stencil_state.enable_depth_write = false;
         pi.target_info.color_target_descriptions  = &color_desc;
@@ -1703,7 +1757,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         vec3 light_target = vec3_create(0.0f, 0.0f, 0.0f);
         vec3 light_up = vec3_create(0.0f, 1.0f, 0.0f);
         /* Avoid degenerate up vector if light is nearly vertical. */
-        if (SDL_fabsf(vec3_dot(light_dir_v, light_up)) > 0.99f)
+        if (SDL_fabsf(vec3_dot(light_dir_v, light_up)) > PARALLEL_THRESHOLD)
             light_up = vec3_create(0.0f, 0.0f, 1.0f);
 
         mat4 light_view = mat4_look_at(light_pos, light_target, light_up);
@@ -1860,7 +1914,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     if (!SDL_AcquireGPUSwapchainTexture(cmd, state->window,
                                          &swapchain_tex, &sw, &sh)) {
         SDL_Log("SDL_AcquireGPUSwapchainTexture failed: %s", SDL_GetError());
-        SDL_CancelGPUCommandBuffer(cmd);
+        if (!SDL_CancelGPUCommandBuffer(cmd)) {
+            SDL_Log("SDL_CancelGPUCommandBuffer failed: %s", SDL_GetError());
+        }
         return SDL_APP_FAILURE;
     }
     if (!swapchain_tex) {

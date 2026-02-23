@@ -18,6 +18,9 @@
 /* Shadow map resolution — must match SHADOW_MAP_SIZE in main.c. */
 #define SHADOW_MAP_RES 2048.0
 
+/* Number of PCF filter samples for soft shadow edges. */
+#define PCF_SAMPLES 4
+
 /* Diffuse texture (slot 0). */
 Texture2D    diffuse_tex : register(t0, space2);
 SamplerState diffuse_smp : register(s0, space2);
@@ -65,23 +68,23 @@ float sample_shadow(float4 light_clip)
     float current_depth = light_ndc.z;
     float2 texel_size = float2(1.0 / SHADOW_MAP_RES, 1.0 / SHADOW_MAP_RES);
 
-    /* 2x2 PCF — sample 4 neighboring texels for soft shadow edges. */
+    /* 2x2 PCF — sample neighboring texels for soft shadow edges. */
     float shadow = 0.0;
-    float2 offsets[4] = {
+    float2 offsets[PCF_SAMPLES] = {
         float2(-0.5, -0.5),
         float2( 0.5, -0.5),
         float2(-0.5,  0.5),
         float2( 0.5,  0.5)
     };
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < PCF_SAMPLES; i++)
     {
         float stored = shadow_tex.Sample(shadow_smp,
             shadow_uv + offsets[i] * texel_size).r;
         shadow += (current_depth - SHADOW_BIAS <= stored) ? 1.0 : 0.0;
     }
 
-    return shadow * 0.25;
+    return shadow / (float)PCF_SAMPLES;
 }
 
 PSOutput main(float4 clip_pos  : SV_Position,

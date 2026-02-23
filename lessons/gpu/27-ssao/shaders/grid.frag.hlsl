@@ -19,6 +19,9 @@ SamplerState shadow_smp : register(s0, space2);
 /* Shadow map resolution — must match SHADOW_MAP_SIZE in main.c. */
 #define SHADOW_MAP_RES 2048.0
 
+/* Number of PCF filter samples for soft shadow edges. */
+#define PCF_SAMPLES 4
+
 cbuffer FragUniforms : register(b0, space3)
 {
     float4 line_color;
@@ -58,21 +61,21 @@ float sample_shadow(float4 light_clip)
     float2 texel_size = float2(1.0 / SHADOW_MAP_RES, 1.0 / SHADOW_MAP_RES);
 
     float shadow = 0.0;
-    float2 offsets[4] = {
+    float2 offsets[PCF_SAMPLES] = {
         float2(-0.5, -0.5),
         float2( 0.5, -0.5),
         float2(-0.5,  0.5),
         float2( 0.5,  0.5)
     };
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < PCF_SAMPLES; i++)
     {
         float stored = shadow_tex.Sample(shadow_smp,
             shadow_uv + offsets[i] * texel_size).r;
         shadow += (current_depth - SHADOW_BIAS <= stored) ? 1.0 : 0.0;
     }
 
-    return shadow * 0.25;
+    return shadow / (float)PCF_SAMPLES;
 }
 
 PSOutput main(float4 clip_pos   : SV_Position,

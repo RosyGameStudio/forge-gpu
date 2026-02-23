@@ -25,6 +25,7 @@
  */
 
 #define KERNEL_SIZE 64
+#define TWO_PI      6.28318530718
 
 /* View-space normals from the G-buffer (slot 0). */
 Texture2D    normal_tex : register(t0, space2);
@@ -90,7 +91,7 @@ float4 main(float4 clip_pos : SV_Position,
     /* Optionally jitter the rotation with IGN to break the 4x4 tiling. */
     if (use_ign_jitter)
     {
-        float angle = ign(clip_pos.xy) * 6.28318530718; /* 2 * PI */
+        float angle = ign(clip_pos.xy) * TWO_PI;
         float s, c;
         sincos(angle, s, c);
         /* Rotate the noise vector in the XY plane. */
