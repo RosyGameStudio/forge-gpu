@@ -6855,7 +6855,11 @@ def diagram_ray_sphere_intersection():
     b = 2 * np.dot(cam, ray_dir)
     c_coeff = np.dot(cam, cam) - R_A**2
     disc = b**2 - 4 * a * c_coeff
-    t_far = (-b + np.sqrt(disc)) / (2 * a)
+    if disc < 0:
+        t_far = 2.0  # fallback: draw ray to a safe max distance
+    else:
+        t_near = (-b - np.sqrt(disc)) / (2 * a)  # noqa: F841
+        t_far = (-b + np.sqrt(disc)) / (2 * a)
 
     # Draw ray
     ray_end = cam + ray_dir * t_far
@@ -7139,7 +7143,9 @@ def diagram_ray_march():
 
 def diagram_phase_functions():
     """Rayleigh vs Mie (g=0.8) angular plots, 0-180 degrees."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), facecolor=STYLE["bg"])
+    fig = plt.figure(figsize=(12, 5), facecolor=STYLE["bg"])
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122, polar=True, facecolor=STYLE["bg"])
 
     theta = np.linspace(0, np.pi, 500)
     cos_theta = np.cos(theta)
@@ -7176,8 +7182,7 @@ def diagram_phase_functions():
         fontweight="bold",
     )
 
-    # Polar plot
-    ax2 = fig.add_subplot(122, polar=True, facecolor=STYLE["bg"])
+    # Polar plot (ax2 was already created with polar=True above)
     ax2.plot(
         theta, rayleigh / rayleigh.max(), color=STYLE["accent1"], lw=2, label="Rayleigh"
     )

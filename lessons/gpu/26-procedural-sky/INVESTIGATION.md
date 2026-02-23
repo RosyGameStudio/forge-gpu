@@ -22,7 +22,7 @@ The reference implementation is the Pixel Storm engine's atmospheric sky system:
 - **`include/ps_kernels.h`** — Kernel declarations
 - **`include/ps_device_common.h`** — Device utilities
   (`ray_sphere_intersect_nearest`, `__saturatef`, etc.)
-- **Paper:** Hillaire, "A Scalable and Production Ready Sky and Atmosphere
+- **Paper:** Hillaire, "A Scalable and Production-Ready Sky and Atmosphere
   Rendering Technique", EGSR 2020
 
 ## Root Cause: NaN in multi-scattering LUT at ground level

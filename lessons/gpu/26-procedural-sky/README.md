@@ -587,13 +587,22 @@ scattering with scene rendering.
    the atmosphere integral from camera to the object distance, not to
    the atmosphere boundary.
 
-4. **Higher-resolution multi-scattering** — The current multi-scattering
+4. **Sky-view LUT** — Instead of ray marching per pixel every frame,
+   add a third LUT (e.g., 192×108) that stores the final sky color for
+   each view direction at the current camera altitude. Regenerate it
+   each frame with a compute pass, then sample it in the fragment shader
+   with a single texture fetch. This is how the Pixel Storm reference
+   implementation (and most production engines) avoid the per-pixel
+   march. You'll need a hemisphere parameterization that maps view
+   direction to UV — compare the performance before and after.
+
+5. **Higher-resolution multi-scattering** — The current multi-scattering
    LUT uses 32×32 texels with 64 direction samples. Increase to 64×64
    texels and 256 directions. Compare the visual quality — is there a
    visible difference? This illustrates why 32×32 is sufficient for
    the nearly-isotropic higher-order scattering.
 
-5. **Dynamic atmosphere** — Make the Rayleigh scale height a uniform
+6. **Dynamic atmosphere** — Make the Rayleigh scale height a uniform
    instead of a compile-time constant. Regenerate the LUTs each time
    the parameter changes by re-dispatching the compute shaders.
    Explore how the sky changes with different scale heights (e.g.,
@@ -844,7 +853,7 @@ for an entire region of parameter space.
 
 ## References
 
-- Hillaire, S. (2020). *A Scalable and Production Ready Sky and
+- Hillaire, S. (2020). *A Scalable and Production-Ready Sky and
   Atmosphere Rendering Technique.* EGSR 2020.
 - Bruneton, E. & Neyret, F. (2008). *Precomputed Atmospheric
   Scattering.* EGSR 2008.

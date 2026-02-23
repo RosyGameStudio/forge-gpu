@@ -173,9 +173,6 @@
 /* Frame timing. */
 #define MAX_FRAME_DT 0.1f
 
-/* Pi constant for sun direction calculations. */
-#define PI_F 3.14159265358979f
-
 /* ── Uniform structures ──────────────────────────────────────────────────── */
 
 /* Sky vertex uniforms — ray matrix mapping NDC to world-space directions.
@@ -508,6 +505,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
             SDL_GPU_SWAPCHAINCOMPOSITION_SDR_LINEAR,
             SDL_GPU_PRESENTMODE_VSYNC)) {
       SDL_Log("SDL_SetGPUSwapchainParameters failed: %s", SDL_GetError());
+      SDL_ReleaseWindowFromGPUDevice(device, window);
       SDL_DestroyWindow(window);
       SDL_DestroyGPUDevice(device);
       return SDL_APP_FAILURE;
@@ -520,6 +518,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   AppState *state = SDL_calloc(1, sizeof(AppState));
   if (!state) {
     SDL_Log("Failed to allocate AppState");
+    SDL_ReleaseWindowFromGPUDevice(device, window);
     SDL_DestroyWindow(window);
     SDL_DestroyGPUDevice(device);
     return SDL_APP_FAILURE;
@@ -1168,8 +1167,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     }
 
     /* Clamp sun elevation to [-π/2, π/2]. */
-    if (state->sun_elevation > PI_F * 0.5f) state->sun_elevation = PI_F * 0.5f;
-    if (state->sun_elevation < -PI_F * 0.5f) state->sun_elevation = -PI_F * 0.5f;
+    if (state->sun_elevation > FORGE_PI * 0.5f) state->sun_elevation = FORGE_PI * 0.5f;
+    if (state->sun_elevation < -FORGE_PI * 0.5f) state->sun_elevation = -FORGE_PI * 0.5f;
   }
 
   /* Auto day/night cycle — orbit the sun in a full circle so it rises,

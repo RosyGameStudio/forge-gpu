@@ -153,6 +153,7 @@ Learn the SDL GPU API and modern rendering techniques:
 <a href="lessons/gpu/26-procedural-sky/"><img src="lessons/gpu/26-procedural-sky/assets/screenshot.png" width="200" alt="Procedural Sky" /></a><br />
 <b>26</b> — Procedural Sky
 </td>
+<td></td>
 </tr>
 </table>
 

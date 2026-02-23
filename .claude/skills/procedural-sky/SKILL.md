@@ -409,5 +409,5 @@ disc and creates a natural glow halo.
 - [Lesson 22 — Bloom](../../../lessons/gpu/22-bloom/) — HDR + bloom pipeline
 - [Lesson 11 — Compute Shaders](../../../lessons/gpu/11-compute-shaders/) —
   Compute pipeline fundamentals
-- Hillaire, S. (2020). *A Scalable and Production Ready Sky and
+- Hillaire, S. (2020). *A Scalable and Production-Ready Sky and
   Atmosphere Rendering Technique.* EGSR 2020.
