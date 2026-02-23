@@ -12,6 +12,7 @@ atmosphere with Rayleigh, Mie, and ozone scattering.
 - Ozone absorption (blue-purple tint during twilight)
 - The Beer-Lambert law for light extinction along a path
 - Phase functions (Rayleigh symmetric, Henyey-Greenstein forward)
+- Earth shadow — testing whether the planet blocks sunlight at each sample
 - Ray-sphere intersection for atmosphere entry/exit
 - Compute-shader LUT precomputation (transmittance + multi-scattering)
 - Bruneton non-linear UV parameterization for LUT precision
@@ -199,8 +200,14 @@ for (int i = 0; i < num_steps; i++) {
     float3 sun_trans = sample_transmittance(length(pos), cos_sun_zenith);
     float3 ms = sample_multiscatter(altitude, cos_sun_zenith);
 
-    /* Single scatter (phase-weighted) + multi-scatter (isotropic) */
-    float3 S = (scatter_r + scatter_m) * sun_trans * sun_intensity
+    /* Earth shadow: is the sun visible from this sample point? */
+    bool sun_blocked = ray_sphere_intersect(
+        pos, sun_dir, R_GROUND, t_shadow_near, t_shadow_far);
+    float earth_shadow = (sun_blocked && t_shadow_near >= 0.0) ? 0.0 : 1.0;
+    earth_shadow *= saturate(cos_sun_zenith * 10.0 + 0.5);
+
+    /* Single scatter (shadowed) + multi-scatter (not shadowed) */
+    float3 S = (scatter_r + scatter_m) * sun_trans * earth_shadow * sun_intensity
              + ms * med.scatter * sun_intensity;
 
     /* Analytical integration for better accuracy */
@@ -219,12 +226,60 @@ At each step:
 2. **Look up sun transmittance** — O(1) texture fetch from the
    precomputed LUT (replaces the 8-step inner march)
 3. **Look up multi-scattering** — adds higher-order bounce contribution
-4. **Accumulate inscattered light** — multiply by phase functions and
+4. **Earth shadow test** — check if the planet blocks sunlight at this
+   point (see below)
+5. **Accumulate inscattered light** — multiply by phase functions and
    the current view transmittance
-5. **Update transmittance** — Beer-Lambert law reduces it exponentially
+6. **Update transmittance** — Beer-Lambert law reduces it exponentially
 
 The analytical integration `(1 - exp(-ext*ds)) / ext` is more accurate
 than the naive `ext * ds` approximation, especially for large step sizes.
+
+### Earth shadow
+
+At each sample point along the view ray, the sun may or may not be
+visible. Points high in the atmosphere with the sun overhead receive
+direct sunlight. But points on the far side of the planet — or at low
+altitude when the sun is near the horizon — are in Earth's shadow.
+
+The test is a ray-sphere intersection from the sample point toward the
+sun. If the ray hits the ground sphere (`t_shadow_near >= 0`), the sun
+is occluded:
+
+```hlsl
+bool sun_blocked = ray_sphere_intersect(
+    pos, sun_dir, R_GROUND, t_shadow_near, t_shadow_far);
+float earth_shadow = (sun_blocked && t_shadow_near >= 0.0) ? 0.0 : 1.0;
+```
+
+The **horizon fade** smooths the transition near the terminator (the
+boundary between lit and shadowed atmosphere). Without it, the shadow
+boundary creates a visible hard edge in the sky:
+
+```hlsl
+earth_shadow *= saturate(cos_sun_zenith * 10.0 + 0.5);
+```
+
+This fades the shadow over ~2.9° around the local horizon at each
+sample point.
+
+**Why earth shadow is critical for sunset colors:** At sunset, the sun
+sits near the horizon. Sample points along a horizontal view ray span
+a range of local sun zenith angles — some points see the sun above
+their local horizon, others see it below. Without earth shadow, all
+points contribute inscattered light, including points where the planet
+blocks the sun. These incorrectly-lit points add cold blue light that
+dilutes the warm Rayleigh colors. With earth shadow, only points with
+a clear line of sight to the sun contribute single-scatter light.
+Those points receive sunlight that has traveled a long atmospheric
+path, losing blue wavelengths to Rayleigh scattering, producing the
+characteristic orange and red sunset gradient.
+
+**Single scatter vs multi-scatter:** Earth shadow applies only to the
+single-scatter term. Multi-scattering light arrives from all directions
+(not just the sun), so it is not blocked by the planet in the same way.
+The multi-scattering LUT already accounts for earth shadow during its
+own precomputation (see below).
 
 ### Transmittance LUT
 
@@ -238,6 +293,19 @@ This makes transmittance a natural candidate for precomputation into a
 40-step ray march once per texel at startup. The fragment shader then
 replaces the inner march with a single texture fetch — reducing per-pixel
 cost from O(outer×inner) to O(outer).
+
+![Transmittance LUT](assets/transmittance_lut.png)
+
+The image above shows the transmittance LUT visualized directly. The
+horizontal axis is the zenith angle cosine (left = looking up, right =
+looking toward/below the horizon) and the vertical axis is altitude
+(bottom = sea level, top = atmosphere edge). White means full
+transmittance (short path, little extinction). The warm orange-to-red
+gradient at the right edge shows long atmospheric paths where blue
+wavelengths have been scattered away — this is the data that produces
+sunset colors. The dark region at the bottom-right represents rays
+pointing below the horizon at low altitude, where the path through
+dense atmosphere extinguishes nearly all light.
 
 **Bruneton non-linear UV parameterization:** The UV mapping is not linear
 in (height, cos\_zenith). Instead, it uses the ray distance through the
@@ -254,6 +322,25 @@ d_max = rho + H                     — longest path (toward horizon)
 
 x_mu = (d - d_min) / (d_max - d_min)  — UV.x (non-linear in cos_zenith)
 x_r = rho / H                          — UV.y (non-linear in view_height)
+```
+
+**Forward and inverse mappings must match exactly.** The compute shader
+uses an inverse mapping (UV → parameters) to decide which
+(view\_height, cos\_zenith) pair each texel represents. The fragment
+shader uses a forward mapping (parameters → UV) to look up values.
+These must be exact mathematical inverses. If the forward mapping
+computes the ray distance `d` differently from the inverse mapping —
+for example, by clipping to the ground intersection instead of always
+using the atmosphere sphere distance — the UV round-trip will look up
+the wrong texel for below-horizon rays. Use the same formula in both
+directions:
+
+```hlsl
+/* Forward mapping: always use atmosphere sphere distance (not ground) */
+float discriminant = view_height * view_height
+    * (cos_zenith * cos_zenith - 1.0) + R_ATMO * R_ATMO;
+float d = max(0.0, -view_height * cos_zenith
+    + sqrt(max(0.0, discriminant)));
 ```
 
 ### Multi-scattering LUT
@@ -279,6 +366,17 @@ an isotropic phase function (1/4π) is used instead of the
 direction-dependent Rayleigh and Mie phases. This is why the LUT only
 needs 2 parameters, not 3.
 
+**Earth shadow in the multi-scatter computation:** The inner march for
+each of the 64 directions must also include the earth shadow test — the
+same `ray_sphere_intersect` + `horizon_fade` used in the fragment shader.
+Without it, the LUT stores non-zero scattered luminance for sun angles
+where the planet actually blocks sunlight at most sample points. The
+symptom is that warm sunset colors appear only *after* the sun drops
+below the horizon and persist indefinitely — the multi-scatter term
+reads these incorrect pre-baked values from the LUT even though the
+single-scatter term has been correctly zeroed by the fragment shader's
+earth shadow.
+
 ### Sun transmittance and sunset colors
 
 ![Sun transmittance](assets/sun_transmittance.png)
@@ -293,6 +391,14 @@ atmosphere. The path length is much greater, causing heavy extinction.
 Blue and green wavelengths are scattered away first (they have the
 highest Rayleigh coefficients), leaving predominantly red and orange
 light — this is why sunsets are orange.
+
+For these warm colors to actually appear in the rendered sky, earth
+shadow (see above) must be present. Without it, sample points in the
+planet's shadow still contribute cold blue inscattered light, washing
+out the warm Rayleigh gradient. Earth shadow ensures that only points
+with a clear line of sight to the sun contribute single-scatter light —
+and at those points, the long atmospheric path has already filtered the
+sunlight to orange and red.
 
 ### Sun disc with limb darkening
 
@@ -665,6 +771,76 @@ pipeline. Systematic binary-search diagnostics — testing one component
 at a time with color-coded outputs — are far more effective than reading
 code and guessing. Each solid-color result eliminates an entire category
 of bugs in seconds.
+
+### 5. Missing earth shadow produces washed-out sunsets
+
+**Symptom:** At sunset (~4° elevation), the sky is mostly blue with only
+a small warm glow at the horizon. The expected orange-to-blue gradient
+is absent. After the sun drops below the horizon, deep red/crimson
+colors suddenly appear across the entire horizon and persist
+indefinitely.
+
+**Cause (two parts):**
+
+1. **Fragment shader missing earth shadow.** Without the
+   `ray_sphere_intersect` test at each march step, every sample point
+   contributes inscattered sunlight — even points where the planet blocks
+   the sun. These incorrectly-lit high-altitude points add cold blue
+   light that drowns out the warm Rayleigh colors from the correctly-lit
+   low-altitude points.
+
+2. **Multi-scatter LUT missing earth shadow.** The compute shader that
+   precomputes the 32×32 multi-scattering LUT also marches rays for 64
+   directions at each texel. Without earth shadow in this inner march,
+   the LUT stores non-zero values for (altitude, sun\_zenith) pairs where
+   the sun is actually below the horizon. The fragment shader reads these
+   values through `sample_multiscatter()` and multiplies by
+   `med.scatter * sun_intensity` — producing a persistent warm glow that
+   never fades because the LUT is precomputed once at startup.
+
+**Fix:** Earth shadow (ray-sphere test + `horizon_fade` smoothing) must
+be present in both the fragment shader's `atmosphere()` loop AND the
+multi-scatter compute shader's inner march loop. Single-scatter is
+multiplied by `earth_shadow`; multi-scatter in the fragment shader is
+not (it's already accounted for in the LUT computation).
+
+**Lesson:** When a precomputed LUT feeds into a per-frame shader, the
+LUT computation must include the same physical effects as the shader.
+If the fragment shader adds earth shadow but the LUT was computed
+without it, the LUT values are physically wrong and no amount of
+per-frame correction can fix them.
+
+### 6. Transmittance LUT forward/inverse mapping mismatch
+
+**Symptom:** Subtle banding or incorrect colors near the horizon,
+especially at sunset. The transmittance LUT visualization looks correct,
+but sampling it from the fragment shader produces wrong values for
+below-horizon sun angles.
+
+**Cause:** The compute shader maps UV → (view\_height, cos\_zenith) using
+the atmosphere sphere distance `d`. The fragment shader maps
+(view\_height, cos\_zenith) → UV using a ground-clipped distance — it
+finds the ground intersection and uses that shorter distance for
+below-horizon rays. The two mappings are not inverses, so the fragment
+shader looks up the wrong texel.
+
+**Fix:** Always use the atmosphere sphere distance in both directions.
+Compute `d` with the quadratic formula:
+
+```hlsl
+float discriminant = r * r * (mu * mu - 1.0) + R_ATMO * R_ATMO;
+float d = max(0.0, -r * mu + sqrt(max(0.0, discriminant)));
+```
+
+Do not clip to the ground. Below-horizon sun angles are handled by earth
+shadow (which zeroes the contribution), not by the transmittance LUT
+mapping.
+
+**Lesson:** When using the Bruneton UV parameterization, the forward
+mapping (used for lookups) must be the exact mathematical inverse of the
+reverse mapping (used to generate the LUT). Any divergence — even one
+that seems harmless, like clipping to the ground — corrupts the lookup
+for an entire region of parameter space.
 
 ## References
 

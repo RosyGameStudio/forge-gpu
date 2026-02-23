@@ -317,6 +317,7 @@ dir_f += throughput * med.scatter * scatter_integral;  // unchanged
 ```
 
 **Expected result:** After this fix:
+
 - Multi-scatter LUT will have near-zero values for below-horizon sun angles
 - Warm Rayleigh colors will appear during sunset (when sun_trans is reddish
   and earth shadow allows single-scatter contributions)

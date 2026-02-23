@@ -376,6 +376,30 @@ disc and creates a natural glow halo.
     compute shader writes to it (storage), then the fragment shader reads
     from it (sampler). Both usage flags must be set at creation time.
 
+11. **Missing earth shadow** — At each sample point in the atmosphere
+    march, test whether the planet blocks sunlight with
+    `ray_sphere_intersect(pos, sun_dir, R_GROUND)`. Without this, points
+    in the planet's shadow still contribute inscattered light, washing out
+    warm Rayleigh sunset colors with incorrect cold blue light. Apply
+    `earth_shadow` only to the single-scatter term; multi-scatter is not
+    shadowed in the fragment shader (it's pre-integrated in the LUT).
+    Add `horizon_fade = saturate(cos_sun_zenith * 10.0 + 0.5)` to smooth
+    the terminator boundary.
+
+12. **Multi-scatter LUT must include earth shadow** — The 64-direction
+    inner march in the multi-scatter compute shader also needs the earth
+    shadow test. Without it, the LUT stores non-zero values for
+    below-horizon sun angles. The symptom is warm sunset colors that
+    appear only after the sun sets and persist indefinitely.
+
+13. **Transmittance LUT forward/inverse mapping mismatch** — The forward
+    mapping (params → UV, used for lookups) must be the exact mathematical
+    inverse of the reverse mapping (UV → params, used in the compute
+    shader). Do NOT clip the ray distance `d` to the ground intersection
+    in the forward mapping — always use the atmosphere sphere distance.
+    Below-horizon sun directions are handled by earth shadow, not by the
+    transmittance parameterization.
+
 ## Reference implementation
 
 - [Lesson 26 main.c](../../../lessons/gpu/26-procedural-sky/main.c)
