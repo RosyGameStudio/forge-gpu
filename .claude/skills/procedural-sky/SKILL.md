@@ -1,15 +1,15 @@
 ---
 name: procedural-sky
-description: Add a physically-based procedural sky with atmospheric scattering (Rayleigh, Mie, ozone) to an SDL GPU project using per-pixel ray marching
+description: Add a physically-based procedural sky with atmospheric scattering (Rayleigh, Mie, ozone) to an SDL GPU project using per-pixel ray marching with LUT-accelerated transmittance and multi-scattering
 user_invokable: true
 ---
 
 # Procedural Sky (Hillaire)
 
 Add a physically-based atmospheric sky to an SDL GPU project. Implements
-Sébastien Hillaire's single-scattering model (EGSR 2020) with per-pixel
-ray marching through Earth's atmosphere, producing correct sky colors at
-any time of day.
+Sebastien Hillaire's atmospheric model (EGSR 2020) with LUT-accelerated
+transmittance and multi-scattering, producing correct sky colors at any
+time of day.
 
 ## When to use
 
@@ -23,17 +23,57 @@ any time of day.
 
 ### Render pipeline
 
-4 pipelines, 4 pass types per frame:
+6 pipelines: 2 compute (one-time) + 4 graphics (per frame).
 
-1. **Sky pass** — Fullscreen quad, atmosphere ray march → HDR target
+**One-time compute passes (at startup):**
+
+1. **Transmittance LUT** (256×64) — compute shader, 40-step march/texel
+2. **Multi-scattering LUT** (32×32) — compute shader, 64 dirs × 20 steps
+
+**Per-frame render passes:**
+
+1. **Sky pass** — Fullscreen quad, atmosphere ray march + LUT sampling → HDR
 2. **Bloom downsample** (5×) — 13-tap Jimenez with Karis → mip chain
 3. **Bloom upsample** (4×) — 9-tap tent, additive blend → mip 0
 4. **Tonemap pass** — HDR + bloom → swapchain (ACES filmic)
 
-### Key shader: sky.frag.hlsl
+### Key shaders
+
+#### transmittance_lut.comp.hlsl
+
+Compute shader generating the transmittance LUT. Uses Bruneton non-linear
+UV mapping that concentrates precision near the horizon.
+
+```hlsl
+/* Register layout (compute spaces) */
+RWTexture2D<float4> output_tex : register(u0, space1);  /* RW output */
+cbuffer LutUniforms : register(b0, space2) { ... };      /* dimensions */
+
+[numthreads(8, 8, 1)]
+void main(uint3 id : SV_DispatchThreadID) { ... }
+```
+
+#### multiscatter_lut.comp.hlsl
+
+Compute shader generating the multi-scattering LUT. Reads the
+transmittance LUT and integrates over 64 sphere directions.
+
+```hlsl
+/* Register layout (compute spaces) */
+Texture2D<float4> transmittance_lut : register(t0, space0);  /* sampled */
+SamplerState      trans_sampler     : register(s0, space0);
+RWTexture2D<float4> output_tex : register(u0, space1);       /* RW output */
+cbuffer LutUniforms : register(b0, space2) { ... };           /* dimensions */
+
+[numthreads(8, 8, 1)]
+void main(uint3 id : SV_DispatchThreadID) { ... }
+```
+
+#### sky.frag.hlsl
 
 All atmosphere constants are `static const` in the shader. Uniforms
-are camera position, sun direction, and march step counts.
+are camera position, sun direction, and march step count. LUT textures
+are bound as fragment samplers.
 
 Core functions (implement in this order):
 
@@ -49,14 +89,17 @@ float mie_phase_hg(float cos_theta, float g); /* Henyey-Greenstein g=0.8 */
 /* 3. Medium sampling — density at altitude */
 MediumSample sample_medium(float3 pos);     /* returns scatter + extinction */
 
-/* 4. Sun transmittance — inner march from sample to sun */
-float3 sun_transmittance(float3 pos, float3 sun_dir);
+/* 4. LUT sampling — O(1) transmittance lookup */
+float3 sample_transmittance(float view_height, float cos_zenith);
 
-/* 5. Main march — outer loop accumulating inscattered light */
+/* 5. LUT sampling — multi-scattering lookup */
+float3 sample_multiscatter(float altitude, float cos_sun_zenith);
+
+/* 6. Main march — outer loop with LUT-accelerated sampling */
 float3 atmosphere(float3 ray_origin, float3 ray_dir,
                   out float3 transmittance);
 
-/* 6. Sun disc — rendered on top with limb darkening */
+/* 7. Sun disc — rendered on top with limb darkening */
 float3 sun_disc(float3 ray_dir, float3 sun_dir, float3 transmittance);
 ```
 
@@ -94,6 +137,26 @@ float4 world_pos = mul(ray_matrix, float4(ndc.x, ndc.y, 1.0, 1.0));
 output.view_ray = world_pos.xyz / world_pos.w;
 ```
 
+### Fragment shader: LUT bindings
+
+```hlsl
+/* LUT textures bound as fragment samplers (space2) */
+Texture2D<float4> transmittance_lut : register(t0, space2);
+SamplerState      trans_sampler     : register(s0, space2);
+Texture2D<float4> multiscatter_lut  : register(t1, space2);
+SamplerState      ms_sampler        : register(s1, space2);
+
+/* Uniforms (space3) */
+cbuffer SkyFragUniforms : register(b0, space3) {
+    float3 cam_pos_km;
+    float  sun_intensity;
+    float3 sun_dir;
+    int    num_steps;
+    float2 resolution;
+    float2 _pad;
+};
+```
+
 ### C-side uniform structures
 
 ```c
@@ -111,9 +174,96 @@ typedef struct SkyFragUniforms {
     float sun_dir[3];
     int   num_steps;         /* default: 32 */
     float resolution[2];
-    int   num_light_steps;   /* default: 8 */
-    float _pad;
+    float _pad[2];
 } SkyFragUniforms;
+
+/* LUT compute: output dimensions (16 bytes) */
+typedef struct LutComputeUniforms {
+    float width;
+    float height;
+    float extra0;  /* transmittance LUT width (for multiscatter) */
+    float extra1;  /* transmittance LUT height (for multiscatter) */
+} LutComputeUniforms;
+```
+
+### Compute pipeline creation
+
+```c
+/* Create compute pipeline (same pattern as lesson 11) */
+state->transmittance_compute = create_compute_pipeline(
+    device,
+    transmittance_lut_comp_spirv, sizeof(transmittance_lut_comp_spirv),
+    transmittance_lut_comp_dxil, sizeof(transmittance_lut_comp_dxil),
+    0, 1, 1,  /* 0 samplers, 1 RW texture, 1 uniform buffer */
+    8, 8, 1); /* workgroup size matches [numthreads(8,8,1)] */
+
+state->multiscatter_compute = create_compute_pipeline(
+    device,
+    multiscatter_lut_comp_spirv, sizeof(multiscatter_lut_comp_spirv),
+    multiscatter_lut_comp_dxil, sizeof(multiscatter_lut_comp_dxil),
+    1, 1, 1,  /* 1 sampler (transmittance LUT), 1 RW texture, 1 uniform */
+    8, 8, 1);
+```
+
+### LUT texture creation
+
+```c
+SDL_GPUTextureCreateInfo tex_info;
+SDL_zero(tex_info);
+tex_info.type = SDL_GPU_TEXTURETYPE_2D;
+tex_info.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+tex_info.layer_count_or_depth = 1;
+tex_info.num_levels = 1;
+tex_info.usage = SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE
+               | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+tex_info.width = 256;
+tex_info.height = 64;
+state->transmittance_lut = SDL_CreateGPUTexture(device, &tex_info);
+
+tex_info.width = 32;
+tex_info.height = 32;
+state->multiscatter_lut = SDL_CreateGPUTexture(device, &tex_info);
+```
+
+### One-time LUT dispatch
+
+```c
+/* Two separate compute passes — SDL GPU does NOT synchronize
+ * reads/writes within a single compute pass. */
+
+/* Pass 1: Transmittance */
+SDL_GPUStorageTextureReadWriteBinding storage;
+storage.texture = state->transmittance_lut;
+SDL_GPUComputePass *pass = SDL_BeginGPUComputePass(cmd, &storage, 1, NULL, 0);
+SDL_BindGPUComputePipeline(pass, state->transmittance_compute);
+SDL_DispatchGPUCompute(pass, 256/8, 64/8, 1);
+SDL_EndGPUComputePass(pass);
+
+/* Pass 2: Multi-scattering (reads transmittance LUT) */
+storage.texture = state->multiscatter_lut;
+pass = SDL_BeginGPUComputePass(cmd, &storage, 1, NULL, 0);
+SDL_BindGPUComputePipeline(pass, state->multiscatter_compute);
+SDL_GPUTextureSamplerBinding sampler_binding = {
+    .texture = state->transmittance_lut,
+    .sampler = state->lut_sampler
+};
+SDL_BindGPUComputeSamplers(pass, 0, &sampler_binding, 1);
+SDL_DispatchGPUCompute(pass, 32/8, 32/8, 1);
+SDL_EndGPUComputePass(pass);
+
+SDL_SubmitGPUCommandBuffer(cmd);
+SDL_WaitForGPUIdle(device);  /* LUTs must be ready before first frame */
+```
+
+### LUT sampling in fragment shader
+
+```c
+/* Bind LUT textures before the sky draw call */
+SDL_GPUTextureSamplerBinding lut_bindings[2];
+lut_bindings[0] = { .texture = transmittance_lut, .sampler = lut_sampler };
+lut_bindings[1] = { .texture = multiscatter_lut,  .sampler = lut_sampler };
+SDL_BindGPUFragmentSamplers(pass, 0, lut_bindings, 2);
 ```
 
 ### Sun direction from angles
@@ -146,12 +296,18 @@ Planet-centric coordinates in km. Camera starts at surface:
 
 | Function | Purpose |
 |----------|---------|
-| `SDL_CreateGPUTexture` | HDR render target (R16G16B16A16_FLOAT) |
-| `SDL_CreateGPUSampler` | Linear/clamp samplers for HDR and bloom |
-| `SDL_CreateGPUGraphicsPipeline` | 4 pipelines (sky, downsample, upsample, tonemap) |
+| `SDL_CreateGPUTexture` | HDR target, LUT textures (COMPUTE\_STORAGE\_WRITE + SAMPLER) |
+| `SDL_CreateGPUSampler` | Linear/clamp samplers for HDR, bloom, and LUTs |
+| `SDL_CreateGPUComputePipeline` | 2 compute pipelines (transmittance, multiscatter) |
+| `SDL_CreateGPUGraphicsPipeline` | 4 graphics pipelines (sky, downsample, upsample, tonemap) |
+| `SDL_BeginGPUComputePass` | Bind RW storage textures for compute dispatch |
+| `SDL_BindGPUComputePipeline` | Bind compute pipeline before dispatch |
+| `SDL_BindGPUComputeSamplers` | Bind transmittance LUT for multiscatter pass |
+| `SDL_DispatchGPUCompute` | Launch compute workgroups |
+| `SDL_PushGPUComputeUniformData` | Push LUT dimensions to compute shader |
 | `SDL_PushGPUVertexUniformData` | Push ray matrix to sky vertex shader |
 | `SDL_PushGPUFragmentUniformData` | Push sky params, bloom params, tonemap params |
-| `SDL_BindGPUFragmentSamplers` | Bind source textures for bloom and tonemap |
+| `SDL_BindGPUFragmentSamplers` | Bind LUT textures, bloom/HDR textures |
 | `SDL_DrawGPUPrimitives` | Fullscreen quad (6 verts, no vertex buffer) |
 | `quat_right`, `quat_up`, `quat_forward` | Camera basis vectors for ray matrix |
 | `quat_from_euler` | Camera orientation from yaw/pitch |
@@ -204,10 +360,30 @@ disc and creates a natural glow halo.
    aspect ratio changes. The ray matrix must be recomputed every frame
    from the current window dimensions.
 
+8. **Compute passes must be separate for synchronization** — SDL GPU does
+   NOT implicitly synchronize reads and writes within a single compute
+   pass. The multi-scattering pass reads the transmittance LUT, so it
+   must be a separate `SDL_BeginGPUComputePass` / `SDL_EndGPUComputePass`
+   from the transmittance write pass. SDL does synchronize between passes
+   on the same command buffer.
+
+9. **Compute samplers use space0, not space2** — In compute shaders,
+   sampled textures go in `t[n], space0` and samplers in `s[n], space0`.
+   This is different from fragment shaders which may use higher spaces.
+   RW storage textures use `u[n], space1` and uniforms use `b[n], space2`.
+
+10. **LUT texture needs both COMPUTE\_STORAGE\_WRITE and SAMPLER** — The
+    compute shader writes to it (storage), then the fragment shader reads
+    from it (sampler). Both usage flags must be set at creation time.
+
 ## Reference implementation
 
 - [Lesson 26 main.c](../../../lessons/gpu/26-procedural-sky/main.c)
 - [sky.frag.hlsl](../../../lessons/gpu/26-procedural-sky/shaders/sky.frag.hlsl)
+- [transmittance_lut.comp.hlsl](../../../lessons/gpu/26-procedural-sky/shaders/transmittance_lut.comp.hlsl)
+- [multiscatter_lut.comp.hlsl](../../../lessons/gpu/26-procedural-sky/shaders/multiscatter_lut.comp.hlsl)
 - [Lesson 22 — Bloom](../../../lessons/gpu/22-bloom/) — HDR + bloom pipeline
+- [Lesson 11 — Compute Shaders](../../../lessons/gpu/11-compute-shaders/) —
+  Compute pipeline fundamentals
 - Hillaire, S. (2020). *A Scalable and Production Ready Sky and
   Atmosphere Rendering Technique.* EGSR 2020.

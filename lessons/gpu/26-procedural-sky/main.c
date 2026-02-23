@@ -4,8 +4,8 @@
  * Why this lesson exists:
  *   Outdoor scenes need a sky.  A static skybox texture can't change
  *   time of day, and pre-baked lookup tables hide the underlying physics.
- *   This lesson implements Sébastien Hillaire's single-scattering
- *   atmospheric model (EGSR 2020) entirely in the fragment shader,
+ *   This lesson implements Sébastien Hillaire's atmospheric model
+ *   (EGSR 2020) with LUT-accelerated transmittance and multi-scattering,
  *   producing a physically-based sky that responds to sun angle in
  *   real time.
  *
@@ -14,12 +14,13 @@
  *   2. Rayleigh, Mie, and ozone scattering from physical constants
  *   3. The Beer-Lambert law for light extinction
  *   4. Phase functions (Rayleigh symmetric, Henyey-Greenstein forward)
- *   5. Inverse view-projection for world-space ray reconstruction
- *   6. HDR rendering to a floating-point render target
- *   7. Jimenez dual-filter bloom (downsample + upsample)
- *   8. ACES filmic tone mapping with exposure control
- *   9. Quaternion fly camera in planet-centric coordinates
- *  10. Sun disc rendering with limb darkening
+ *   5. Compute-shader LUT precomputation (transmittance + multi-scatter)
+ *   6. Ray matrix reconstruction for world-space view directions
+ *   7. HDR rendering to a floating-point render target
+ *   8. Jimenez dual-filter bloom (downsample + upsample)
+ *   9. ACES filmic tone mapping with exposure control
+ *  10. Quaternion fly camera in planet-centric coordinates
+ *  11. Sun disc rendering with limb darkening
  *
  * Scene:
  *   A fullscreen quad where the fragment shader ray-marches through
@@ -27,6 +28,10 @@
  *   per pixel.  HDR output feeds into a Jimenez bloom pass (bright sun
  *   disc creates a natural glow), then ACES tone mapping compresses to
  *   displayable range.
+ *
+ * One-time compute passes (at startup):
+ *   1. Transmittance LUT (256×64) — precompute optical transmittance
+ *   2. Multi-scattering LUT (32×32) — precompute higher-order bounces
  *
  * Render passes (per frame):
  *   1. Sky pass → HDR render target (R16G16B16A16_FLOAT)
@@ -69,6 +74,12 @@
 #include "shaders/compiled/sky_vert_dxil.h"
 #include "shaders/compiled/sky_frag_spirv.h"
 #include "shaders/compiled/sky_frag_dxil.h"
+
+/* Compute shaders — one-time LUT generation */
+#include "shaders/compiled/transmittance_lut_comp_spirv.h"
+#include "shaders/compiled/transmittance_lut_comp_dxil.h"
+#include "shaders/compiled/multiscatter_lut_comp_spirv.h"
+#include "shaders/compiled/multiscatter_lut_comp_dxil.h"
 
 /* Fullscreen vertex — shared by bloom downsample, upsample, and tonemap */
 #include "shaders/compiled/fullscreen_vert_spirv.h"
@@ -123,7 +134,13 @@
 
 /* Atmosphere ray march defaults. */
 #define NUM_VIEW_STEPS   32  /* outer ray march step count             */
-#define NUM_LIGHT_STEPS  8   /* inner sun transmittance step count     */
+
+/* Precomputed LUT dimensions. */
+#define TRANSMITTANCE_LUT_W  256  /* transmittance LUT width in texels  */
+#define TRANSMITTANCE_LUT_H   64  /* transmittance LUT height in texels */
+#define MULTISCATTER_LUT_W    32  /* multi-scattering LUT width         */
+#define MULTISCATTER_LUT_H    32  /* multi-scattering LUT height        */
+#define COMPUTE_WORKGROUP      8  /* compute shader workgroup size      */
 
 /* HDR render target format. */
 #define HDR_FORMAT SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT
@@ -176,16 +193,14 @@ typedef struct SkyVertUniforms {
  *   float3 sun_dir         (12 bytes)
  *   int    num_steps       ( 4 bytes)
  *   float2 resolution      ( 8 bytes)
- *   int    num_light_steps ( 4 bytes)
- *   float  _pad            ( 4 bytes) */
+ *   float2 _pad            ( 8 bytes) */
 typedef struct SkyFragUniforms {
   float cam_pos_km[3];    /* camera position in km (planet-centric)   */
   float sun_intensity;     /* sun radiance multiplier                  */
   float sun_dir[3];        /* normalized direction toward the sun      */
   int   num_steps;         /* outer ray march step count               */
   float resolution[2];     /* window size in pixels                    */
-  int   num_light_steps;   /* inner sun transmittance steps            */
-  float _pad;              /* pad to 16-byte alignment          (4 bytes) */
+  float _pad[2];           /* pad to 16-byte alignment          (8 bytes) */
 } SkyFragUniforms;         /* 48 bytes */
 
 /* Bloom downsample uniforms. */
@@ -215,11 +230,20 @@ typedef struct AppState {
   SDL_Window    *window;  /* main application window                        */
   SDL_GPUDevice *device;  /* GPU device handle (Vulkan/D3D12)               */
 
-  /* Pipelines — one per render pass type. */
+  /* Graphics pipelines — one per render pass type. */
   SDL_GPUGraphicsPipeline *sky_pipeline;        /* atmosphere ray march → HDR target    */
   SDL_GPUGraphicsPipeline *downsample_pipeline; /* 13-tap Jimenez bloom downsample      */
   SDL_GPUGraphicsPipeline *upsample_pipeline;   /* 9-tap tent upsample, additive blend  */
   SDL_GPUGraphicsPipeline *tonemap_pipeline;    /* HDR + bloom → swapchain (ACES)       */
+
+  /* Compute pipelines — LUT generation (one-time at startup). */
+  SDL_GPUComputePipeline *transmittance_compute;  /* transmittance LUT generator  */
+  SDL_GPUComputePipeline *multiscatter_compute;   /* multi-scattering LUT generator */
+
+  /* Precomputed LUT textures. */
+  SDL_GPUTexture *transmittance_lut;  /* 256×64 transmittance (view_height × cos_zenith)  */
+  SDL_GPUTexture *multiscatter_lut;   /* 32×32 multi-scattering (cos_sun × altitude)      */
+  SDL_GPUSampler *lut_sampler;        /* linear/clamp sampler shared by both LUTs          */
 
   /* HDR render target — R16G16B16A16_FLOAT, both COLOR_TARGET and SAMPLER. */
   SDL_GPUTexture *hdr_target;   /* sky output texture (HDR floating point)  */
@@ -301,6 +325,51 @@ static SDL_GPUShader *create_shader(
     SDL_Log("Failed to create shader: %s", SDL_GetError());
   }
   return shader;
+}
+
+/* ── Helper: create compute pipeline from SPIRV/DXIL bytecodes ────────────── */
+
+static SDL_GPUComputePipeline *create_compute_pipeline(
+    SDL_GPUDevice       *device,
+    const unsigned char *spirv_code,  size_t spirv_size,
+    const unsigned char *dxil_code,   size_t dxil_size,
+    int num_samplers,
+    int num_readwrite_storage_textures,
+    int num_uniform_buffers,
+    int threadcount_x,
+    int threadcount_y,
+    int threadcount_z
+) {
+  SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device);
+
+  SDL_GPUComputePipelineCreateInfo info;
+  SDL_zero(info);
+  info.entrypoint                     = "main";
+  info.num_samplers                   = num_samplers;
+  info.num_readwrite_storage_textures = num_readwrite_storage_textures;
+  info.num_uniform_buffers            = num_uniform_buffers;
+  info.threadcount_x                  = threadcount_x;
+  info.threadcount_y                  = threadcount_y;
+  info.threadcount_z                  = threadcount_z;
+
+  if (formats & SDL_GPU_SHADERFORMAT_SPIRV) {
+    info.format    = SDL_GPU_SHADERFORMAT_SPIRV;
+    info.code      = spirv_code;
+    info.code_size = spirv_size;
+  } else if (formats & SDL_GPU_SHADERFORMAT_DXIL) {
+    info.format    = SDL_GPU_SHADERFORMAT_DXIL;
+    info.code      = dxil_code;
+    info.code_size = dxil_size;
+  } else {
+    SDL_Log("No supported shader format for compute pipeline");
+    return NULL;
+  }
+
+  SDL_GPUComputePipeline *pipeline = SDL_CreateGPUComputePipeline(device, &info);
+  if (!pipeline) {
+    SDL_Log("Failed to create compute pipeline: %s", SDL_GetError());
+  }
+  return pipeline;
 }
 
 /* ── Helper: create HDR render target ─────────────────────────────────────── */
@@ -518,11 +587,176 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
       goto init_fail;
     }
   }
+  {
+    /* LUT sampler — linear filtering, clamp to edge (shared by both LUTs). */
+    SDL_GPUSamplerCreateInfo samp_info;
+    SDL_zero(samp_info);
+    samp_info.min_filter = SDL_GPU_FILTER_LINEAR;
+    samp_info.mag_filter = SDL_GPU_FILTER_LINEAR;
+    samp_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    samp_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    samp_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
 
-  /* Step 11 — Create the sky pipeline.
+    state->lut_sampler = SDL_CreateGPUSampler(device, &samp_info);
+    if (!state->lut_sampler) {
+      SDL_Log("Failed to create LUT sampler: %s", SDL_GetError());
+      goto init_fail;
+    }
+  }
+
+  /* Step 11 — Create LUT textures for precomputed atmosphere data.
+   * Both use R16G16B16A16_FLOAT, COMPUTE_STORAGE_WRITE for the compute
+   * shader to write, and SAMPLER for the fragment shader to read. */
+  {
+    SDL_GPUTextureCreateInfo tex_info;
+    SDL_zero(tex_info);
+    tex_info.type = SDL_GPU_TEXTURETYPE_2D;
+    tex_info.format = HDR_FORMAT;
+    tex_info.layer_count_or_depth = 1;
+    tex_info.num_levels = 1;
+    tex_info.usage = SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE
+                   | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+    /* Transmittance LUT: 256×64. */
+    tex_info.width = TRANSMITTANCE_LUT_W;
+    tex_info.height = TRANSMITTANCE_LUT_H;
+    state->transmittance_lut = SDL_CreateGPUTexture(device, &tex_info);
+    if (!state->transmittance_lut) {
+      SDL_Log("Failed to create transmittance LUT: %s", SDL_GetError());
+      goto init_fail;
+    }
+
+    /* Multi-scattering LUT: 32×32. */
+    tex_info.width = MULTISCATTER_LUT_W;
+    tex_info.height = MULTISCATTER_LUT_H;
+    state->multiscatter_lut = SDL_CreateGPUTexture(device, &tex_info);
+    if (!state->multiscatter_lut) {
+      SDL_Log("Failed to create multi-scattering LUT: %s", SDL_GetError());
+      goto init_fail;
+    }
+  }
+
+  /* Step 12 — Create compute pipelines for LUT generation. */
+  {
+    /* Transmittance compute: 0 samplers, 1 RW storage texture, 0 uniforms.
+     * LUT dimensions are compile-time constants in the shader. */
+    state->transmittance_compute = create_compute_pipeline(
+        device,
+        transmittance_lut_comp_spirv, sizeof(transmittance_lut_comp_spirv),
+        transmittance_lut_comp_dxil, sizeof(transmittance_lut_comp_dxil),
+        0, 1, 0,
+        COMPUTE_WORKGROUP, COMPUTE_WORKGROUP, 1);
+    if (!state->transmittance_compute) {
+      goto init_fail;
+    }
+
+    /* Multi-scattering compute: 1 sampler, 1 RW storage texture, 0 uniforms.
+     * LUT dimensions are compile-time constants in the shader. */
+    state->multiscatter_compute = create_compute_pipeline(
+        device,
+        multiscatter_lut_comp_spirv, sizeof(multiscatter_lut_comp_spirv),
+        multiscatter_lut_comp_dxil, sizeof(multiscatter_lut_comp_dxil),
+        1, 1, 0,
+        COMPUTE_WORKGROUP, COMPUTE_WORKGROUP, 1);
+    if (!state->multiscatter_compute) {
+      goto init_fail;
+    }
+  }
+
+  /* Step 13 — One-time LUT generation via compute dispatch.
+   * Two separate compute passes on one command buffer.  SDL GPU does NOT
+   * implicitly synchronize reads/writes within a single compute pass,
+   * so the multi-scattering pass (which reads the transmittance LUT)
+   * must be a separate pass from the transmittance write pass. */
+  {
+    SDL_GPUCommandBuffer *lut_cmd = SDL_AcquireGPUCommandBuffer(device);
+    if (!lut_cmd) {
+      SDL_Log("Failed to acquire command buffer for LUT generation: %s", SDL_GetError());
+      goto init_fail;
+    }
+
+    /* Pass 1: Generate transmittance LUT.
+     * No uniforms needed — LUT dimensions are compile-time constants. */
+    {
+      SDL_GPUStorageTextureReadWriteBinding storage_binding;
+      SDL_zero(storage_binding);
+      storage_binding.texture = state->transmittance_lut;
+      storage_binding.mip_level = 0;
+      storage_binding.layer = 0;
+      storage_binding.cycle = false;
+
+      SDL_GPUComputePass *pass = SDL_BeginGPUComputePass(
+          lut_cmd, &storage_binding, 1, NULL, 0);
+      if (!pass) {
+        SDL_Log("Failed to begin transmittance compute pass: %s", SDL_GetError());
+        if (!SDL_SubmitGPUCommandBuffer(lut_cmd)) {
+          SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
+        goto init_fail;
+      }
+
+      SDL_BindGPUComputePipeline(pass, state->transmittance_compute);
+
+      Uint32 groups_x = (TRANSMITTANCE_LUT_W + COMPUTE_WORKGROUP - 1) / COMPUTE_WORKGROUP;
+      Uint32 groups_y = (TRANSMITTANCE_LUT_H + COMPUTE_WORKGROUP - 1) / COMPUTE_WORKGROUP;
+      SDL_DispatchGPUCompute(pass, groups_x, groups_y, 1);
+      SDL_EndGPUComputePass(pass);
+    }
+
+    /* Pass 2: Generate multi-scattering LUT.
+     * This pass reads the transmittance LUT (as a sampled texture)
+     * and writes the multi-scattering LUT.
+     * No uniforms needed — LUT dimensions are compile-time constants. */
+    {
+      SDL_GPUStorageTextureReadWriteBinding storage_binding;
+      SDL_zero(storage_binding);
+      storage_binding.texture = state->multiscatter_lut;
+      storage_binding.mip_level = 0;
+      storage_binding.layer = 0;
+      storage_binding.cycle = false;
+
+      SDL_GPUComputePass *pass = SDL_BeginGPUComputePass(
+          lut_cmd, &storage_binding, 1, NULL, 0);
+      if (!pass) {
+        SDL_Log("Failed to begin multi-scattering compute pass: %s", SDL_GetError());
+        if (!SDL_SubmitGPUCommandBuffer(lut_cmd)) {
+          SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        }
+        goto init_fail;
+      }
+
+      SDL_BindGPUComputePipeline(pass, state->multiscatter_compute);
+
+      /* Bind the transmittance LUT as a sampled texture for reading. */
+      SDL_GPUTextureSamplerBinding sampler_binding;
+      SDL_zero(sampler_binding);
+      sampler_binding.texture = state->transmittance_lut;
+      sampler_binding.sampler = state->lut_sampler;
+      SDL_BindGPUComputeSamplers(pass, 0, &sampler_binding, 1);
+
+      Uint32 groups_x = (MULTISCATTER_LUT_W + COMPUTE_WORKGROUP - 1) / COMPUTE_WORKGROUP;
+      Uint32 groups_y = (MULTISCATTER_LUT_H + COMPUTE_WORKGROUP - 1) / COMPUTE_WORKGROUP;
+      SDL_DispatchGPUCompute(pass, groups_x, groups_y, 1);
+      SDL_EndGPUComputePass(pass);
+    }
+
+    if (!SDL_SubmitGPUCommandBuffer(lut_cmd)) {
+      SDL_Log("SDL_SubmitGPUCommandBuffer (LUT generation) failed: %s", SDL_GetError());
+      goto init_fail;
+    }
+
+    /* Wait for the GPU to finish LUT generation before continuing.
+     * The LUTs must be ready before the first frame renders. */
+    SDL_WaitForGPUIdle(device);
+    SDL_Log("  LUT generation complete (transmittance %dx%d, multiscatter %dx%d)",
+            TRANSMITTANCE_LUT_W, TRANSMITTANCE_LUT_H,
+            MULTISCATTER_LUT_W, MULTISCATTER_LUT_H);
+  }
+
+  /* Step 14 — Create the sky pipeline.
    * Renders to the HDR target.  No vertex buffer — fullscreen quad via
    * SV_VertexID.  The sky vertex shader has 1 uniform buffer (ray_matrix),
-   * the fragment shader has 1 uniform buffer (camera + sun + march). */
+   * the fragment shader has 2 samplers (LUTs) and 1 uniform buffer. */
   {
     SDL_GPUShader *vert = create_shader(
         device, SDL_GPU_SHADERSTAGE_VERTEX,
@@ -534,7 +768,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         device, SDL_GPU_SHADERSTAGE_FRAGMENT,
         sky_frag_spirv, sizeof(sky_frag_spirv),
         sky_frag_dxil, sizeof(sky_frag_dxil),
-        0, 1); /* 0 samplers, 1 uniform buffer (sky params) */
+        2, 1); /* 2 samplers (transmittance + multiscatter LUTs), 1 uniform buffer */
 
     if (!vert || !frag) {
       SDL_Log("Failed to create sky shaders");
@@ -568,7 +802,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     }
   }
 
-  /* Step 12 — Create the bloom downsample pipeline. */
+  /* Step 15 — Create the bloom downsample pipeline. */
   {
     SDL_GPUShader *vert = create_shader(
         device, SDL_GPU_SHADERSTAGE_VERTEX,
@@ -614,7 +848,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     }
   }
 
-  /* Step 13 — Create the bloom upsample pipeline.
+  /* Step 16 — Create the bloom upsample pipeline.
    * Additive blending (ONE + ONE) so upsampled contribution accumulates. */
   {
     SDL_GPUShader *vert = create_shader(
@@ -669,7 +903,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     }
   }
 
-  /* Step 14 — Create the tone mapping pipeline. */
+  /* Step 17 — Create the tone mapping pipeline. */
   {
     SDL_GPUShader *vert = create_shader(
         device, SDL_GPU_SHADERSTAGE_VERTEX,
@@ -715,7 +949,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     }
   }
 
-  /* Step 15 — Initialize camera and sun state. */
+  /* Step 18 — Initialize camera and sun state. */
   state->cam_position = (vec3){ CAM_START_X, CAM_START_Y, CAM_START_Z };
   state->cam_yaw = 0.0f;
   state->cam_pitch = 0.0f;
@@ -733,7 +967,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
   state->last_ticks = SDL_GetPerformanceCounter();
 
-  /* Step 16 — Capture the mouse for FPS-style controls. */
+  /* Step 19 — Capture the mouse for FPS-style controls. */
   if (!SDL_SetWindowRelativeMouseMode(window, true)) {
     SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s", SDL_GetError());
   }
@@ -1056,6 +1290,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
    *
    * Ray-march through Earth's atmosphere for each pixel.  The vertex
    * shader reconstructs world-space view rays via the ray matrix.
+   * LUT textures provide transmittance and multi-scattering data.
    * ════════════════════════════════════════════════════════════════════ */
   {
     SDL_GPUColorTargetInfo color_target;
@@ -1075,6 +1310,15 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     SDL_BindGPUGraphicsPipeline(pass, state->sky_pipeline);
 
+    /* Bind LUT textures for the fragment shader. */
+    SDL_GPUTextureSamplerBinding lut_bindings[2];
+    SDL_zero(lut_bindings);
+    lut_bindings[0].texture = state->transmittance_lut;
+    lut_bindings[0].sampler = state->lut_sampler;
+    lut_bindings[1].texture = state->multiscatter_lut;
+    lut_bindings[1].sampler = state->lut_sampler;
+    SDL_BindGPUFragmentSamplers(pass, 0, lut_bindings, 2);
+
     /* Push vertex uniforms — ray matrix that maps NDC to world-space
      * view directions (replaces inv_vp to avoid float precision loss). */
     SkyVertUniforms vert_u;
@@ -1093,8 +1337,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     frag_u.num_steps = NUM_VIEW_STEPS;
     frag_u.resolution[0] = (float)state->hdr_width;
     frag_u.resolution[1] = (float)state->hdr_height;
-    frag_u.num_light_steps = NUM_LIGHT_STEPS;
-    frag_u._pad = 0.0f;
+    frag_u._pad[0] = 0.0f;
+    frag_u._pad[1] = 0.0f;
     SDL_PushGPUFragmentUniformData(cmd, 0, &frag_u, sizeof(frag_u));
 
     SDL_DrawGPUPrimitives(pass, FULLSCREEN_QUAD_VERTS, 1, 0, 0);
@@ -1296,13 +1540,24 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
   if (state->sky_pipeline)
     SDL_ReleaseGPUGraphicsPipeline(state->device, state->sky_pipeline);
 
+  if (state->multiscatter_compute)
+    SDL_ReleaseGPUComputePipeline(state->device, state->multiscatter_compute);
+  if (state->transmittance_compute)
+    SDL_ReleaseGPUComputePipeline(state->device, state->transmittance_compute);
+
   if (state->bloom_sampler)
     SDL_ReleaseGPUSampler(state->device, state->bloom_sampler);
+  if (state->lut_sampler)
+    SDL_ReleaseGPUSampler(state->device, state->lut_sampler);
   if (state->hdr_sampler)
     SDL_ReleaseGPUSampler(state->device, state->hdr_sampler);
 
   release_bloom_mip_chain(state);
 
+  if (state->multiscatter_lut)
+    SDL_ReleaseGPUTexture(state->device, state->multiscatter_lut);
+  if (state->transmittance_lut)
+    SDL_ReleaseGPUTexture(state->device, state->transmittance_lut);
   if (state->hdr_target)
     SDL_ReleaseGPUTexture(state->device, state->hdr_target);
 

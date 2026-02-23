@@ -1,10 +1,17 @@
 /*
- * sky.frag.hlsl — Physically-based atmospheric scattering (Hillaire)
+ * sky.frag.hlsl -- Physically-based atmospheric scattering (Hillaire)
  *
- * Implements Sébastien Hillaire's single-scattering atmospheric model
- * (EGSR 2020) entirely in the fragment shader.  Each pixel casts a ray
- * from the camera through Earth's atmosphere and accumulates inscattered
- * sunlight via ray marching.
+ * Implements Sebastien Hillaire's atmospheric model (EGSR 2020) with
+ * LUT-accelerated transmittance and multi-scattering.  Each pixel casts
+ * a ray from the camera through Earth's atmosphere and accumulates
+ * inscattered sunlight via ray marching.
+ *
+ * Two precomputed LUTs (generated once at startup by compute shaders)
+ * replace the per-pixel inner march and add multi-scattering:
+ *   - Transmittance LUT: O(1) lookup replaces the inner ray march that
+ *     previously ran at every sample point (32x8 = 256 evaluations/pixel)
+ *   - Multi-scattering LUT: adds light from 2nd+ order bounces that
+ *     fill in shadows and brighten the horizon
  *
  * Three scattering species:
  *   - Rayleigh: molecular scattering, wavelength-dependent (blue sky)
@@ -15,25 +22,34 @@
  * Units are in kilometers throughout.
  *
  * Key functions:
- *   1. ray_sphere_intersect — quadratic ray-sphere intersection test
- *   2. rayleigh_phase       — (3/16pi)(1 + cos^2 theta)
- *   3. mie_phase_hg         — Henyey-Greenstein with g=0.8
- *   4. sample_medium        — density and extinction at a given altitude
- *   5. sun_transmittance    — inner march from sample to sun
- *   6. atmosphere           — outer ray march accumulating inscattered light
- *   7. sun_disc             — solar disc with limb darkening
+ *   1. ray_sphere_intersect         -- quadratic ray-sphere intersection
+ *   2. rayleigh_phase               -- (3/16pi)(1 + cos^2 theta)
+ *   3. mie_phase_hg                 -- Henyey-Greenstein with g=0.8
+ *   4. sample_medium                -- density and extinction at altitude
+ *   5. sample_transmittance         -- LUT lookup (replaces inner march)
+ *   6. sample_multiscatter          -- LUT lookup for multi-scattering
+ *   7. atmosphere                   -- outer ray march with LUT sampling
+ *   8. sun_disc                     -- solar disc with limb darkening
  *
  * Uniform layout (48 bytes):
- *   float3 cam_pos_km       (12 bytes) — camera position in km (planet center)
- *   float  sun_intensity    ( 4 bytes) — sun radiance multiplier
- *   float3 sun_dir          (12 bytes) — normalized direction TO the sun
- *   int    num_steps        ( 4 bytes) — outer ray march step count
- *   float2 resolution       ( 8 bytes) — window size in pixels
- *   int    num_light_steps  ( 4 bytes) — inner (sun) march step count
- *   float  _pad             ( 4 bytes)
+ *   float3 cam_pos_km       (12 bytes) -- camera position in km
+ *   float  sun_intensity    ( 4 bytes) -- sun radiance multiplier
+ *   float3 sun_dir          (12 bytes) -- normalized direction TO the sun
+ *   int    num_steps        ( 4 bytes) -- outer ray march step count
+ *   float2 resolution       ( 8 bytes) -- window size in pixels
+ *   float2 _pad             ( 8 bytes) -- padding
  *
  * SPDX-License-Identifier: Zlib
  */
+
+/* ---- LUT texture bindings (space2) -------------------------------------- */
+
+Texture2D<float4> transmittance_lut : register(t0, space2);
+SamplerState      trans_sampler     : register(s0, space2);
+Texture2D<float4> multiscatter_lut  : register(t1, space2);
+SamplerState      ms_sampler        : register(s1, space2);
+
+/* ---- Uniforms (space3) -------------------------------------------------- */
 
 cbuffer SkyFragUniforms : register(b0, space3)
 {
@@ -42,8 +58,7 @@ cbuffer SkyFragUniforms : register(b0, space3)
     float3 sun_dir;          /* normalized direction toward the sun          */
     int    num_steps;        /* outer ray march steps (default 32)           */
     float2 resolution;       /* window width, height in pixels               */
-    int    num_light_steps;  /* inner sun transmittance steps (default 8)    */
-    float  _pad;
+    float2 _pad;
 };
 
 struct PSInput
@@ -53,61 +68,44 @@ struct PSInput
     float2 uv       : TEXCOORD1;
 };
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Atmosphere constants — Hillaire EGSR 2020, Table 1
- *
- * All values in km^-1.  The planet is centered at the origin.
- * ════════════════════════════════════════════════════════════════════════════ */
+/* ---- Atmosphere constants (Hillaire EGSR 2020, Table 1) ----------------- */
 
 static const float R_GROUND = 6360.0;    /* Earth radius in km             */
 static const float R_ATMO   = 6460.0;    /* atmosphere top radius in km    */
 
-/* Rayleigh scattering — molecular scattering by N2 and O2.
- * Wavelength-dependent: short wavelengths (blue) scatter ~16x more than
- * long wavelengths (red), which is why the sky appears blue. */
 static const float3 RAYLEIGH_SCATTER = float3(5.802e-3, 13.558e-3, 33.1e-3);
-static const float  RAYLEIGH_H       = 8.0;  /* scale height in km */
+static const float  RAYLEIGH_H       = 8.0;
 
-/* Mie scattering — aerosol particles (dust, water droplets).
- * Nearly wavelength-independent (white/gray).  Strongly forward-peaked
- * due to particle size >> wavelength (Henyey-Greenstein g=0.8). */
 static const float MIE_SCATTER = 3.996e-3;
 static const float MIE_ABSORB  = 0.444e-3;
-static const float MIE_H       = 1.2;  /* scale height in km */
-static const float MIE_G       = 0.8;  /* asymmetry parameter */
+static const float MIE_H       = 1.2;
+static const float MIE_G       = 0.8;
 
-/* Ozone absorption — concentrated in a layer around 25 km altitude.
- * Absorbs red/green wavelengths, contributing to blue zenith color
- * and the blue-purple tint visible during twilight. */
 static const float3 OZONE_ABSORB = float3(0.650e-3, 1.881e-3, 0.085e-3);
-static const float  OZONE_CENTER = 25.0;  /* peak altitude in km */
-static const float  OZONE_WIDTH  = 15.0;  /* tent half-width in km */
+static const float  OZONE_CENTER = 25.0;
+static const float  OZONE_WIDTH  = 15.0;
 
-/* Sun angular radius — half the ~0.53° angular diameter (0.00465 radians). */
+/* Sun angular radius -- half the ~0.53 degree diameter (0.00465 radians). */
 static const float SUN_ANGULAR_RADIUS = 0.00465;
 
 /* Sun disc rendering parameters. */
-static const float SUN_DISC_MULTIPLIER = 10.0;  /* brightness boost relative to sun_intensity */
-static const float LIMB_DARKENING_U    = 0.6;   /* empirical coefficient for visible spectrum  */
-static const float SUN_EDGE_OUTER      = 1.2;   /* smoothstep outer radius multiplier          */
-static const float SUN_EDGE_INNER      = 0.9;   /* smoothstep inner radius multiplier          */
+static const float SUN_DISC_MULTIPLIER = 10.0;
+static const float LIMB_DARKENING_U    = 0.6;
+static const float SUN_EDGE_OUTER      = 1.2;
+static const float SUN_EDGE_INNER      = 0.9;
 
 /* PI constant. */
 static const float PI = 3.14159265358979323846;
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Ray-sphere intersection
- *
- * Tests whether a ray (origin ro, direction rd) intersects a sphere of
- * given radius centered at the origin.  Returns the near and far hit
- * distances via t_near and t_far.
- *
- * Uses the standard quadratic formula:
- *   |ro + t*rd|^2 = r^2
- *   t^2(rd.rd) + 2t(ro.rd) + (ro.ro - r^2) = 0
- *
- * Returns false if the ray misses the sphere entirely.
- * ════════════════════════════════════════════════════════════════════════════ */
+/* Transmittance LUT dimensions (must match C-side constants). */
+static const float TRANSMITTANCE_LUT_W = 256.0;
+static const float TRANSMITTANCE_LUT_H = 64.0;
+
+/* Multi-scattering LUT dimensions. */
+static const float MULTISCATTER_LUT_W = 32.0;
+static const float MULTISCATTER_LUT_H = 32.0;
+
+/* ---- Ray-sphere intersection -------------------------------------------- */
 
 bool ray_sphere_intersect(float3 ro, float3 rd, float radius,
                           out float t_near, out float t_far)
@@ -131,25 +129,13 @@ bool ray_sphere_intersect(float3 ro, float3 rd, float radius,
     return true;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Phase functions
- *
- * Phase functions describe how light is scattered as a function of the
- * angle between the incoming and outgoing directions.
- * ════════════════════════════════════════════════════════════════════════════ */
+/* ---- Phase functions ---------------------------------------------------- */
 
-/* Rayleigh phase function: (3/16pi)(1 + cos^2 theta).
- * Symmetric — scatters equally forward and backward.
- * The cos^2 term means 90-degree scattering is weakest. */
 float rayleigh_phase(float cos_theta)
 {
     return (3.0 / (16.0 * PI)) * (1.0 + cos_theta * cos_theta);
 }
 
-/* Henyey-Greenstein phase function for Mie scattering.
- * g controls the forward peak: g=0 is isotropic, g=0.8 is strongly
- * forward-peaked (light mostly continues in the forward direction).
- * This creates the bright halo around the sun disc. */
 float mie_phase_hg(float cos_theta, float g)
 {
     float g2 = g * g;
@@ -157,51 +143,30 @@ float mie_phase_hg(float cos_theta, float g)
     return (1.0 / (4.0 * PI)) * (1.0 - g2) / (denom * sqrt(denom));
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Medium sampling — density and optical properties at a given altitude
- *
- * Each scattering species has a characteristic density profile:
- *   - Rayleigh and Mie: exponential decay with altitude (scale height)
- *   - Ozone: tent function peaking at ~25 km
- *
- * Returns the total scattering and extinction coefficients at position p.
- * ════════════════════════════════════════════════════════════════════════════ */
+/* ---- Medium sampling ---------------------------------------------------- */
 
 struct MediumSample
 {
-    float3 scatter;     /* total scattering coefficient (sigma_s)      */
-    float3 extinction;  /* total extinction coefficient (sigma_t)      */
+    float3 scatter;
+    float3 extinction;
 };
 
 MediumSample sample_medium(float3 pos)
 {
     MediumSample m;
 
-    /* Altitude above ground in km. */
     float altitude = length(pos) - R_GROUND;
 
-    /* Rayleigh density: exponential falloff with 8 km scale height.
-     * At sea level, density = 1.  At 8 km, density = 1/e ≈ 0.37. */
     float rho_rayleigh = exp(-altitude / RAYLEIGH_H);
-
-    /* Mie density: exponential falloff with 1.2 km scale height.
-     * Aerosols are concentrated near the surface. */
     float rho_mie = exp(-altitude / MIE_H);
-
-    /* Ozone density: tent function centered at 25 km, width 15 km.
-     * This approximation captures the ozone layer's vertical profile. */
     float rho_ozone = max(0.0, 1.0 - abs(altitude - OZONE_CENTER) / OZONE_WIDTH);
 
-    /* Scattering: Rayleigh + Mie (ozone has no scattering). */
     float3 rayleigh_s = RAYLEIGH_SCATTER * rho_rayleigh;
     float  mie_s      = MIE_SCATTER * rho_mie;
 
     m.scatter = rayleigh_s + float3(mie_s, mie_s, mie_s);
 
-    /* Extinction = scattering + absorption for each species.
-     * Rayleigh has zero absorption.  Mie has a small absorption.
-     * Ozone is pure absorption (no scattering). */
-    float3 rayleigh_t = rayleigh_s;  /* Rayleigh absorption = 0 */
+    float3 rayleigh_t = rayleigh_s;
     float  mie_t      = mie_s + MIE_ABSORB * rho_mie;
     float3 ozone_t    = OZONE_ABSORB * rho_ozone;
 
@@ -210,65 +175,94 @@ MediumSample sample_medium(float3 pos)
     return m;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Sun transmittance — optical depth from a point to the sun
+/* ---- Transmittance LUT sampling ----------------------------------------- *
  *
- * Marches from position pos toward the sun and accumulates extinction.
- * The transmittance is exp(-optical_depth), representing the fraction of
- * sunlight that reaches this point without being scattered or absorbed.
+ * Forward Bruneton mapping: (view_height, cos_zenith) -> UV.
+ * Mirrors the inverse mapping in transmittance_lut.comp.hlsl.
  *
- * This is the "inner loop" of the atmosphere calculation.  Near sunset,
- * light travels a long path through dense atmosphere, causing heavy
- * extinction of blue/green wavelengths — which is why sunsets are orange.
- * ════════════════════════════════════════════════════════════════════════════ */
+ * H = sqrt(R_ATMO^2 - R_GROUND^2) -- max geometric horizon distance
+ * rho = sqrt(r^2 - R_GROUND^2)    -- distance to tangent point
+ * d_min = R_ATMO - r              -- shortest path (straight up)
+ * d_max = rho + H                 -- longest path (toward horizon)
+ * x_r = rho / H                   -- maps view_height to [0,1]
+ * x_mu = (d - d_min) / (d_max - d_min) -- maps cos_zenith to [0,1]
+ * ---------------------------------------------------------------------- */
 
-float3 sun_transmittance(float3 pos, float3 sun_direction)
+float2 transmittance_params_to_uv(float view_height, float cos_zenith)
 {
+    float H = sqrt(R_ATMO * R_ATMO - R_GROUND * R_GROUND);
+    float rho = sqrt(max(0.0, view_height * view_height - R_GROUND * R_GROUND));
+
+    /* Compute the ray distance to the atmosphere boundary. */
+    float sin_zenith = sqrt(max(0.0, 1.0 - cos_zenith * cos_zenith));
+    float3 ro = float3(0.0, view_height, 0.0);
+    float3 rd = float3(sin_zenith, cos_zenith, 0.0);
+
     float t_near, t_far;
-    ray_sphere_intersect(pos, sun_direction, R_ATMO, t_near, t_far);
+    ray_sphere_intersect(ro, rd, R_ATMO, t_near, t_far);
+    float d = t_far;
 
-    /* March from pos to atmosphere boundary along sun direction. */
-    float step_size = t_far / (float)num_light_steps;
-    float3 optical_depth = float3(0.0, 0.0, 0.0);
-
-    for (int i = 0; i < num_light_steps; i++)
+    /* If the ray hits ground, use the ground distance. */
+    float t_gnd_near, t_gnd_far;
+    if (ray_sphere_intersect(ro, rd, R_GROUND, t_gnd_near, t_gnd_far))
     {
-        float t = (float(i) + 0.5) * step_size;
-        float3 sample_pos = pos + sun_direction * t;
-
-        /* Check if this sample is underground. */
-        if (length(sample_pos) < R_GROUND)
-            return float3(0.0, 0.0, 0.0);
-
-        MediumSample med = sample_medium(sample_pos);
-        optical_depth += med.extinction * step_size;
+        if (t_gnd_near > 0.0)
+            d = t_gnd_near;
     }
 
-    return exp(-optical_depth);
+    float d_min = R_ATMO - view_height;
+    float d_max = rho + H;
+
+    float x_mu = (d_max > d_min) ? (d - d_min) / (d_max - d_min) : 0.0;
+    float x_r  = (H > 0.0) ? rho / H : 0.0;
+
+    return float2(clamp(x_mu, 0.0, 1.0), clamp(x_r, 0.0, 1.0));
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Main atmosphere ray march
+float3 sample_transmittance(float view_height, float cos_zenith)
+{
+    float2 uv = transmittance_params_to_uv(view_height, cos_zenith);
+    return transmittance_lut.SampleLevel(trans_sampler, uv, 0).rgb;
+}
+
+/* ---- Multi-scattering LUT sampling -------------------------------------- *
+ *
+ * Linear mapping with sub-UV correction to prevent bilinear edge bleed.
+ * ---------------------------------------------------------------------- */
+
+float from_unit_to_sub_uvs(float u, float res)
+{
+    return (u + 0.5 / res) * (res / (res + 1.0));
+}
+
+float3 sample_multiscatter(float altitude, float cos_sun_zenith)
+{
+    float u = from_unit_to_sub_uvs(cos_sun_zenith * 0.5 + 0.5, MULTISCATTER_LUT_W);
+    float v = from_unit_to_sub_uvs(
+        saturate(altitude / (R_ATMO - R_GROUND)), MULTISCATTER_LUT_H);
+
+    return multiscatter_lut.SampleLevel(ms_sampler, float2(u, v), 0).rgb;
+}
+
+/* ---- Main atmosphere ray march ------------------------------------------ *
  *
  * The outer loop: march along the view ray through the atmosphere,
  * accumulating inscattered sunlight at each sample point.
  *
  * At each step:
  *   1. Sample the medium properties (scattering + extinction)
- *   2. Compute transmittance from this point to the sun
- *   3. Compute phase-weighted inscattered radiance
- *   4. Accumulate using Beer-Lambert transmittance
+ *   2. Look up sun transmittance from the precomputed LUT
+ *   3. Look up multi-scattering from the precomputed LUT
+ *   4. Compute phase-weighted inscattered radiance
+ *   5. Accumulate using Beer-Lambert transmittance
  *
- * The transmittance along the view ray decreases exponentially as we
- * march through denser atmosphere.  This naturally handles:
- *   - Blue sky overhead (short path, little extinction)
- *   - White/orange near horizon (long path, heavy extinction)
- *   - Dark night sky (sun below horizon, no direct illumination)
- * ════════════════════════════════════════════════════════════════════════════ */
+ * The transmittance LUT replaces the inner march (O(1) per sample),
+ * and the multi-scattering LUT adds light from higher-order bounces.
+ * ---------------------------------------------------------------------- */
 
 float3 atmosphere(float3 ray_origin, float3 ray_dir, out float3 transmittance_out)
 {
-    /* Intersect with the atmosphere sphere.  If we miss, return black. */
+    /* Intersect with the atmosphere sphere. */
     float t_near, t_far;
     if (!ray_sphere_intersect(ray_origin, ray_dir, R_ATMO, t_near, t_far))
     {
@@ -276,12 +270,10 @@ float3 atmosphere(float3 ray_origin, float3 ray_dir, out float3 transmittance_ou
         return float3(0.0, 0.0, 0.0);
     }
 
-    /* If the camera is inside the atmosphere, start marching from the
-     * camera (t=0), not the entry point. */
     if (t_near < 0.0)
         t_near = 0.0;
 
-    /* Check if the ray hits the ground.  If so, stop the march there. */
+    /* Stop at the ground if the ray hits it. */
     float t_ground_near, t_ground_far;
     if (ray_sphere_intersect(ray_origin, ray_dir, R_GROUND, t_ground_near, t_ground_far))
     {
@@ -291,11 +283,10 @@ float3 atmosphere(float3 ray_origin, float3 ray_dir, out float3 transmittance_ou
 
     float step_size = (t_far - t_near) / (float)num_steps;
 
-    /* Cosine of the angle between view ray and sun direction.
-     * This is the scattering angle for the phase functions. */
+    /* Scattering angle between view ray and sun direction. */
     float cos_theta = dot(ray_dir, sun_dir);
 
-    /* Evaluate phase functions (constant along the ray). */
+    /* Phase functions (constant along the ray). */
     float phase_r = rayleigh_phase(cos_theta);
     float phase_m = mie_phase_hg(cos_theta, MIE_G);
 
@@ -305,44 +296,44 @@ float3 atmosphere(float3 ray_origin, float3 ray_dir, out float3 transmittance_ou
 
     for (int i = 0; i < num_steps; i++)
     {
-        /* Sample at the midpoint of each step for better accuracy. */
         float t = t_near + (float(i) + 0.5) * step_size;
         float3 pos = ray_origin + ray_dir * t;
 
         /* Sample scattering and extinction at this altitude. */
         MediumSample med = sample_medium(pos);
 
-        /* Transmittance from this sample point to the sun.
-         * If the sun is below the horizon from here, this is ~0. */
-        float3 sun_trans = sun_transmittance(pos, sun_dir);
+        /* Sun transmittance from the precomputed LUT. */
+        float sample_height = length(pos);
+        float cos_sun_zenith = dot(normalize(pos), sun_dir);
+        float3 sun_trans = sample_transmittance(sample_height, cos_sun_zenith);
 
-        /* Separate Rayleigh and Mie scattering for phase weighting.
-         * Each species has its own phase function. */
-        float altitude = length(pos) - R_GROUND;
+        /* Separate Rayleigh and Mie for phase weighting. */
+        float altitude = sample_height - R_GROUND;
         float rho_r = exp(-altitude / RAYLEIGH_H);
         float rho_m = exp(-altitude / MIE_H);
 
         float3 scatter_r = RAYLEIGH_SCATTER * rho_r * phase_r;
-        float3 scatter_m = float3(MIE_SCATTER, MIE_SCATTER, MIE_SCATTER) * rho_m * phase_m;
+        float3 scatter_m = float3(MIE_SCATTER, MIE_SCATTER, MIE_SCATTER)
+                         * rho_m * phase_m;
 
-        /* In-scattered radiance at this step: sunlight * transmittance_to_sun
-         * * scattering * transmittance_along_view * step_size.
-         * The sun_intensity multiplier controls overall sky brightness. */
-        float3 S = (scatter_r + scatter_m) * sun_trans * sun_intensity;
+        /* Multi-scattering contribution from the LUT.
+         * Uses total scattering coefficient (no phase weighting --
+         * higher-order scattering is isotropic). */
+        float3 ms = sample_multiscatter(altitude, cos_sun_zenith);
 
-        /* Beer-Lambert: transmittance decreases exponentially with
-         * accumulated extinction (optical depth). */
+        /* Combined inscattered radiance:
+         * single scatter (phase-weighted) + multi-scatter (isotropic). */
+        float3 S = (scatter_r + scatter_m) * sun_trans * sun_intensity
+                 + ms * med.scatter * sun_intensity;
+
+        /* Beer-Lambert: transmittance decreases exponentially. */
         float3 step_extinction = exp(-med.extinction * step_size);
 
-        /* Analytical integration of inscattering over the step.
-         * Instead of naive: inscatter += S * transmittance * step_size
-         * We use: inscatter += S * (1 - exp(-ext*ds)) / ext * transmittance
-         * This is more accurate for large step sizes. */
+        /* Analytical integration for better accuracy at large steps. */
         float3 scatter_integral = (float3(1.0, 1.0, 1.0) - step_extinction)
                                   / max(med.extinction, float3(1e-6, 1e-6, 1e-6));
         inscatter += S * scatter_integral * transmittance;
 
-        /* Update view transmittance for the next step. */
         transmittance *= step_extinction;
     }
 
@@ -350,48 +341,30 @@ float3 atmosphere(float3 ray_origin, float3 ray_dir, out float3 transmittance_ou
     return inscatter;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Sun disc with limb darkening
- *
- * Adds a visible sun disc on top of the atmosphere.  The disc uses
- * a smooth edge (smoothstep) and limb darkening — the sun is brighter
- * at the center and dimmer at the edges.  This is caused by viewing
- * through more of the sun's (cooler, dimmer) outer atmosphere at the
- * edges.
- *
- * The empirical limb darkening law: I(r) = 1 - u*(1 - cos(theta))
- * where u ≈ 0.6 for the visible sun and cos(theta) = sqrt(1 - r^2).
- * ════════════════════════════════════════════════════════════════════════════ */
+/* ---- Sun disc with limb darkening --------------------------------------- */
 
 float3 sun_disc(float3 ray_dir, float3 sun_direction, float3 transmittance)
 {
     float cos_angle = dot(ray_dir, sun_direction);
     float angle = acos(clamp(cos_angle, -1.0, 1.0));
 
-    /* Smooth edge transition over a small angular range. */
     float edge = smoothstep(SUN_ANGULAR_RADIUS * SUN_EDGE_OUTER,
                             SUN_ANGULAR_RADIUS * SUN_EDGE_INNER, angle);
 
     if (edge <= 0.0)
         return float3(0.0, 0.0, 0.0);
 
-    /* Limb darkening: brightness falls off toward the disc edge.
-     * r is the fractional radius from disc center (0=center, 1=edge). */
     float r = angle / SUN_ANGULAR_RADIUS;
     float cos_limb = sqrt(max(0.0, 1.0 - r * r));
     float limb_darkening = 1.0 - LIMB_DARKENING_U * (1.0 - cos_limb);
 
-    /* The sun's apparent brightness as seen through the atmosphere.
-     * We multiply by the view transmittance so the sun dims at sunset. */
     float3 sun_color = float3(1.0, 1.0, 1.0) * sun_intensity * SUN_DISC_MULTIPLIER
                      * limb_darkening * edge * transmittance;
 
     return sun_color;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Fragment shader entry point
- * ════════════════════════════════════════════════════════════════════════════ */
+/* ---- Fragment shader entry point ---------------------------------------- */
 
 float4 main(PSInput input) : SV_Target
 {
@@ -406,7 +379,7 @@ float4 main(PSInput input) : SV_Target
 
     /* Add the sun disc only if the sun is not occluded by the planet.
      * Check if a ray from the camera toward the sun hits the ground
-     * sphere — if it does, the planet blocks the sun disc. */
+     * sphere -- if it does, the planet blocks the sun disc. */
     float t_gnd_near, t_gnd_far;
     bool sun_hits_ground = ray_sphere_intersect(
         cam_pos_km, sun_dir, R_GROUND, t_gnd_near, t_gnd_far);

@@ -1,8 +1,8 @@
 # Lesson 26 — Procedural Sky (Hillaire)
 
-A physically-based atmospheric sky rendered entirely in the fragment shader
-using per-pixel ray marching through Earth's atmosphere, with Rayleigh,
-Mie, and ozone scattering.
+A physically-based atmospheric sky with LUT-accelerated transmittance
+and multi-scattering, using per-pixel ray marching through Earth's
+atmosphere with Rayleigh, Mie, and ozone scattering.
 
 ## What you'll learn
 
@@ -13,6 +13,9 @@ Mie, and ozone scattering.
 - The Beer-Lambert law for light extinction along a path
 - Phase functions (Rayleigh symmetric, Henyey-Greenstein forward)
 - Ray-sphere intersection for atmosphere entry/exit
+- Compute-shader LUT precomputation (transmittance + multi-scattering)
+- Bruneton non-linear UV parameterization for LUT precision
+- Multi-scattering via geometric power series summation
 - Ray matrix reconstruction for world-space view directions
 - HDR rendering with Jimenez dual-filter bloom
 - ACES filmic tone mapping with exposure control
@@ -50,18 +53,23 @@ the atmosphere in kilometers.
 ### Why per-pixel ray marching?
 
 Pre-baked skybox textures are static — they capture one moment in time
-and can't change with the sun angle. Lookup tables (LUTs) pre-compute
-atmosphere colors into textures, which is fast but hides the physics.
+and can't change with the sun angle. Full-resolution LUTs that
+pre-compute the entire sky into textures are fast but hide the physics.
 
 This lesson computes the sky per pixel, every frame. A ray from the
 camera through each pixel marches through Earth's atmosphere, accumulating
 scattered sunlight at each step. The result is a physically correct sky
 that responds naturally to any sun angle, camera altitude, or atmosphere
-configuration — all from a single fragment shader.
+configuration.
 
-The approach follows Sébastien Hillaire's single-scattering model
-(EGSR 2020), which achieves real-time performance with ~32 outer steps
-and ~8 inner steps per pixel.
+The approach follows Sebastien Hillaire's atmospheric model (EGSR 2020).
+Two precomputed LUTs replace the expensive inner march and add
+multi-scattering, reducing per-pixel cost while improving quality:
+
+- **Transmittance LUT** — O(1) lookup replaces the inner ray march
+  (previously 8 steps at each of 32 outer steps = 256 evaluations/pixel)
+- **Multi-scattering LUT** — adds light from 2nd+ order bounces that
+  were entirely missing from single-scatter-only rendering
 
 ### Atmosphere structure
 
@@ -188,10 +196,12 @@ for (int i = 0; i < num_steps; i++) {
     float3 pos = ray_origin + ray_dir * t;
 
     MediumSample med = sample_medium(pos);
-    float3 sun_trans = sun_transmittance(pos, sun_dir);
+    float3 sun_trans = sample_transmittance(length(pos), cos_sun_zenith);
+    float3 ms = sample_multiscatter(altitude, cos_sun_zenith);
 
-    /* Phase-weighted inscattered radiance */
-    float3 S = (scatter_r + scatter_m) * sun_trans * sun_intensity;
+    /* Single scatter (phase-weighted) + multi-scatter (isotropic) */
+    float3 S = (scatter_r + scatter_m) * sun_trans * sun_intensity
+             + ms * med.scatter * sun_intensity;
 
     /* Analytical integration for better accuracy */
     float3 step_ext = exp(-med.extinction * step_size);
@@ -206,23 +216,77 @@ At each step:
 
 1. **Sample the medium** — get scattering and extinction coefficients
    from the density profiles
-2. **Compute sun transmittance** — inner march from this point toward
-   the sun to find how much sunlight reaches here
-3. **Accumulate inscattered light** — multiply by phase functions and
+2. **Look up sun transmittance** — O(1) texture fetch from the
+   precomputed LUT (replaces the 8-step inner march)
+3. **Look up multi-scattering** — adds higher-order bounce contribution
+4. **Accumulate inscattered light** — multiply by phase functions and
    the current view transmittance
-4. **Update transmittance** — Beer-Lambert law reduces it exponentially
+5. **Update transmittance** — Beer-Lambert law reduces it exponentially
 
 The analytical integration `(1 - exp(-ext*ds)) / ext` is more accurate
 than the naive `ext * ds` approximation, especially for large step sizes.
+
+### Transmittance LUT
+
+Sun transmittance — the fraction of sunlight reaching a point — depends
+only on two parameters: the **view height** (distance from planet center)
+and the **cosine of the zenith angle** (angle between the up direction
+and the ray). It does not depend on view direction or azimuth.
+
+This makes transmittance a natural candidate for precomputation into a
+2D lookup table. A compute shader (256×64 texels) evaluates the full
+40-step ray march once per texel at startup. The fragment shader then
+replaces the inner march with a single texture fetch — reducing per-pixel
+cost from O(outer×inner) to O(outer).
+
+**Bruneton non-linear UV parameterization:** The UV mapping is not linear
+in (height, cos\_zenith). Instead, it uses the ray distance through the
+atmosphere as an intermediate variable (from Bruneton & Neyret 2008).
+This concentrates precision near the horizon where transmittance changes
+fastest — a linear mapping would waste most of its resolution on the
+slowly-varying zenith region.
+
+```text
+H = sqrt(R_ATMO² - R_GROUND²)     — max geometric horizon distance
+rho = sqrt(r² - R_GROUND²)         — distance to ground tangent point
+d_min = R_ATMO - r                  — shortest path (straight up)
+d_max = rho + H                     — longest path (toward horizon)
+
+x_mu = (d - d_min) / (d_max - d_min)  — UV.x (non-linear in cos_zenith)
+x_r = rho / H                          — UV.y (non-linear in view_height)
+```
+
+### Multi-scattering LUT
+
+Single scattering captures light that scatters exactly once toward the
+camera. In reality, scattered light bounces between molecules many times.
+These higher-order bounces fill in shadows and brighten the horizon,
+creating a more natural-looking sky.
+
+The multi-scattering LUT (32×32 texels) computes this contribution using
+a geometric power series. For each (altitude, sun\_zenith) pair:
+
+1. **Sample 64 directions** on the unit sphere (8×8 stratified grid)
+2. For each direction, march 20 steps through the atmosphere
+3. Accumulate **L\_2nd** (luminance from second-order scattering) and
+   **f\_ms** (rescattering fraction — how much scattered light scatters
+   again)
+4. Sum infinite bounces via the geometric series:
+   **Ψ = L\_2nd / (1 - f\_ms)**
+
+Higher-order scattering is nearly isotropic (direction-independent), so
+an isotropic phase function (1/4π) is used instead of the
+direction-dependent Rayleigh and Mie phases. This is why the LUT only
+needs 2 parameters, not 3.
 
 ### Sun transmittance and sunset colors
 
 ![Sun transmittance](assets/sun_transmittance.png)
 
-The inner march determines how much sunlight reaches each sample point.
-At noon, sunlight travels a short path straight down through the
-atmosphere — little extinction occurs, and the sky is bright blue
-(Rayleigh scattering favors short wavelengths).
+The transmittance LUT encodes how much sunlight reaches each point in
+the atmosphere. At noon, sunlight travels a short path straight down —
+little extinction occurs, and the sky is bright blue (Rayleigh scattering
+favors short wavelengths).
 
 At sunset, sunlight must travel a long path through dense low-altitude
 atmosphere. The path length is much greater, causing heavy extinction.
@@ -269,10 +333,26 @@ color grading needed.
 
 ![Render pipeline](assets/render_pipeline.png)
 
-The rendering follows a multi-pass HDR pipeline:
+The rendering has two phases: one-time LUT precomputation and per-frame
+sky rendering.
 
-1. **Sky pass** — Ray march the atmosphere into an R16G16B16A16_FLOAT
+**One-time compute passes** (at startup):
+
+1. **Transmittance LUT** (256×64) — 40-step ray march per texel, stores
+   exp(-optical\_depth) as R16G16B16A16\_FLOAT
+2. **Multi-scattering LUT** (32×32) — 64 directions × 20 steps per texel,
+   reads transmittance LUT, stores Ψ = L\_2nd / (1 - f\_ms)
+
+These run as separate compute passes on the same command buffer (separate
+passes are required because SDL GPU does not synchronize reads/writes
+within a single compute pass).
+
+**Per-frame render passes:**
+
+1. **Sky pass** — Ray march the atmosphere into an R16G16B16A16\_FLOAT
    HDR render target. The sun disc can produce values far exceeding 1.0.
+   LUT textures are bound as fragment samplers for O(1) transmittance
+   and multi-scattering lookups.
 
 2. **Bloom downsample** (5 passes) — Jimenez 13-tap filter progressively
    halves the resolution. The first pass applies a brightness threshold
@@ -335,26 +415,34 @@ unit conversion needed between the C code and the shader.
 
 ```text
 26-procedural-sky/
-├── main.c                        Application with 4 pipelines
-├── CMakeLists.txt                Build configuration
-├── README.md                     This file
+├── main.c                              Application with 6 pipelines
+├── CMakeLists.txt                      Build configuration
+├── README.md                           This file
 └── shaders/
-    ├── sky.vert.hlsl             Fullscreen quad + ray matrix reconstruction
-    ├── sky.frag.hlsl             Atmospheric scattering ray march
-    ├── fullscreen.vert.hlsl      Standard SV_VertexID quad (bloom/tonemap)
-    ├── bloom_downsample.frag.hlsl  13-tap Jimenez with Karis averaging
-    ├── bloom_upsample.frag.hlsl    9-tap tent filter
-    └── tonemap.frag.hlsl          ACES + bloom compositing
+    ├── transmittance_lut.comp.hlsl     Transmittance LUT compute shader
+    ├── multiscatter_lut.comp.hlsl      Multi-scattering LUT compute shader
+    ├── sky.vert.hlsl                   Fullscreen quad + ray matrix
+    ├── sky.frag.hlsl                   Atmosphere ray march + LUT sampling
+    ├── fullscreen.vert.hlsl            Standard SV_VertexID quad
+    ├── bloom_downsample.frag.hlsl      13-tap Jimenez with Karis averaging
+    ├── bloom_upsample.frag.hlsl        9-tap tent filter
+    └── tonemap.frag.hlsl              ACES + bloom compositing
 ```
 
-**4 pipelines:** sky, downsample, upsample, tonemap
+**6 pipelines:** transmittance compute, multiscatter compute, sky,
+downsample, upsample, tonemap
+
+**One-time compute sequence (at startup):**
+
+1. Transmittance LUT compute pass (256×64, 40 steps/texel)
+2. Multi-scattering LUT compute pass (32×32, 64 directions × 20 steps)
 
 **Per-frame render sequence:**
 
-1. Sky pass → HDR target (LOADOP_DONT_CARE, no depth)
-2. 5× bloom downsample (HDR → bloom_mips[0..4])
-3. 4× bloom upsample (bloom_mips[4] → bloom_mips[0], additive ONE+ONE)
-4. Tonemap pass (HDR + bloom_mips[0] → swapchain)
+1. Sky pass → HDR target (LOADOP\_DONT\_CARE, no depth, 2 LUT samplers)
+2. 5× bloom downsample (HDR → bloom\_mips[0..4])
+3. 4× bloom upsample (bloom\_mips[4] → bloom\_mips[0], additive ONE+ONE)
+4. Tonemap pass (HDR + bloom\_mips[0] → swapchain)
 
 ## Build and run
 
@@ -370,16 +458,9 @@ Invoke it with `/procedural-sky` in Claude Code.
 
 ## What's next
 
-This lesson computes single scattering — each light ray scatters at most
-once before reaching the camera. Real atmospheres involve multiple
-scattering (light bouncing between molecules many times), which fills in
-shadows and brightens the horizon. Exercise 3 introduces a simple
-approximation; for production quality, explore Hillaire's multi-scattering
-LUT approach.
-
 Combining this sky with 3D geometry requires **aerial perspective** — applying
 the atmosphere integral between the camera and each surface point. This is
-explored in Exercise 5 and is how production engines integrate atmospheric
+explored in Exercise 3 and is how production engines integrate atmospheric
 scattering with scene rendering.
 
 ## Exercises
@@ -394,24 +475,23 @@ scattering with scene rendering.
    transmittance at the hit point instead of black. How does the
    ground color change at sunset?
 
-3. **Multiple scattering approximation** — The current model only
-   computes single scattering (light scattered once toward the camera).
-   Add a simple multi-scattering approximation: after computing single
-   scatter, add a fraction (e.g., 0.3×) of the inscattered light with
-   an isotropic phase function. This brightens shadowed areas and
-   reduces the dark band near the horizon at sunset.
-
-4. **Atmosphere LUT** — Pre-compute the transmittance function into a
-   2D lookup table (altitude × sun zenith angle) in a compute shader.
-   Sample this LUT instead of doing the inner march per pixel. Compare
-   performance and quality. This is the approach used in production
-   engines.
-
-5. **Aerial perspective** — Add 3D geometry (a terrain mesh) and apply
+3. **Aerial perspective** — Add 3D geometry (a terrain mesh) and apply
    the atmosphere between the camera and each surface point. Objects
    far away should fade into the sky color. This requires evaluating
    the atmosphere integral from camera to the object distance, not to
    the atmosphere boundary.
+
+4. **Higher-resolution multi-scattering** — The current multi-scattering
+   LUT uses 32×32 texels with 64 direction samples. Increase to 64×64
+   texels and 256 directions. Compare the visual quality — is there a
+   visible difference? This illustrates why 32×32 is sufficient for
+   the nearly-isotropic higher-order scattering.
+
+5. **Dynamic atmosphere** — Make the Rayleigh scale height a uniform
+   instead of a compile-time constant. Regenerate the LUTs each time
+   the parameter changes by re-dispatching the compute shaders.
+   Explore how the sky changes with different scale heights (e.g.,
+   simulating a Mars-like atmosphere).
 
 ## Debugging notes
 
@@ -489,10 +569,109 @@ below the horizon (the inner march returns zero transmittance when it
 hits the ground). But separately rendered elements like the sun disc
 need their own occlusion test — they don't participate in the march.
 
+### 3. NaN from ground-level boundary in multi-scattering LUT
+
+**Symptom:** Completely black screen after adding LUT-based transmittance
+and multi-scattering. The transmittance LUT visualized correctly (valid
+color gradient), but the full atmosphere output was NaN for every pixel.
+
+**Cause:** The multi-scattering compute shader integrates over 64
+directions on the unit sphere at each (altitude, sun\_zenith) pair.
+When altitude clamped to exactly 0 (`view_height == R_GROUND`),
+downward-directed rays started exactly on the ground sphere. The
+ground intersection returned `t_gnd_near == 0.0`, but the guard check
+used strict inequality:
+
+```hlsl
+/* BUG: misses the t_gnd_near == 0.0 boundary case */
+if (hits_ground && t_gnd_near > 0.0)
+    march_dist = min(march_dist, t_gnd_near - march_start);
+```
+
+These rays marched through the planet interior. At negative altitudes,
+the exponential density functions explode:
+
+```text
+altitude = -500 km (inside planet)
+exp(-(-500) / 8.0) = exp(62.5) ≈ 1.6 × 10²⁷  (effectively infinity)
+```
+
+The scatter integral then computed `infinity × 0 = NaN`:
+
+```text
+scatter = infinity (from exp blowup)
+step_extinction = exp(-infinity) = 0
+integral = (1 - 0) / infinity = 0
+contribution = scatter × integral = infinity × 0 = NaN  ← IEEE 754
+```
+
+NaN propagated from one texel row through bilinear filtering into
+neighboring texels. In the fragment shader, `sample_multiscatter()`
+returned NaN at low altitudes, contaminating the entire inscatter sum.
+
+**Fix:** Two changes in `multiscatter_lut.comp.hlsl`:
+
+```hlsl
+/* 1. Minimum 10 m altitude prevents the exact-ground boundary case */
+float view_height = R_GROUND + clamp(altitude, 0.01, R_ATMO - R_GROUND);
+
+/* 2. Inclusive inequality catches rays starting on the ground */
+if (hits_ground && t_gnd_near >= 0.0)
+    march_dist = min(march_dist, t_gnd_near - march_start);
+```
+
+**Lesson:** Boundary conditions at sphere surfaces are a common source
+of NaN in atmospheric rendering. When a point sits exactly on a sphere,
+the ray-sphere intersection returns `t = 0`, which strict inequality
+checks silently miss. The `infinity × 0 = NaN` pattern is particularly
+insidious because both values seem individually reasonable (large
+density, zero path length) but their product is undefined in IEEE 754.
+Always test with the camera and sample points at boundary altitudes
+(ground level, atmosphere top), not just well-behaved mid-atmosphere
+positions.
+
+### 4. Diagnosing black screens with color-coded fragment output
+
+**Symptom:** Black screen with no error messages or validation warnings.
+Could be any of: broken pipeline, empty LUTs, NaN in computations, or
+zero inscattering.
+
+**Approach:** Replace the fragment shader's `main()` with diagnostic
+outputs that encode different failure modes as solid colors:
+
+```hlsl
+/* Step 1: Is the pipeline working at all? */
+return float4(0.5, 0.0, 0.5, 1.0);  /* purple = pipeline OK */
+
+/* Step 2: Does the LUT have data? */
+float3 t = transmittance_lut.SampleLevel(trans_sampler, input.uv, 0).rgb;
+return float4(t, 1.0);  /* gradient = LUT has data, black = empty */
+
+/* Step 3: Where does NaN originate? */
+float3 color = atmosphere(...);
+if (any(isnan(color))) return float4(1, 0, 0, 1);  /* red = NaN */
+if (all(color < 0.001)) return float4(0, 0, 1, 1); /* blue = zero */
+return float4(0, 1, 1, 1);                          /* cyan = OK */
+```
+
+Each test takes one recompile-and-capture cycle. The progression quickly
+narrows the search from "something is wrong" to "NaN originates in
+`sample_multiscatter()`." From there, visualizing the multi-scattering
+LUT directly revealed NaN in the bottom texel rows (ground level),
+pinpointing the boundary condition bug.
+
+**Lesson:** When GPU output is black, the cause could be anywhere in the
+pipeline. Systematic binary-search diagnostics — testing one component
+at a time with color-coded outputs — are far more effective than reading
+code and guessing. Each solid-color result eliminates an entire category
+of bugs in seconds.
+
 ## References
 
 - Hillaire, S. (2020). *A Scalable and Production Ready Sky and
   Atmosphere Rendering Technique.* EGSR 2020.
+- Bruneton, E. & Neyret, F. (2008). *Precomputed Atmospheric
+  Scattering.* EGSR 2008.
 - Jimenez, J. (2014). *Next Generation Post Processing in Call of Duty:
   Advanced Warfare.* SIGGRAPH 2014.
 - Narkowicz, K. (2015). *ACES Filmic Tone Mapping Curve.* Blog post.
@@ -501,3 +680,5 @@ need their own occlusion test — they don't participate in the march.
   HDR rendering and tone mapping fundamentals
 - [Math Lesson 06 — Projections](../../math/06-projections/README.md) —
   Perspective matrix and inverse projection
+- [Lesson 11 — Compute Shaders](../11-compute-shaders/README.md) —
+  Compute pipeline and storage texture fundamentals
