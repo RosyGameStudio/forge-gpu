@@ -37,6 +37,29 @@ show where nearby geometry occludes ambient light. Notice the darkening in
 crevices where box faces meet, along the base where objects contact the floor,
 and in the interior spaces of the truck model.
 
+## Key concepts
+
+- **Hemisphere kernel SSAO** — test 64 random sample points in a hemisphere
+  above each surface point to estimate how much ambient light is blocked
+  ([Pass 3 — SSAO](#pass-3--ssao-hemisphere-kernel-sampling))
+- **G-buffer with MRT** — a single geometry draw call writes lit scene color,
+  view-space normals, and depth to separate textures
+  ([Pass 2 — Geometry pass](#pass-2--geometry-pass-the-g-buffer))
+- **Depth reconstruction** — recover a 3D view-space position from a depth
+  buffer sample using `view_pos_from_depth` and the inverse projection matrix
+  ([Step 3](#step-3-reconstruct-view-space-position-from-depth))
+- **TBN construction** — build a per-pixel tangent-bitangent-normal matrix via
+  Gram-Schmidt orthonormalization to orient kernel samples along the surface
+  ([Step 4](#step-4-build-a-tbn-matrix-gram-schmidt-orthonormalization))
+- **IGN jitter** — Interleaved Gradient Noise adds per-pixel rotation to break
+  the repeating 4x4 noise tile pattern
+  ([IGN jitter](#ign-jitter-jimenez-2014))
+- **Box blur** — a 4x4 kernel averages exactly one noise tile period, canceling
+  the tiling artifact ([Pass 4 — Box blur](#pass-4--box-blur))
+- **Composite** — multiply the blurred AO factor with the lit scene color and
+  apply dithering to prevent 8-bit banding
+  ([Pass 5 — Composite](#pass-5--composite))
+
 ## Prerequisites
 
 - [Lesson 06 — Depth & 3D](../06-depth-and-3d/) (depth buffers, perspective
@@ -597,6 +620,18 @@ post-process pipeline. From here you could explore:
 - **Temporal accumulation** to spread the SSAO cost over multiple frames
 - **HBAO+** (Horizon-Based Ambient Occlusion) for improved quality
 
+## Further reading
+
+- [John Chapman — SSAO Tutorial](https://john-chapman-graphics.blogspot.com/2013/01/ssao-tutorial.html)
+  — the hemisphere kernel approach used in this lesson
+- [LearnOpenGL — SSAO](https://learnopengl.com/Advanced-Lighting/SSAO)
+  — detailed walkthrough with OpenGL code
+- Jimenez et al., "Next-Generation Post Processing in Call of Duty: Advanced
+  Warfare" (SIGGRAPH 2014) — IGN dithering technique
+- Crytek, "Finding Next Gen" (SIGGRAPH 2007) — original SSAO paper
+- Bavoil & Sainz, "Screen-Space Ambient Occlusion" (NVIDIA, 2008) — HBAO
+  approach with horizon-based sampling
+
 ## Exercises
 
 1. **Adjust the radius** — Change `SSAO_RADIUS` from 0.5 to 1.0 or 2.0 and
@@ -622,15 +657,3 @@ post-process pipeline. From here you could explore:
    (640x360) and upsample for the composite pass. This roughly quarters the
    cost of the most expensive pass. Use a bilateral upsample to avoid blocky
    artifacts at object edges.
-
-## Further reading
-
-- [John Chapman — SSAO Tutorial](https://john-chapman-graphics.blogspot.com/2013/01/ssao-tutorial.html)
-  — the hemisphere kernel approach used in this lesson
-- [LearnOpenGL — SSAO](https://learnopengl.com/Advanced-Lighting/SSAO)
-  — detailed walkthrough with OpenGL code
-- Jimenez et al., "Next-Generation Post Processing in Call of Duty: Advanced
-  Warfare" (SIGGRAPH 2014) — IGN dithering technique
-- Crytek, "Finding Next Gen" (SIGGRAPH 2007) — original SSAO paper
-- Bavoil & Sainz, "Screen-Space Ambient Occlusion" (NVIDIA, 2008) — HBAO
-  approach with horizon-based sampling

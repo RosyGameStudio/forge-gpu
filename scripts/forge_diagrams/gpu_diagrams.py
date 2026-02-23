@@ -7662,7 +7662,7 @@ def diagram_ssao_render_pipeline():
     # Output textures beneath each pass
     outputs = [
         (1.0, 4.3, "shadow_depth\nD32_FLOAT\n2048\u00d72048", STYLE["accent4"]),
-        (3.8, 3.1, "scene_color\nR8G8B8A8", STYLE["accent1"]),
+        (3.8, 3.1, "scene_color\nR8G8B8A8_UNORM", STYLE["accent1"]),
         (3.8, 1.8, "view_normals\nR16G16B16A16_FLOAT", STYLE["accent1"]),
         (3.8, 0.5, "scene_depth\nD32_FLOAT", STYLE["accent1"]),
         (6.6, 4.3, "ssao_raw\nR8_UNORM", STYLE["accent2"]),
@@ -8884,12 +8884,13 @@ def diagram_noise_and_blur():
     tiled_noise = np.tile(noise_tile, (size // 4, size // 4))
     raw_ao = np.clip(base_ao + tiled_noise, 0, 1)
 
-    # Box blur 4x4 of the raw AO (manual convolution, no scipy dependency)
+    # Box blur 4x4 of the raw AO (edge-padded to avoid wrap-around artifacts)
     kernel_size = 4
+    padded = np.pad(raw_ao, pad_width=((1, 2), (1, 2)), mode="edge")
     blurred_ao = np.zeros_like(raw_ao)
     for dy in range(kernel_size):
         for dx in range(kernel_size):
-            blurred_ao += np.roll(np.roll(raw_ao, dy - 1, axis=0), dx - 1, axis=1)
+            blurred_ao += padded[dy : dy + size, dx : dx + size]
     blurred_ao /= kernel_size * kernel_size
 
     # Left: raw SSAO
