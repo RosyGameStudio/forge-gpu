@@ -46,6 +46,10 @@ static const float  OZONE_WIDTH  = 15.0;
 
 static const float PI = 3.14159265358979323846;
 
+/* LUT dimensions (must match C-side constants and sky.frag.hlsl). */
+static const float LUT_WIDTH  = 256.0;
+static const float LUT_HEIGHT = 64.0;
+
 /* Number of integration steps along the transmittance path.
  * Generous since this runs once at startup, not per frame. */
 static const int TRANSMITTANCE_STEPS = 40;
@@ -148,8 +152,8 @@ void main(uint3 id : SV_DispatchThreadID)
      * so no bounds check is needed.  We use the known constants
      * for UV computation to avoid any dependency on uniform push
      * timing. */
-    float width  = 256.0;
-    float height = 64.0;
+    float width  = LUT_WIDTH;
+    float height = LUT_HEIGHT;
 
     /* Texel center UV with half-texel offset for correct sampling. */
     float2 uv = float2(

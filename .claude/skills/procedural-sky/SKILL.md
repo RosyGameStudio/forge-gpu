@@ -47,7 +47,10 @@ UV mapping that concentrates precision near the horizon.
 ```hlsl
 /* Register layout (compute spaces) */
 RWTexture2D<float4> output_tex : register(u0, space1);  /* RW output */
-cbuffer LutUniforms : register(b0, space2) { ... };      /* dimensions */
+
+/* LUT dimensions are compile-time constants — no uniform buffer needed. */
+static const float LUT_WIDTH  = 256.0;
+static const float LUT_HEIGHT = 64.0;
 
 [numthreads(8, 8, 1)]
 void main(uint3 id : SV_DispatchThreadID) { ... }
@@ -63,7 +66,10 @@ transmittance LUT and integrates over 64 sphere directions.
 Texture2D<float4> transmittance_lut : register(t0, space0);  /* sampled */
 SamplerState      trans_sampler     : register(s0, space0);
 RWTexture2D<float4> output_tex : register(u0, space1);       /* RW output */
-cbuffer LutUniforms : register(b0, space2) { ... };           /* dimensions */
+
+/* LUT dimensions are compile-time constants — no uniform buffer needed. */
+static const float LUT_WIDTH  = 32.0;
+static const float LUT_HEIGHT = 32.0;
 
 [numthreads(8, 8, 1)]
 void main(uint3 id : SV_DispatchThreadID) { ... }
@@ -177,31 +183,27 @@ typedef struct SkyFragUniforms {
     float _pad[2];
 } SkyFragUniforms;
 
-/* LUT compute: output dimensions (16 bytes) */
-typedef struct LutComputeUniforms {
-    float width;
-    float height;
-    float extra0;  /* transmittance LUT width (for multiscatter) */
-    float extra1;  /* transmittance LUT height (for multiscatter) */
-} LutComputeUniforms;
+/* No uniform struct needed for compute shaders — LUT dimensions are
+ * compile-time constants in the HLSL (static const). */
 ```
 
 ### Compute pipeline creation
 
 ```c
-/* Create compute pipeline (same pattern as lesson 11) */
+/* Create compute pipeline (same pattern as lesson 11).
+ * No uniform buffers — LUT dimensions are compile-time constants. */
 state->transmittance_compute = create_compute_pipeline(
     device,
     transmittance_lut_comp_spirv, sizeof(transmittance_lut_comp_spirv),
     transmittance_lut_comp_dxil, sizeof(transmittance_lut_comp_dxil),
-    0, 1, 1,  /* 0 samplers, 1 RW texture, 1 uniform buffer */
+    0, 1, 0,  /* 0 samplers, 1 RW texture, 0 uniform buffers */
     8, 8, 1); /* workgroup size matches [numthreads(8,8,1)] */
 
 state->multiscatter_compute = create_compute_pipeline(
     device,
     multiscatter_lut_comp_spirv, sizeof(multiscatter_lut_comp_spirv),
     multiscatter_lut_comp_dxil, sizeof(multiscatter_lut_comp_dxil),
-    1, 1, 1,  /* 1 sampler (transmittance LUT), 1 RW texture, 1 uniform */
+    1, 1, 0,  /* 1 sampler (transmittance LUT), 1 RW texture, 0 uniforms */
     8, 8, 1);
 ```
 
@@ -304,7 +306,6 @@ Planet-centric coordinates in km. Camera starts at surface:
 | `SDL_BindGPUComputePipeline` | Bind compute pipeline before dispatch |
 | `SDL_BindGPUComputeSamplers` | Bind transmittance LUT for multiscatter pass |
 | `SDL_DispatchGPUCompute` | Launch compute workgroups |
-| `SDL_PushGPUComputeUniformData` | Push LUT dimensions to compute shader |
 | `SDL_PushGPUVertexUniformData` | Push ray matrix to sky vertex shader |
 | `SDL_PushGPUFragmentUniformData` | Push sky params, bloom params, tonemap params |
 | `SDL_BindGPUFragmentSamplers` | Bind LUT textures, bloom/HDR textures |

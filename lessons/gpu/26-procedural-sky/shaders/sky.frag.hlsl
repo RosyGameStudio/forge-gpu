@@ -97,6 +97,12 @@ static const float SUN_EDGE_INNER      = 0.9;
 /* PI constant. */
 static const float PI = 3.14159265358979323846;
 
+/* Horizon fade parameters for earth shadow smoothing.
+ * Smooths the terminator (shadow boundary) over ~2.9 degrees around
+ * each sample point's local horizon: saturate(cos_zenith * SCALE + BIAS). */
+static const float HORIZON_FADE_SCALE = 10.0;
+static const float HORIZON_FADE_BIAS  = 0.5;
+
 /* Transmittance LUT dimensions (must match C-side constants). */
 static const float TRANSMITTANCE_LUT_W = 256.0;
 static const float TRANSMITTANCE_LUT_H = 64.0;
@@ -312,7 +318,7 @@ float3 atmosphere(float3 ray_origin, float3 ray_dir, out float3 transmittance_ou
         /* Smooth transition near the terminator.  Without this, the shadow
          * boundary would be a hard edge causing visible artifacts.
          * The fade covers ~2.9 degrees around the local horizon. */
-        earth_shadow *= saturate(cos_sun_zenith * 10.0 + 0.5);
+        earth_shadow *= saturate(cos_sun_zenith * HORIZON_FADE_SCALE + HORIZON_FADE_BIAS);
 
         /* Separate Rayleigh and Mie for phase weighting. */
         float altitude = sample_height - R_GROUND;

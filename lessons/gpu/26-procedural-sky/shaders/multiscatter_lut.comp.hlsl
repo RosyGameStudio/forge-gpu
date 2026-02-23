@@ -60,11 +60,20 @@ static const float  OZONE_WIDTH  = 15.0;
 
 static const float PI = 3.14159265358979323846;
 
+/* LUT dimensions (must match C-side constants and sky.frag.hlsl). */
+static const float LUT_WIDTH  = 32.0;
+static const float LUT_HEIGHT = 32.0;
+
 /* Direction sampling grid: 8x8 = 64 stratified directions on the sphere. */
 static const int SQRT_SAMPLE_COUNT = 8;
 
 /* Integration steps per direction.  Generous for one-time computation. */
 static const int MULTISCATTER_STEPS = 20;
+
+/* Horizon fade parameters for earth shadow smoothing.
+ * Must match the values in sky.frag.hlsl for consistent results. */
+static const float HORIZON_FADE_SCALE = 10.0;
+static const float HORIZON_FADE_BIAS  = 0.5;
 
 /* ---- Ray-sphere intersection -------------------------------------------- */
 
@@ -178,8 +187,8 @@ void main(uint3 id : SV_DispatchThreadID)
     /* Dispatch groups match LUT dimensions exactly (32/8, 32/8),
      * so no bounds check is needed.  We use known constants for
      * UV computation to avoid dependency on uniform push timing. */
-    float width  = 32.0;
-    float height = 32.0;
+    float width  = LUT_WIDTH;
+    float height = LUT_HEIGHT;
 
     /* UV with sub-UV correction to prevent bilinear edge bleed. */
     float2 uv = float2(
@@ -275,7 +284,7 @@ void main(uint3 id : SV_DispatchThreadID)
                 /* Smooth transition near the terminator to avoid a hard
                  * shadow edge.  horizon_fade goes from 0 to 1 over ~2.9°
                  * around the local horizon. */
-                earth_shadow *= saturate(cos_sun * 10.0 + 0.5);
+                earth_shadow *= saturate(cos_sun * HORIZON_FADE_SCALE + HORIZON_FADE_BIAS);
 
                 /* Analytical integration of scattering over the step. */
                 float3 scatter_integral = (float3(1.0, 1.0, 1.0) - step_ext)

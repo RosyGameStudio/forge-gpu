@@ -114,9 +114,6 @@
 #define MOUSE_SENS    0.003f  /* radians per pixel of mouse movement    */
 #define PITCH_CLAMP   1.5f    /* ~86 degrees, prevents camera flip      */
 #define FOV_DEG       60      /* vertical field of view in degrees      */
-#define NEAR_PLANE    0.0001f /* 0.1 meters in km units                 */
-#define FAR_PLANE     1000.0f /* 1000 km — enough to see the horizon    */
-
 /* Camera starting position — 1 meter above ground at equator.
  * In planet-centric coordinates: (0, R_ground + 0.001, 0). */
 #define CAM_START_X   0.0f
@@ -164,11 +161,16 @@
 #define TONEMAP_REINHARD 1
 #define TONEMAP_ACES     2
 
+/* Camera and sun starting orientation — sun near the horizon, camera
+ * facing it for an appealing default sunset view. */
+#define CAM_START_YAW         1.63f  /* face the sun at orbit start angle           */
+#define SUN_ORBIT_START       3.08f  /* near π — sun ~4° above horizon, setting     */
+
 /* Capture mode — fixed sun angle for consistent screenshots.
  * Low elevation shows warm scattering, bloom halo, and orange horizon. */
-#define CAPTURE_SUN_ELEVATION  0.07f /* ~4 degrees — sunset shows warm scattering       */
-#define CAPTURE_SUN_AZIMUTH   3.08f /* match orbit start angle                     */
-#define CAPTURE_CAM_YAW       1.63f /* face the sun at azimuth 3.08                */
+#define CAPTURE_SUN_ELEVATION  0.07f /* ~4 degrees — sunset shows warm scattering   */
+#define CAPTURE_SUN_AZIMUTH   SUN_ORBIT_START /* match orbit start angle            */
+#define CAPTURE_CAM_YAW       CAM_START_YAW   /* face the sun at orbit start        */
 
 /* Frame timing. */
 #define MAX_FRAME_DT 0.1f
@@ -747,7 +749,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     /* Wait for the GPU to finish LUT generation before continuing.
      * The LUTs must be ready before the first frame renders. */
-    SDL_WaitForGPUIdle(device);
+    if (!SDL_WaitForGPUIdle(device)) {
+      SDL_Log("SDL_WaitForGPUIdle failed: %s", SDL_GetError());
+      goto init_fail;
+    }
     SDL_Log("  LUT generation complete (transmittance %dx%d, multiscatter %dx%d)",
             TRANSMITTANCE_LUT_W, TRANSMITTANCE_LUT_H,
             MULTISCATTER_LUT_W, MULTISCATTER_LUT_H);
@@ -951,13 +956,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
   /* Step 18 — Initialize camera and sun state. */
   state->cam_position = (vec3){ CAM_START_X, CAM_START_Y, CAM_START_Z };
-  state->cam_yaw = 1.63f;  /* face the sun at orbit_angle 3.08 */
+  state->cam_yaw = CAM_START_YAW;
   state->cam_pitch = 0.0f;
 
   state->sun_elevation = SUN_ELEVATION_DEFAULT;
   state->sun_azimuth = SUN_AZIMUTH_DEFAULT;
   state->sun_auto = true;
-  state->sun_orbit_angle = 3.08f; /* near π — sun ~4° above horizon, setting */
+  state->sun_orbit_angle = SUN_ORBIT_START;
 
   state->exposure = DEFAULT_EXPOSURE;
   state->tonemap_mode = TONEMAP_ACES;
@@ -1473,12 +1478,15 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     SDL_BindGPUGraphicsPipeline(pass, state->tonemap_pipeline);
 
-    /* Bind HDR target (slot 0) and bloom result (slot 1). */
+    /* Bind HDR target (slot 0) and bloom result (slot 1).
+     * If bloom mips are NULL (e.g. allocation failed during resize),
+     * bind the HDR target as a dummy to avoid undefined behavior. */
     SDL_GPUTextureSamplerBinding tex_bindings[2];
     SDL_zero(tex_bindings);
     tex_bindings[0].texture = state->hdr_target;
     tex_bindings[0].sampler = state->hdr_sampler;
-    tex_bindings[1].texture = state->bloom_mips[0];
+    tex_bindings[1].texture = state->bloom_mips[0]
+                                  ? state->bloom_mips[0] : state->hdr_target;
     tex_bindings[1].sampler = state->bloom_sampler;
     SDL_BindGPUFragmentSamplers(pass, 0, tex_bindings, 2);
 
