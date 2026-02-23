@@ -121,7 +121,7 @@
 #define CAM_START_Z   0.0f
 
 /* Sun defaults. */
-#define SUN_ELEVATION_DEFAULT 10.5f  /* radians above horizon (~29 deg) */
+#define SUN_ELEVATION_DEFAULT 0.5f   /* radians above horizon (~29 deg) */
 #define SUN_AZIMUTH_DEFAULT   0.0f   /* radians from east               */
 #define SUN_ELEVATION_SPEED   0.5f   /* radians/sec for arrow keys      */
 #define SUN_AZIMUTH_SPEED     0.5f   /* radians/sec for arrow keys      */
