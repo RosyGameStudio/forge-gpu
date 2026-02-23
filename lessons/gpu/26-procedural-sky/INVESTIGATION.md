@@ -3,6 +3,27 @@
 This document catalogs all identified issues and fixes during the LUT
 integration for lesson 26. Bugs 1-4 caused the initial black screen.
 Bugs 5-7 are rendering correctness issues discovered afterward.
+Bug 9 is the remaining root cause of incorrect Rayleigh scattering timing.
+
+## Pixel Storm Reference File Paths
+
+The reference implementation is the Pixel Storm engine's atmospheric sky system:
+
+- **`inl/ps_sky_lut.cu`** — Core `integrate_scattered_luminance` function
+  with earth shadow, transmittance UV mappings, multi-scatter sampling.
+  This is the function called from both the sky-view LUT and the
+  multi-scatter LUT kernels.
+- **`src/ps_sky.cu`** — `ps_init_earth_atmosphere` with physical constants
+  (Rayleigh, Mie, ozone coefficients matching Hillaire Table 1)
+- **`include/ps_sky.h`** — All LUT dimensions, sample counts, atmosphere
+  constants, struct definitions (`PsSkyAtmosphereParams`, etc.)
+- **`src/ps_kernels.cu`** — Kernel entry points: `ps_sky_transmittance_lut`,
+  `ps_sky_multi_scatter_lut`, `ps_sky_view_lut`
+- **`include/ps_kernels.h`** — Kernel declarations
+- **`include/ps_device_common.h`** — Device utilities
+  (`ray_sphere_intersect_nearest`, `__saturatef`, etc.)
+- **Paper:** Hillaire, "A Scalable and Production Ready Sky and Atmosphere
+  Rendering Technique", EGSR 2020
 
 ## Root Cause: NaN in multi-scattering LUT at ground level
 
@@ -114,147 +135,64 @@ unnecessary and could introduce timing issues with
 `SDL_PushGPUComputeUniformData`. Removed the cbuffer from both compute
 shaders and updated pipeline creation to `num_uniform_buffers=0`.
 
-## Bug 5: Missing earth shadow — no Rayleigh sunset colors
+## Bug 5: Missing earth shadow in fragment shader
 
-**Status: OPEN**
+**Status: FIXED**
 
 **File:** `shaders/sky.frag.hlsl`, function `atmosphere()`
 
-The atmosphere function does not check whether the sun is occluded by the
+The atmosphere function did not check whether the sun is occluded by the
 planet at each sample point along the view ray. In the Pixel Storm
-reference implementation (`ps_sky_lut.cu`, `integrate_scattered_luminance`),
-this is done with an explicit ray-sphere test at every march step:
+reference (`inl/ps_sky_lut.cu`, `integrate_scattered_luminance`), this
+is done with an explicit ray-sphere test at every march step.
 
-```cuda
-// Pixel Storm — earth shadow at each sample point:
-f32 t_earth = ray_sphere_intersect_nearest(
-    P, sun_dir, earth_o + PS_PLANET_RADIUS_OFFSET * up_vector,
-    ap->bottom_radius);
-f32 earth_shadow = t_earth >= 0.f ? 0.f : 1.f;
-
-// Smooth transition near the terminator to prevent hard shadow edge:
-f32 horizon_fade = __saturatef(sun_zenith_cos_angle * 10.f + 0.5f);
-earth_shadow *= horizon_fade;
-
-// Single-scatter is multiplied by earth_shadow;
-// multi-scatter is NOT (it's already integrated over the sphere):
-float3 S = global_l * (earth_shadow * transmittance_to_sun * phase_scatter
-                     + multi_scattered_luminance * medium.scattering);
-```
-
-Our code applies `sun_trans` from the transmittance LUT without any
-shadow check:
+**Fix applied:** Added earth shadow test + `horizon_fade` smoothing in
+the `atmosphere()` loop. Single-scatter is multiplied by `earth_shadow`;
+multi-scatter is not (it's pre-integrated over the sphere in the LUT).
 
 ```hlsl
-// WRONG — no earth shadow:
-float3 S = (scatter_r + scatter_m) * sun_trans * sun_intensity
+float t_shadow_near, t_shadow_far;
+bool sun_blocked = ray_sphere_intersect(
+    pos, sun_dir, R_GROUND, t_shadow_near, t_shadow_far);
+float earth_shadow = (sun_blocked && t_shadow_near >= 0.0) ? 0.0 : 1.0;
+earth_shadow *= saturate(cos_sun_zenith * 10.0 + 0.5);
+
+float3 S = (scatter_r + scatter_m) * sun_trans * earth_shadow * sun_intensity
          + ms * med.scatter * sun_intensity;
 ```
 
-**Why this matters for sunset colors:**
-
-At sunset (sun at ~4° elevation), sample points along a horizontal view
-ray span a range of local sun zenith angles. Points at higher altitudes
-or farther from the sun have the sun below their local horizon — the
-planet blocks direct sunlight from reaching them.
-
-Without earth shadow, these shadowed points still contribute inscattered
-sunlight (using the transmittance LUT value, which is non-zero — see
-Bug 6). This adds cold/blue inscattered light from incorrectly-lit
-points, diluting the warm Rayleigh scattering colors from the correctly-
-lit lower-atmosphere points where sunlight has traveled a long path
-and lost its blue component.
-
-With earth shadow, only points where the sun is above the local horizon
-contribute single-scatter light. These points receive sunlight that has
-traveled through a long atmospheric path (at sunset), preferentially
-removing blue wavelengths via Rayleigh scattering. The resulting
-`sun_trans` is reddish, producing the warm sunset gradient visible in
-the transmittance LUT visualization.
-
-**Required fix (two parts):**
-
-1. Add earth shadow test in the atmosphere loop:
-
-   ```hlsl
-   float t_earth_near, t_earth_far;
-   bool sun_blocked = ray_sphere_intersect(
-       pos, sun_dir, R_GROUND, t_earth_near, t_earth_far);
-   float earth_shadow = (sun_blocked && t_earth_near >= 0.0) ? 0.0 : 1.0;
-
-   // Smooth transition near the terminator:
-   float horizon_fade = saturate(cos_sun_zenith * 10.0 + 0.5);
-   earth_shadow *= horizon_fade;
-   ```
-
-2. Apply earth shadow only to the single-scatter term (multi-scatter
-   light comes from all directions, already integrated in the LUT):
-
-   ```hlsl
-   float3 S = (scatter_r + scatter_m) * sun_trans * earth_shadow * sun_intensity
-            + ms * med.scatter * sun_intensity;
-   ```
+**Note:** This fix alone is necessary but not sufficient for correct
+Rayleigh sunset colors — the multi-scatter LUT also needs earth shadow
+baked in (see Bug 9).
 
 ## Bug 6: Transmittance LUT forward mapping clips to ground
 
-**Status: OPEN**
+**Status: FIXED**
 
 **Files:** `shaders/sky.frag.hlsl` (`transmittance_params_to_uv`),
 `shaders/multiscatter_lut.comp.hlsl` (`sample_transmittance_lut`)
 
-The forward Bruneton mapping (params → UV) in both the fragment shader
-and the multi-scattering compute shader clips the ray distance `d` to
-the ground intersection distance for below-horizon rays:
+The forward Bruneton mapping (params → UV) clipped the ray distance `d`
+to the ground intersection distance for below-horizon rays, but the
+compute shader's inverse mapping (UV → params) used the full atmosphere
+sphere distance. This made the forward and inverse not exact inverses
+for below-horizon rays.
+
+**Fix applied:** Replaced the ground-clipped ray-sphere forward mapping
+with the quadratic formula in both `sky.frag.hlsl` and
+`multiscatter_lut.comp.hlsl`. Now matches Pixel Storm and the compute
+shader's inverse mapping:
 
 ```hlsl
-// Our forward mapping — clips d to ground:
-float d = t_far;  // atmosphere distance
-if (ray_sphere_intersect(ro, rd, R_GROUND, t_gnd_near, t_gnd_far))
-    if (t_gnd_near > 0.0)
-        d = t_gnd_near;  // <-- DIFFERENT from compute shader's inverse
-```
-
-But the compute shader's inverse mapping (UV → params) uses the full
-atmosphere sphere distance, not ground-clipped:
-
-```hlsl
-// Compute shader inverse mapping — atmosphere distance (no ground clip):
-float d = d_min + uv.x * (d_max - d_min);
-cos_zenith = (H*H - rho*rho - d*d) / (2 * view_height * d);
-```
-
-The forward and inverse must be exact inverses for the UV round-trip to
-work. For above-horizon rays both give the same result (no ground
-intersection), so the LUT lookup is correct. For below-horizon rays,
-the ground-clipped d is shorter, producing a different UV, which looks
-up a DIFFERENT texel than intended.
-
-The Pixel Storm reference uses the atmosphere distance in BOTH mappings
-(forward and inverse), making them exact inverses. Below-horizon
-sun directions are handled by the explicit earth shadow test (Bug 5),
-not by the transmittance LUT itself.
-
-**Required fix:** Remove the ground clipping from the forward mapping
-in both `sky.frag.hlsl` and `multiscatter_lut.comp.hlsl`. Match the
-Pixel Storm approach: always use the atmosphere sphere distance `d`
-for the UV parameterization. Use the quadratic formula directly:
-
-```hlsl
-// Correct forward mapping (matches Pixel Storm):
 float discriminant = view_height * view_height
     * (cos_zenith * cos_zenith - 1.0) + R_ATMO * R_ATMO;
 float d = max(0.0, -view_height * cos_zenith
     + sqrt(max(0.0, discriminant)));
 ```
 
-With earth shadow (Bug 5 fix) handling below-horizon sun directions,
-the below-horizon transmittance values are multiplied by zero anyway,
-so the mapping inconsistency becomes harmless. But fixing the mapping
-ensures correctness for all cases.
-
 ## Bug 7: Bloom persists after the sun sinks below the horizon
 
-**Status: OPEN**
+**Status: FIXED** (resolved by Bug 9 fix)
 
 **File:** `shaders/sky.frag.hlsl`, `main.c`
 
@@ -280,7 +218,7 @@ drop to zero as sample points lose direct sunlight.
 
 ## Bug 8: Bell curve artifact as sun dips below horizon
 
-**Status: OPEN**
+**Status: FIXED** (resolved by Bugs 5, 6, and 9 fixes together)
 
 **File:** `shaders/sky.frag.hlsl`
 
@@ -303,6 +241,88 @@ by the interaction of Bugs 5 and 6:
 artifact. The earth shadow with horizon_fade provides a smooth transition,
 and the corrected UV mapping removes the abrupt boundary.
 
+## Bug 9: Multi-scatter LUT missing earth shadow in computation
+
+**Status: FIXED**
+
+**File:** `shaders/multiscatter_lut.comp.hlsl`
+
+**This is the remaining root cause of incorrect Rayleigh scattering timing.**
+
+The multi-scatter LUT compute shader does NOT include earth shadow in its
+inner march loop. In Pixel Storm, the `ps_sky_multi_scatter_lut` kernel
+(`src/ps_kernels.cu`) calls `integrate_scattered_luminance`
+(`inl/ps_sky_lut.cu`), which includes earth shadow at every march step.
+Our compute shader applies `sun_trans` from the transmittance LUT without
+checking if the planet blocks sunlight:
+
+```hlsl
+// CURRENT — no earth shadow in multi-scatter computation:
+dir_L += throughput * med.scatter * sun_trans * scatter_integral;
+```
+
+**Symptom observed:** Warm Rayleigh sunset colors appear only AFTER the
+sun drops below the horizon, and persist indefinitely. At +4° elevation
+(actual sunset), the sky is mostly blue with a small warm glow at the
+horizon. At -8.6° (well below horizon), a deep crimson band covers the
+entire horizon and does not fade.
+
+**Why this happens:**
+
+The fragment shader correctly applies earth shadow to single-scatter
+(Bug 5 fix). But the multi-scatter term `ms * med.scatter * sun_intensity`
+is NOT multiplied by earth shadow (correctly — it's pre-integrated).
+The problem is that the LUT values themselves are wrong.
+
+Without earth shadow in the LUT computation, the multi-scatter LUT stores
+non-zero warm values for sun angles where the sun is actually below the
+horizon at most sample points. When the sun drops below the camera's
+horizon:
+
+1. Single-scatter is correctly zeroed by the fragment shader earth shadow
+2. Multi-scatter reads the incorrectly pre-computed warm values from the
+   LUT and displays them — producing the persistent crimson band
+3. The warm colors never fade because the LUT values are static
+   (pre-computed once at startup)
+
+**Pixel Storm reference** (`inl/ps_sky_lut.cu`, called from multi-scatter
+kernel):
+
+```cuda
+// Earth shadow at each march step in integrate_scattered_luminance:
+f32 t_earth = ray_sphere_intersect_nearest(
+    P, sun_dir, earth_o + PS_PLANET_RADIUS_OFFSET * up_vector,
+    ap->bottom_radius);
+f32 earth_shadow = t_earth >= 0.f ? 0.f : 1.f;
+f32 horizon_fade = __saturatef(sun_zenith_cos_angle * 10.f + 0.5f);
+earth_shadow *= horizon_fade;
+```
+
+**Required fix:** Add earth shadow to the multi-scatter compute shader's
+inner march loop:
+
+```hlsl
+// In the inner march loop (k loop), after computing sun_trans:
+float cos_sun_local = dot(normalize(sample_pos), sun_dir);
+float t_shadow_near, t_shadow_far;
+bool sun_blocked = ray_sphere_intersect(
+    sample_pos, sun_dir, R_GROUND, t_shadow_near, t_shadow_far);
+float earth_shadow = (sun_blocked && t_shadow_near >= 0.0) ? 0.0 : 1.0;
+earth_shadow *= saturate(cos_sun_local * 10.0 + 0.5);
+
+// Apply earth shadow only to L_2nd (scattered luminance), not f_ms:
+dir_L += throughput * med.scatter * sun_trans * earth_shadow
+       * scatter_integral;
+dir_f += throughput * med.scatter * scatter_integral;  // unchanged
+```
+
+**Expected result:** After this fix:
+- Multi-scatter LUT will have near-zero values for below-horizon sun angles
+- Warm Rayleigh colors will appear during sunset (when sun_trans is reddish
+  and earth shadow allows single-scatter contributions)
+- Colors will correctly fade as the sun drops below the horizon
+- Bugs 7 (bloom persistence) and 8 (bell curve) should also resolve
+
 ## Verified Correct (NOT the cause)
 
 - **Register space convention:** space2 for fragment textures, space3 for
@@ -322,6 +342,7 @@ and the corrected UV mapping removes the abrupt boundary.
   ozone coefficients, scale heights, planet radii)
 - **Multi-scattering LUT computation:** Mathematically equivalent to
   Pixel Storm (sphere sampling weights, power series, sub-UV correction)
+  — EXCEPT missing earth shadow (see Bug 9)
 - **Phase functions:** Rayleigh and Henyey-Greenstein match Pixel Storm
   (Pixel Storm uses a more advanced Draine fog phase for Mie, but the
   standard HG with g=0.8 is correct for teaching purposes)
@@ -331,12 +352,13 @@ and the corrected UV mapping removes the abrupt boundary.
 ## Reference Implementation Comparison
 
 Key differences between our code and the Pixel Storm reference
-(`ps_sky_lut.cu`):
+(`inl/ps_sky_lut.cu`, `src/ps_kernels.cu`):
 
 | Feature | Pixel Storm | Lesson 26 | Impact |
 |---------|-------------|-----------|--------|
-| Earth shadow | `ray_sphere_intersect` + `horizon_fade` | Missing | Bugs 5, 7, 8 |
-| Transmittance UV forward | Atmosphere distance (quadratic) | Ground-clipped ray-sphere | Bug 6 |
+| Earth shadow (fragment) | `ray_sphere_intersect` + `horizon_fade` | **FIXED** (Bug 5) | Was: Bugs 5, 7, 8 |
+| Earth shadow (multi-scatter LUT) | Baked into `integrate_scattered_luminance` | **FIXED** (Bug 9) | Was: persistent sunset colors |
+| Transmittance UV forward | Atmosphere distance (quadratic) | **FIXED** (Bug 6) | Was: Bug 6 |
 | Mie phase function | Draine fog phase (4 params) | Henyey-Greenstein (1 param) | Minor visual difference |
 | Sun illuminance | Per-channel `float3(10.47, 10.85, 10.91)` | Scalar multiplier `20.0` | Slight color balance |
 | Sky-View LUT | 192×108, regenerated each frame | Not implemented (direct ray march) | Performance, not correctness |

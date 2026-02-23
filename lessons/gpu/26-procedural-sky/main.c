@@ -166,7 +166,7 @@
 
 /* Capture mode — fixed sun angle for consistent screenshots.
  * Low elevation shows warm scattering, bloom halo, and orange horizon. */
-#define CAPTURE_SUN_ELEVATION 0.07f /* ~4 degrees — low sun for sunset scattering  */
+#define CAPTURE_SUN_ELEVATION  0.07f /* ~4 degrees — sunset shows warm scattering       */
 #define CAPTURE_SUN_AZIMUTH   3.08f /* match orbit start angle                     */
 #define CAPTURE_CAM_YAW       1.63f /* face the sun at azimuth 3.08                */
 

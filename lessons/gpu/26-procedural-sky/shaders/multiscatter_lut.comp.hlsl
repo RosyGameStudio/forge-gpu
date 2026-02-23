@@ -260,14 +260,32 @@ void main(uint3 id : SV_DispatchThreadID)
                 float cos_sun = dot(normalize(sample_pos), sun_dir);
                 float3 sun_trans = sample_transmittance_lut(sample_height, cos_sun);
 
+                /* Earth shadow: check if the planet blocks sunlight at this
+                 * sample point.  Without this, the LUT stores non-zero values
+                 * for below-horizon sun angles, causing warm colors to persist
+                 * after the sun sets.  Matches Pixel Storm's
+                 * integrate_scattered_luminance (inl/ps_sky_lut.cu). */
+                float t_shadow_near, t_shadow_far;
+                bool sun_blocked = ray_sphere_intersect(
+                    sample_pos, sun_dir, R_GROUND,
+                    t_shadow_near, t_shadow_far);
+                float earth_shadow = (sun_blocked && t_shadow_near >= 0.0)
+                    ? 0.0 : 1.0;
+
+                /* Smooth transition near the terminator to avoid a hard
+                 * shadow edge.  horizon_fade goes from 0 to 1 over ~2.9°
+                 * around the local horizon. */
+                earth_shadow *= saturate(cos_sun * 10.0 + 0.5);
+
                 /* Analytical integration of scattering over the step. */
                 float3 scatter_integral = (float3(1.0, 1.0, 1.0) - step_ext)
                     / max(med.extinction, float3(1e-6, 1e-6, 1e-6));
 
-                /* L_2nd contribution: scattered light * sun transmittance.
-                 * Uses isotropic phase since higher-order scattering is
-                 * direction-independent. */
-                dir_L += throughput * med.scatter * sun_trans * scatter_integral;
+                /* L_2nd contribution: scattered light * sun transmittance *
+                 * earth shadow.  Uses isotropic phase since higher-order
+                 * scattering is direction-independent. */
+                dir_L += throughput * med.scatter * sun_trans * earth_shadow
+                    * scatter_integral;
 
                 /* f_ms contribution: fraction of scattered light that could
                  * scatter again (total scattering, no sun transmittance). */
