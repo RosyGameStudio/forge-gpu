@@ -3964,3 +3964,499 @@ def diagram_radical_inverse():
     )
     fig.tight_layout()
     save(fig, "math/14-blue-noise-sequences", "radical_inverse.png")
+
+
+# ---------------------------------------------------------------------------
+# math/02-coordinate-spaces — coordinate space visualizations
+# ---------------------------------------------------------------------------
+#
+# A simple house shape (pentagon with door and window) is transformed
+# through the six-stage rendering pipeline.  Each diagram shows the
+# house at one stage so learners can follow the shape from local space
+# all the way to screen pixels.
+
+_COORD_LESSON = "math/02-coordinate-spaces"
+
+
+def _coord_pipeline():
+    """Compute house vertices at every pipeline stage.
+
+    Returns a dict keyed by stage name.  Each value is a sub-dict with
+    ``house``, ``door``, and ``window`` as N×2 arrays.  The ``clip``
+    entry also carries ``w`` (the per-vertex w components).
+    """
+    # House outline in local space (z = 0 plane, homogeneous coords)
+    house = np.array(
+        [
+            [-0.5, 0.0, 0.0, 1.0],
+            [0.5, 0.0, 0.0, 1.0],
+            [0.5, 0.7, 0.0, 1.0],
+            [0.0, 1.0, 0.0, 1.0],
+            [-0.5, 0.7, 0.0, 1.0],
+        ]
+    )
+    door = np.array(
+        [
+            [-0.10, 0.00, 0.0, 1.0],
+            [0.10, 0.00, 0.0, 1.0],
+            [0.10, 0.28, 0.0, 1.0],
+            [-0.10, 0.28, 0.0, 1.0],
+        ]
+    )
+    window = np.array(
+        [
+            [-0.35, 0.38, 0.0, 1.0],
+            [-0.15, 0.38, 0.0, 1.0],
+            [-0.15, 0.55, 0.0, 1.0],
+            [-0.35, 0.55, 0.0, 1.0],
+        ]
+    )
+
+    # --- Model matrix: scale 2.5×, rotate 30° around Z, translate (4, 2, 0) ---
+    angle = np.radians(30.0)
+    co, si = np.cos(angle), np.sin(angle)
+    sc = 2.5
+    scale_m = np.diag([sc, sc, sc, 1.0])
+    rot_z = np.array(
+        [
+            [co, -si, 0, 0],
+            [si, co, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ]
+    )
+    trans_m = np.eye(4)
+    trans_m[0, 3], trans_m[1, 3], trans_m[2, 3] = 4.0, 2.0, 0.0
+    model = trans_m @ rot_z @ scale_m
+
+    # --- View matrix: camera at (0, 3, 8) looking at origin ---
+    eye = np.array([0.0, 3.0, 8.0])
+    tgt = np.array([0.0, 0.0, 0.0])
+    up_vec = np.array([0.0, 1.0, 0.0])
+
+    fwd = tgt - eye
+    fwd = fwd / np.linalg.norm(fwd)
+    right = np.cross(fwd, up_vec)
+    right = right / np.linalg.norm(right)
+    cam_up = np.cross(right, fwd)
+
+    view = np.eye(4)
+    view[0, :3] = right
+    view[1, :3] = cam_up
+    view[2, :3] = -fwd
+    view[0, 3] = -np.dot(right, eye)
+    view[1, 3] = -np.dot(cam_up, eye)
+    view[2, 3] = np.dot(fwd, eye)
+
+    # --- Projection: 60° FOV, 16 : 9, near 0.1, far 100 ---
+    fov_rad = np.radians(60.0)
+    aspect = 1920.0 / 1080.0
+    near_p, far_p = 0.1, 100.0
+    fv = 1.0 / np.tan(fov_rad / 2.0)
+
+    proj = np.zeros((4, 4))
+    proj[0, 0] = fv / aspect
+    proj[1, 1] = fv
+    proj[2, 2] = far_p / (near_p - far_p)
+    proj[2, 3] = (near_p * far_p) / (near_p - far_p)
+    proj[3, 2] = -1.0
+
+    # --- Push every part through the pipeline ---
+    def xf(verts, m):
+        return (m @ verts.T).T
+
+    parts = {"house": house, "door": door, "window": window}
+    stages = {}
+
+    # Local — raw XY
+    stages["local"] = {k: v[:, :2] for k, v in parts.items()}
+
+    # World
+    w_parts = {k: xf(v, model) for k, v in parts.items()}
+    stages["world"] = {k: v[:, :2] for k, v in w_parts.items()}
+
+    # View
+    v_parts = {k: xf(v, view) for k, v in w_parts.items()}
+    stages["view"] = {k: v[:, :2] for k, v in v_parts.items()}
+
+    # Clip
+    c_parts = {k: xf(v, proj) for k, v in v_parts.items()}
+    stages["clip"] = {k: v[:, :2] for k, v in c_parts.items()}
+    stages["clip"]["w"] = c_parts["house"][:, 3]
+
+    # NDC (perspective divide)
+    n_parts = {}
+    for k, v in c_parts.items():
+        nv = v.copy()
+        nv[:, :3] /= nv[:, 3:4]
+        n_parts[k] = nv
+    stages["ndc"] = {k: v[:, :2] for k, v in n_parts.items()}
+
+    # Screen (viewport transform, Y flipped)
+    sw, sh = 1920.0, 1080.0
+
+    def to_screen(nv):
+        return np.column_stack(
+            [
+                (nv[:, 0] + 1.0) * 0.5 * sw,
+                (1.0 - nv[:, 1]) * 0.5 * sh,
+            ]
+        )
+
+    stages["screen"] = {k: to_screen(v) for k, v in n_parts.items()}
+
+    return stages
+
+
+def _draw_coord_house(ax, house_xy, door_xy, window_xy):
+    """Draw the house polygon with door, window, and vertex markers."""
+    ax.add_patch(
+        Polygon(
+            house_xy,
+            closed=True,
+            facecolor=STYLE["accent1"],
+            edgecolor=STYLE["text"],
+            linewidth=1.5,
+            alpha=0.55,
+            zorder=3,
+        )
+    )
+    ax.add_patch(
+        Polygon(
+            door_xy,
+            closed=True,
+            facecolor=STYLE["surface"],
+            edgecolor=STYLE["text_dim"],
+            linewidth=0.8,
+            zorder=4,
+        )
+    )
+    ax.add_patch(
+        Polygon(
+            window_xy,
+            closed=True,
+            facecolor=STYLE["surface"],
+            edgecolor=STYLE["text_dim"],
+            linewidth=0.8,
+            zorder=4,
+        )
+    )
+    ax.plot(
+        house_xy[:, 0],
+        house_xy[:, 1],
+        "o",
+        color=STYLE["accent2"],
+        markersize=5,
+        zorder=5,
+    )
+
+
+# ---------------------------------------------------------------------------
+# math/02-coordinate-spaces — coord_local_space.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_coord_local_space():
+    """House centred at the origin in its own local coordinate system."""
+    d = _coord_pipeline()["local"]
+
+    fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    setup_axes(ax, xlim=(-2, 2), ylim=(-1.2, 2.8))
+
+    _draw_coord_house(ax, d["house"], d["door"], d["window"])
+
+    # Origin marker
+    ax.plot(0, 0, "+", color=STYLE["warn"], markersize=14, mew=2, zorder=6)
+    ax.text(
+        0.18,
+        -0.3,
+        "origin",
+        color=STYLE["warn"],
+        fontsize=10,
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    ax.set_xlabel("x", color=STYLE["axis"], fontsize=11)
+    ax.set_ylabel("y", color=STYLE["axis"], fontsize=11)
+    ax.set_title(
+        "1. Local Space",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    fig.tight_layout()
+    save(fig, _COORD_LESSON, "coord_local_space.png")
+
+
+# ---------------------------------------------------------------------------
+# math/02-coordinate-spaces — coord_world_space.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_coord_world_space():
+    """House placed in the scene after scale, rotation, and translation."""
+    d = _coord_pipeline()["world"]
+
+    fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    setup_axes(ax, xlim=(-1, 8), ylim=(-1, 7))
+
+    _draw_coord_house(ax, d["house"], d["door"], d["window"])
+
+    # World origin
+    ax.plot(0, 0, "+", color=STYLE["warn"], markersize=14, mew=2, zorder=6)
+    ax.text(
+        0.3,
+        -0.5,
+        "world origin",
+        color=STYLE["warn"],
+        fontsize=9,
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # Ground reference
+    ax.axhline(
+        0,
+        color=STYLE["grid"],
+        lw=1.0,
+        alpha=0.4,
+        linestyle="--",
+        zorder=1,
+    )
+
+    ax.set_xlabel("x", color=STYLE["axis"], fontsize=11)
+    ax.set_ylabel("y", color=STYLE["axis"], fontsize=11)
+    ax.set_title(
+        "2. World Space",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    fig.tight_layout()
+    save(fig, _COORD_LESSON, "coord_world_space.png")
+
+
+# ---------------------------------------------------------------------------
+# math/02-coordinate-spaces — coord_view_space.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_coord_view_space():
+    """House as seen from the camera, with camera at the origin."""
+    d = _coord_pipeline()["view"]
+
+    fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+
+    # Dynamic range that always includes the camera (origin)
+    all_pts = np.vstack([d["house"], d["door"], d["window"]])
+    margin = 1.5
+    lo_x = min(-margin, all_pts[:, 0].min() - margin)
+    hi_x = max(margin, all_pts[:, 0].max() + margin)
+    lo_y = min(-margin, all_pts[:, 1].min() - margin)
+    hi_y = max(margin, all_pts[:, 1].max() + margin)
+    setup_axes(ax, xlim=(lo_x, hi_x), ylim=(lo_y, hi_y))
+
+    _draw_coord_house(ax, d["house"], d["door"], d["window"])
+
+    # Camera icon at origin (small upward-pointing triangle)
+    cam_s = (hi_x - lo_x) * 0.02
+    cam_tri = Polygon(
+        [(-cam_s, -cam_s), (cam_s, -cam_s), (0, cam_s * 1.5)],
+        closed=True,
+        facecolor=STYLE["warn"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        zorder=6,
+    )
+    ax.add_patch(cam_tri)
+    ax.text(
+        cam_s * 2.5,
+        0,
+        "camera",
+        color=STYLE["warn"],
+        fontsize=10,
+        va="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    ax.set_xlabel("x  (right)", color=STYLE["axis"], fontsize=10)
+    ax.set_ylabel("y  (up)", color=STYLE["axis"], fontsize=10)
+    ax.set_title(
+        "3. View / Camera Space",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    fig.tight_layout()
+    save(fig, _COORD_LESSON, "coord_view_space.png")
+
+
+# ---------------------------------------------------------------------------
+# math/02-coordinate-spaces — coord_clip_space.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_coord_clip_space():
+    """House in clip space where the w component encodes depth."""
+    d = _coord_pipeline()["clip"]
+
+    fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+
+    all_pts = np.vstack([d["house"], d["door"], d["window"]])
+    span = max(np.ptp(all_pts[:, 0]), np.ptp(all_pts[:, 1]))
+    margin = span * 0.4
+    lo_x = all_pts[:, 0].min() - margin
+    hi_x = all_pts[:, 0].max() + margin
+    lo_y = all_pts[:, 1].min() - margin
+    hi_y = all_pts[:, 1].max() + margin
+    setup_axes(ax, xlim=(lo_x, hi_x), ylim=(lo_y, hi_y))
+
+    _draw_coord_house(ax, d["house"], d["door"], d["window"])
+
+    # Annotate the roof peak (vertex 3) with its w value
+    peak = d["house"][3]
+    w_val = d["w"][3]
+    ax.annotate(
+        f"w = {w_val:.1f}",
+        xy=(peak[0], peak[1]),
+        xytext=(peak[0] + margin * 0.5, peak[1] + margin * 0.5),
+        color=STYLE["warn"],
+        fontsize=11,
+        fontweight="bold",
+        arrowprops={"arrowstyle": "->", "color": STYLE["warn"], "lw": 1.2},
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+        zorder=6,
+    )
+
+    ax.set_xlabel("clip x", color=STYLE["axis"], fontsize=10)
+    ax.set_ylabel("clip y", color=STYLE["axis"], fontsize=10)
+    ax.set_title(
+        "4. Clip Space",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    fig.tight_layout()
+    save(fig, _COORD_LESSON, "coord_clip_space.png")
+
+
+# ---------------------------------------------------------------------------
+# math/02-coordinate-spaces — coord_ndc.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_coord_ndc():
+    """House normalised inside the [-1, 1] visible region."""
+    d = _coord_pipeline()["ndc"]
+
+    fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    setup_axes(ax, xlim=(-1.6, 1.6), ylim=(-1.6, 1.6))
+
+    # Visible-region box
+    ax.add_patch(
+        Rectangle(
+            (-1, -1),
+            2,
+            2,
+            linewidth=1.5,
+            edgecolor=STYLE["warn"],
+            facecolor="none",
+            linestyle="--",
+            zorder=2,
+            alpha=0.8,
+        )
+    )
+    ax.text(
+        -0.98,
+        -1.2,
+        "visible region",
+        color=STYLE["warn"],
+        fontsize=9,
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    _draw_coord_house(ax, d["house"], d["door"], d["window"])
+
+    ax.set_xlabel("ndc x", color=STYLE["axis"], fontsize=10)
+    ax.set_ylabel("ndc y", color=STYLE["axis"], fontsize=10)
+    ax.set_title(
+        "5. Normalized Device Coordinates",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    fig.tight_layout()
+    save(fig, _COORD_LESSON, "coord_ndc.png")
+
+
+# ---------------------------------------------------------------------------
+# math/02-coordinate-spaces — coord_screen_space.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_coord_screen_space():
+    """House mapped to final pixel coordinates on a 1920 × 1080 screen."""
+    d = _coord_pipeline()["screen"]
+
+    fig = plt.figure(figsize=(8, 5.5), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    # Y inverted: 0 at top, 1080 at bottom (screen convention)
+    setup_axes(
+        ax,
+        xlim=(-80, 2000),
+        ylim=(1140, -60),
+        grid=True,
+        aspect=None,
+    )
+
+    # Screen boundary
+    ax.add_patch(
+        Rectangle(
+            (0, 0),
+            1920,
+            1080,
+            linewidth=2,
+            edgecolor=STYLE["text_dim"],
+            facecolor=STYLE["surface"],
+            alpha=0.25,
+            zorder=1,
+        )
+    )
+    ax.text(
+        960,
+        1105,
+        "1920 \u00d7 1080",
+        color=STYLE["text_dim"],
+        fontsize=10,
+        ha="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    _draw_coord_house(ax, d["house"], d["door"], d["window"])
+
+    ax.set_xlabel("pixel x", color=STYLE["axis"], fontsize=10)
+    ax.set_ylabel("pixel y  (0 = top)", color=STYLE["axis"], fontsize=10)
+    ax.set_title(
+        "6. Screen Space",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    fig.tight_layout()
+    save(fig, _COORD_LESSON, "coord_screen_space.png")
