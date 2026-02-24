@@ -299,15 +299,15 @@ swapchain texture that eventually appears in your window.
 Understanding the full journey from your C array to a pixel on screen ties
 everything together:
 
-```text
-C vertex array          Vertex Shader           Rasterizer           Fragment Shader
-┌──────────────┐      ┌───────────────┐      ┌──────────────┐      ┌───────────────┐
-│ position: vec2│─────▸│ expand to     │─────▸│ which pixels │─────▸│ output the    │──▸ pixel
-│ color:    vec3│      │ float4 pos    │      │ are inside   │      │ interpolated  │   on
-│              │      │ float4 color  │      │ the triangle?│      │ color         │   screen
-└──────────────┘      └───────────────┘      │ interpolate  │      └───────────────┘
-  (3 vertices)          (runs 3 times)        │ attributes   │       (runs per pixel)
-                                              └──────────────┘
+```mermaid
+flowchart LR
+    A["<b>C vertex array</b><br/>position: vec2<br/>color: vec3<br/><i>(3 vertices)</i>"]
+    B["<b>Vertex Shader</b><br/>expand to<br/>float4 pos + color<br/><i>(runs 3×)</i>"]
+    C["<b>Rasterizer</b><br/>which pixels are<br/>inside the triangle?<br/><i>interpolate attributes</i>"]
+    D["<b>Fragment Shader</b><br/>output the<br/>interpolated color<br/><i>(runs per pixel)</i>"]
+    E["<b>Screen</b>"]
+
+    A --> B --> C --> D --> E
 ```
 
 1. **CPU side:** You define three vertices in a C array and upload them to GPU
