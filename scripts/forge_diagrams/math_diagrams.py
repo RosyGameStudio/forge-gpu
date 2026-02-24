@@ -3985,12 +3985,16 @@ _COORD_LESSON = "math/02-coordinate-spaces"
 #
 #   Vertices (x, y, z):
 #
-#       6────7          roof ridge
-#      /|   /|
-#     4────5 |          roof eave (same y as wall top)
-#     | 2──|─3          wall top  (y = 0.7)
-#     |/   |/
-#     0────1            ground    (y = 0)
+#        8─────9          roof peak   (y = 1.0)
+#       /|\   /|\
+#      / | \ / | \
+#     2──+──3  |  |       wall top    (y = 0.7)
+#     |  4──|──5  |       (back wall top, same y)
+#     | /   | /  /
+#     |/    |/  /
+#     0─────1  /          ground      (y = 0)
+#      \       /
+#       6─────7           back ground (y = 0)
 #
 # Faces reference these indices.
 
@@ -4117,6 +4121,21 @@ _CAM_UP = np.array([0.0, 1.0, 0.0])
 _VIEW_MAT = _mat4_look_at(_CAM_EYE, _CAM_TARGET, _CAM_UP)
 _PROJ_MAT = _mat4_perspective(60.0, 16.0 / 9.0, 0.1, 100.0)
 _SCR_W, _SCR_H = 1920.0, 1080.0
+
+
+def _coord_pipeline():
+    """Push house vertices through the full transform pipeline.
+
+    Returns (world_verts, view_verts, clip4, ndc_verts, screen_x, screen_y).
+    All arrays use GPU Y-up convention (apply _gpu_to_mpl before plotting).
+    """
+    world_verts = _xf3(_HOUSE_VERTS, _MODEL_MAT)
+    view_verts = _xf3(world_verts, _VIEW_MAT)
+    clip4 = _xf4(view_verts, _PROJ_MAT)
+    ndc_verts = clip4[:, :3] / clip4[:, 3:4]
+    screen_x = (ndc_verts[:, 0] + 1.0) * 0.5 * _SCR_W
+    screen_y = (1.0 - ndc_verts[:, 1]) * 0.5 * _SCR_H
+    return world_verts, view_verts, clip4, ndc_verts, screen_x, screen_y
 
 
 # ── Coordinate-system adapter ─────────────────────────────────────────────
@@ -4296,7 +4315,8 @@ def _add_camera_icon(ax, eye_mpl, target_mpl, size=0.6):
         tmp_up = np.array([0.0, 1.0, 0.0])
     right = np.cross(fwd, tmp_up)
     right = right / np.linalg.norm(right) * size * 0.5
-    up = np.cross(right, fwd) * size * 0.5
+    up = np.cross(right, fwd)
+    up = up / np.linalg.norm(up) * size * 0.5
     tip = eye_mpl
     base_center = eye_mpl + fwd * size
     corners = [
@@ -4334,7 +4354,7 @@ def diagram_coord_world_space():
     fig = plt.figure(figsize=(8, 7), facecolor=STYLE["bg"])
     ax: Axes3D = fig.add_subplot(111, projection="3d")  # type: ignore[assignment]
 
-    world_verts = _xf3(_HOUSE_VERTS, _MODEL_MAT)
+    world_verts, _, _, _, _, _ = _coord_pipeline()
     mpl_verts = _gpu_to_mpl(world_verts)
     _add_house_3d(ax, mpl_verts)
 
@@ -4401,8 +4421,7 @@ def diagram_coord_view_space():
     fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
     ax: Axes3D = fig.add_subplot(111, projection="3d")  # type: ignore[assignment]
 
-    world_verts = _xf3(_HOUSE_VERTS, _MODEL_MAT)
-    view_verts = _xf3(world_verts, _VIEW_MAT)
+    _, view_verts, _, _, _, _ = _coord_pipeline()
     mpl_verts = _gpu_to_mpl(view_verts)
     _add_house_3d(ax, mpl_verts)
 
@@ -4434,7 +4453,7 @@ def diagram_coord_view_space():
         ax,
         "3. View / Camera Space",
         xlabel="x (right)",
-        ylabel="z (forward)",
+        ylabel="z (depth)",
         zlabel="y (up)",
     )
 
@@ -4452,9 +4471,7 @@ def diagram_coord_clip_space():
     fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
     ax: Axes3D = fig.add_subplot(111, projection="3d")  # type: ignore[assignment]
 
-    world_verts = _xf3(_HOUSE_VERTS, _MODEL_MAT)
-    view_verts = _xf3(world_verts, _VIEW_MAT)
-    clip4 = _xf4(view_verts, _PROJ_MAT)
+    _, _, clip4, _, _, _ = _coord_pipeline()
     clip_xyz = clip4[:, :3]
     clip_w = clip4[:, 3]
 
@@ -4494,10 +4511,7 @@ def diagram_coord_ndc():
     fig = plt.figure(figsize=(7, 7), facecolor=STYLE["bg"])
     ax: Axes3D = fig.add_subplot(111, projection="3d")  # type: ignore[assignment]
 
-    world_verts = _xf3(_HOUSE_VERTS, _MODEL_MAT)
-    view_verts = _xf3(world_verts, _VIEW_MAT)
-    clip4 = _xf4(view_verts, _PROJ_MAT)
-    ndc_verts = clip4[:, :3] / clip4[:, 3:4]
+    _, _, _, ndc_verts, _, _ = _coord_pipeline()
 
     mpl_ndc = _gpu_to_mpl(ndc_verts)
     _add_house_3d(ax, mpl_ndc)
@@ -4560,12 +4574,10 @@ def diagram_coord_screen_space():
     ax = fig.add_subplot(111)
     ax.set_facecolor(STYLE["bg"])
 
-    world_verts = _xf3(_HOUSE_VERTS, _MODEL_MAT)
-    view_verts = _xf3(world_verts, _VIEW_MAT)
-    clip4 = _xf4(view_verts, _PROJ_MAT)
-    ndc = clip4[:, :3] / clip4[:, 3:4]
-    screen_x = (ndc[:, 0] + 1.0) * 0.5 * _SCR_W
-    screen_y = (1.0 - ndc[:, 1]) * 0.5 * _SCR_H
+    _, _, clip4, ndc_verts, screen_x, screen_y = _coord_pipeline()
+
+    # Per-vertex depth in view space (GPU z) for painter's algorithm
+    screen_z = ndc_verts[:, 2]
 
     # Screen boundary
     ax.add_patch(
@@ -4581,8 +4593,15 @@ def diagram_coord_screen_space():
         )
     )
 
-    # Project each face to 2-D and draw as a filled polygon
+    # Sort faces back-to-front (painter's algorithm) so nearer faces
+    # draw on top of farther ones.
+    face_depths = []
     for face_idx, idx_list in enumerate(_HOUSE_FACES):
+        avg_z = np.mean(screen_z[idx_list])
+        face_depths.append((avg_z, face_idx, idx_list))
+    face_depths.sort(key=lambda t: t[0], reverse=True)  # farthest first
+
+    for draw_order, (_, face_idx, idx_list) in enumerate(face_depths):
         fx = screen_x[idx_list]
         fy = screen_y[idx_list]
         poly = np.column_stack([fx, fy])
@@ -4594,7 +4613,7 @@ def diagram_coord_screen_space():
                 edgecolor=STYLE["text_dim"],
                 linewidth=0.6,
                 alpha=0.85,
-                zorder=3,
+                zorder=3 + draw_order,
             )
         )
 
