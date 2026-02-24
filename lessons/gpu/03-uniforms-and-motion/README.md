@@ -99,20 +99,7 @@ The functions `sin` (sine) and `cos` (cosine) are the mathematical tools that
 make rotation work. Given an angle, they return the coordinates of a point on a
 **unit circle** (a circle with radius 1 centered at the origin):
 
-```text
-          (0, 1)
-            |
-            |  . (cos t, sin t)
-            | /
-            |/ t
-  (-1, 0)---+---(1, 0)
-            |
-            |
-          (0, -1)
-
-cos(t) = horizontal position on the unit circle
-sin(t) = vertical position on the unit circle
-```
+![Unit circle showing cos and sin as coordinates](assets/unit_circle.png)
 
 When `t = 0`, `cos(0) = 1` and `sin(0) = 0` — the point is at `(1, 0)`, the
 rightmost position. As `t` increases, the point moves counter-clockwise around
@@ -168,18 +155,7 @@ This matters because of how the GPU maps coordinates to pixels. The GPU's
 and y-axis. The GPU maps this square coordinate range onto your rectangular
 window, which stretches the x-axis:
 
-```text
-NDC space (square)          Window (1280x720, stretched)
-     +1                          +1
-      |                           |
-      |                           |
- -1---+---+1               -1----+----+1
-      |                           |
-      |                           |
-     -1                          -1
-
- A circle in NDC            ...becomes an ellipse on screen
-```
+![Circle in NDC becomes an ellipse on a widescreen window](assets/aspect_ratio.png)
 
 A shape that is perfectly round in NDC appears stretched horizontally on a
 widescreen window. To fix this, you divide the x coordinate by the aspect
