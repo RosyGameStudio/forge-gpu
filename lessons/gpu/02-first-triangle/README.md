@@ -263,8 +263,9 @@ struct PSInput
 };
 ```
 
-This struct must match the vertex shader's output struct. The fields with
-matching semantics are connected automatically:
+This struct should contain fields whose semantics match the vertex shader's
+output — but it can be a subset (only the fields you actually need). The GPU
+connects them by semantic name, not by struct layout:
 
 - `SV_Position` — the pixel's screen position. This semantic is required on the
   vertex shader's output (the rasterizer needs it), but it is optional in
