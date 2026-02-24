@@ -5,7 +5,7 @@
 - What **SDL** is and why we use it for graphics programming
 - What a **GPU** is and why rendering uses it instead of the CPU
 - How to create a **window** — the rectangle on screen where your program draws
-- How to initialise SDL3 and create a **GPU device**
+- How to initialize SDL3 and create a **GPU device**
 - What a **swapchain** is and how it connects the GPU to your window
 - The **callback architecture** — how SDL runs your program
 - The per-frame rhythm: **command buffer → render pass → submit**
