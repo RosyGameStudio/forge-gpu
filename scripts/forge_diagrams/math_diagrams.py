@@ -4541,7 +4541,9 @@ def diagram_coord_view_space():
         [mpl_house, ground_mpl, road_mpl, origin_mpl.reshape(1, 3), [[0, 0, 0]]]
     )
     _set_equal_3d(ax, all_pts, pad=3.0)
-    ax.view_init(elev=30, azim=-60)
+    # Position the viewpoint roughly behind and above the camera origin,
+    # looking toward the scene (camera looks down -Z → mpl -Y).
+    ax.view_init(elev=25, azim=80)
     _style_3d(
         ax,
         "3. View / Camera Space",
