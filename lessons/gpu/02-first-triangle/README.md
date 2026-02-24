@@ -332,7 +332,7 @@ flowchart LR
 5. **Display:** The final colors are written to the swapchain texture, which
    the operating system presents in your window.
 
-## Key concepts in the C code
+## Key concepts
 
 ### Vertex data and vertex buffers
 
