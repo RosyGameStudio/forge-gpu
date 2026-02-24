@@ -70,7 +70,7 @@ shader runs on every covered pixel.
 
 ### What is HLSL?
 
-**HLSL** (High Level Shading Language) is Microsoft's shader language,
+**HLSL** (High-Level Shading Language) is Microsoft's shader language,
 originally designed for Direct3D. We use it because SDL's shader toolchain can
 compile HLSL to multiple formats:
 
@@ -79,7 +79,7 @@ compile HLSL to multiple formats:
 
 You write your shader once in HLSL, and the compiler produces the right
 bytecode for each platform. The compiled bytecodes are stored as C arrays in
-header files (`shaders/compiled/*_spirv.h` and `*_dxil.h`), which the C code
+header files (`shaders/compiled/*_spirv.h` and `shaders/compiled/*_dxil.h`), which the C code
 `#include`s directly.
 
 HLSL looks similar to C but has built-in types for GPU work (`float2`,
@@ -266,8 +266,11 @@ struct PSInput
 This struct must match the vertex shader's output struct. The fields with
 matching semantics are connected automatically:
 
-- `SV_Position` — the pixel's screen position (required by the pipeline, even
-  if you don't use it)
+- `SV_Position` — the pixel's screen position. This semantic is required on the
+  vertex shader's output (the rasterizer needs it), but it is optional in
+  `PSInput` — you only need to declare it if your fragment shader reads
+  `input.position`. Our shader never does, so it could be omitted here. We
+  include it to show the full correspondence with `VSOutput`.
 - `TEXCOORD0` — the interpolated color from the vertex shader
 
 The key insight: the color value arriving here is **not** one of the three
@@ -437,8 +440,17 @@ The flags mean:
 Then regenerate the C headers so the bytecodes can be `#include`d:
 
 ```bash
+# SPIRV headers
 python scripts/spirv_to_header.py shaders/compiled/triangle.vert.spv \
     triangle_vert_spirv shaders/compiled/triangle_vert_spirv.h
+python scripts/spirv_to_header.py shaders/compiled/triangle.frag.spv \
+    triangle_frag_spirv shaders/compiled/triangle_frag_spirv.h
+
+# DXIL headers
+python scripts/spirv_to_header.py shaders/compiled/triangle.vert.dxil \
+    triangle_vert_dxil shaders/compiled/triangle_vert_dxil.h
+python scripts/spirv_to_header.py shaders/compiled/triangle.frag.dxil \
+    triangle_frag_dxil shaders/compiled/triangle_frag_dxil.h
 ```
 
 ## Math connections
