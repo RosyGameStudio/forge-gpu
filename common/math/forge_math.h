@@ -245,6 +245,22 @@ static inline float forge_trilerpf(float c000, float c100,
  */
 #define FORGE_EPSILON 1.1920928955078125e-7f
 
+/* Threshold for detecting degenerate Bézier curves.
+ *
+ * When the squared length of the baseline (endpoint-to-endpoint vector) falls
+ * below this value, the curve is treated as degenerate — the endpoints
+ * effectively coincide and the perpendicular-distance flatness test would
+ * divide by near-zero.  The flatness functions fall back to a simple
+ * point-distance check instead.
+ *
+ * Value: 1e-12 ≈ (1e-6)², so curves shorter than ~1 micron (in whatever
+ * coordinate system) are considered degenerate.
+ *
+ * See: vec2_bezier_quadratic_is_flat, vec2_bezier_cubic_is_flat
+ * See: lessons/math/15-bezier-curves
+ */
+#define FORGE_BEZIER_DEGENERATE_EPSILON 1e-12f
+
 /* ── Floating-Point Comparison ───────────────────────────────────────────── */
 
 /* Test if two floats are approximately equal using absolute tolerance.
@@ -5043,7 +5059,7 @@ static inline int vec2_bezier_quadratic_is_flat(vec2 p0, vec2 p1, vec2 p2,
     vec2 d = vec2_sub(p2, p0);
     float len_sq = d.x * d.x + d.y * d.y;
 
-    if (len_sq < 1e-12f) {
+    if (len_sq < FORGE_BEZIER_DEGENERATE_EPSILON) {
         /* Degenerate: endpoints coincide, measure distance to p1 */
         vec2 dp = vec2_sub(p1, p0);
         return (dp.x * dp.x + dp.y * dp.y) <= tolerance * tolerance;
@@ -5080,7 +5096,7 @@ static inline int vec2_bezier_cubic_is_flat(vec2 p0, vec2 p1, vec2 p2,
     float len_sq = d.x * d.x + d.y * d.y;
     float tol_sq = tolerance * tolerance;
 
-    if (len_sq < 1e-12f) {
+    if (len_sq < FORGE_BEZIER_DEGENERATE_EPSILON) {
         /* Degenerate: check if all points are within tolerance of p0 */
         vec2 dp1 = vec2_sub(p1, p0);
         vec2 dp2 = vec2_sub(p2, p0);
@@ -5134,9 +5150,10 @@ static inline void vec2_bezier_quadratic_flatten(vec2 p0, vec2 p1, vec2 p2,
 {
     if (*count >= max_out) return;
 
-    /* Guard against NaN/Inf tolerance which would never satisfy the flatness
-     * test, causing infinite recursion.  Fall back to the curve endpoint. */
-    if (!isfinite(tolerance)) {
+    /* Guard against non-positive, NaN, or Inf tolerance which would never
+     * satisfy the flatness test, causing infinite recursion.  Fall back to
+     * the curve endpoint. */
+    if (!isfinite(tolerance) || tolerance <= 0.0f) {
         out[(*count)++] = p2;
         return;
     }
@@ -5183,9 +5200,10 @@ static inline void vec2_bezier_cubic_flatten(vec2 p0, vec2 p1, vec2 p2,
 {
     if (*count >= max_out) return;
 
-    /* Guard against NaN/Inf tolerance which would never satisfy the flatness
-     * test, causing infinite recursion.  Fall back to the curve endpoint. */
-    if (!isfinite(tolerance)) {
+    /* Guard against non-positive, NaN, or Inf tolerance which would never
+     * satisfy the flatness test, causing infinite recursion.  Fall back to
+     * the curve endpoint. */
+    if (!isfinite(tolerance) || tolerance <= 0.0f) {
         out[(*count)++] = p3;
         return;
     }
