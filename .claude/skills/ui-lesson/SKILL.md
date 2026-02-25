@@ -118,11 +118,13 @@ add_executable(NN-topic-name main.c)
 target_include_directories(NN-topic-name PRIVATE ${FORGE_COMMON_DIR})
 target_link_libraries(NN-topic-name PRIVATE SDL3::SDL3)
 
-add_custom_command(TARGET NN-topic-name POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<TARGET_FILE:SDL3::SDL3-shared>
-        $<TARGET_FILE_DIR:NN-topic-name>
-)
+if(TARGET SDL3::SDL3-shared)
+    add_custom_command(TARGET NN-topic-name POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:SDL3::SDL3-shared>
+            $<TARGET_FILE_DIR:NN-topic-name>
+    )
+endif()
 ```
 
 **Adapt as needed:** Later lessons may link against a shared UI library
@@ -243,6 +245,11 @@ build\lessons\ui\NN-topic-name\Debug\NN-topic-name.exe
 ```bash
 cmake -B build
 cmake --build build --config Debug
+
+# Windows
+.\build\lessons\ui\NN-topic-name\Debug\NN-topic-name.exe
+
+# Linux / macOS
 ./build/lessons/ui/NN-topic-name/NN-topic-name
 ```
 
