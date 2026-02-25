@@ -504,16 +504,16 @@ Quadratic Bezier tangent:
   t=0.50  tangent=(4.0000, 0.0000)  |tangent|=4.0000
   t=1.00  tangent=(4.0000, -8.0000)  |tangent|=8.9443
 
---- 9. Curve Splitting (Subdivision) ---
+--- 11. Curve Splitting (Subdivision) ---
 Splitting cubic curve at t=0.5:
   Left half:  ( 0.00, 0.00) ( 0.50, 1.50) ( 1.25, 2.25) ( 2.00, 2.25)
   Right half: ( 2.00, 2.25) ( 2.75, 2.25) ( 3.50, 1.50) ( 4.00, 0.00)
 
---- 10. Degree Elevation (Quadratic -> Cubic) ---
+--- 12. Degree Elevation (Quadratic -> Cubic) ---
 Quadratic: p0=(0.0,0.0) p1=(2.0,4.0) p2=(4.0,0.0)
 Cubic:     p0=(0.0000,0.0000) p1=(1.3333,2.6667) p2=(2.6667,2.6667) p3=(4.0000,0.0000)
 
---- 11. Adaptive Flattening ---
+--- 13. Adaptive Flattening ---
 Flattening cubic Bezier at different tolerances:
   tolerance=2.00 -> 2 line segments (3 points)
   tolerance=0.50 -> 4 line segments (5 points)

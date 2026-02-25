@@ -14,6 +14,26 @@
 #include <SDL3/SDL.h>
 #include "math/forge_math.h"
 
+/* ── Constants ─────────────────────────────────────────────────────────────── */
+
+#define SAMPLE_COUNT      9      /* Number of samples to show along each curve */
+#define DEMO_STEPS        4      /* Number of intervals for demonstration loops */
+#define FLOAT_TOLERANCE   0.001f /* Tolerance for floating-point comparison */
+#define FLATTEN_MAX_POINTS 512   /* Maximum points for adaptive flattening output */
+
+/* ── Shared control points ─────────────────────────────────────────────────── */
+
+/* Quadratic control points used across several demos */
+static const vec2 QP0 = { 0.0f, 0.0f };  /* Start */
+static const vec2 QP1 = { 2.0f, 4.0f };  /* Guide */
+static const vec2 QP2 = { 4.0f, 0.0f };  /* End   */
+
+/* Cubic control points used across several demos */
+static const vec2 CP0 = { 0.0f, 0.0f };  /* Start   */
+static const vec2 CP1 = { 1.0f, 3.0f };  /* Guide 1 */
+static const vec2 CP2 = { 3.0f, 3.0f };  /* Guide 2 */
+static const vec2 CP3 = { 4.0f, 0.0f };  /* End     */
+
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
 static void print_vec2(const char *name, vec2 v)
@@ -39,28 +59,10 @@ static void print_curve_samples(const char *label, vec2 *pts, int count)
     }
 }
 
-/* ── Main ────────────────────────────────────────────────────────────────── */
+/* ── Demo functions ────────────────────────────────────────────────────────── */
 
-#define SAMPLE_COUNT      9      /* Number of samples to show along each curve */
-#define DEMO_STEPS        4      /* Number of intervals for demonstration loops */
-#define FLOAT_TOLERANCE   0.001f /* Tolerance for floating-point comparison */
-#define FLATTEN_MAX_POINTS 512   /* Maximum points for adaptive flattening output */
-
-int main(int argc, char *argv[])
+static void demo_lerp(void)
 {
-    (void)argc;
-    (void)argv;
-
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
-        SDL_Log("SDL_Init failed: %s", SDL_GetError());
-        return 1;
-    }
-
-    SDL_Log("\n=== Bezier Curves Demo ===\n");
-
-    /* ================================================================== */
-    /*  1. Linear interpolation (lerp) — the foundation                   */
-    /* ================================================================== */
     SDL_Log("--- 1. Linear Interpolation (Lerp) ---");
     SDL_Log("Bezier curves are built entirely from lerp (linear interpolation).");
     SDL_Log("lerp(a, b, t) = a + t * (b - a)");
@@ -77,30 +79,26 @@ int main(int argc, char *argv[])
     }
     SDL_Log("A straight line segment IS a degree-1 Bezier curve.");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  2. Quadratic Bezier — De Casteljau with 3 control points          */
-    /* ================================================================== */
+static void demo_quadratic(void)
+{
     SDL_Log("--- 2. Quadratic Bezier Curve (3 Control Points) ---");
     SDL_Log("De Casteljau's algorithm: lerp twice to get the curve point.");
     SDL_Log(" ");
 
-    vec2 qp0 = vec2_create(0.0f, 0.0f);  /* Start */
-    vec2 qp1 = vec2_create(2.0f, 4.0f);  /* Guide */
-    vec2 qp2 = vec2_create(4.0f, 0.0f);  /* End   */
-
     SDL_Log("Control points:");
-    print_vec2("  p0 (start)", qp0);
-    print_vec2("  p1 (guide)", qp1);
-    print_vec2("  p2 (end)  ", qp2);
+    print_vec2("  p0 (start)", QP0);
+    print_vec2("  p1 (guide)", QP1);
+    print_vec2("  p2 (end)  ", QP2);
     SDL_Log(" ");
 
     /* Show De Casteljau step by step for t = 0.5 */
     float t_demo = 0.5f;
     SDL_Log("De Casteljau at t = %.1f:", t_demo);
 
-    vec2 q0 = vec2_lerp(qp0, qp1, t_demo);
-    vec2 q1 = vec2_lerp(qp1, qp2, t_demo);
+    vec2 q0 = vec2_lerp(QP0, QP1, t_demo);
+    vec2 q1 = vec2_lerp(QP1, QP2, t_demo);
     vec2 qr = vec2_lerp(q0, q1, t_demo);
 
     SDL_Log("  Round 1: q0 = lerp(p0, p1, 0.5) = (%.4f, %.4f)", q0.x, q0.y);
@@ -109,7 +107,7 @@ int main(int argc, char *argv[])
     SDL_Log(" ");
 
     /* Verify with the library function */
-    vec2 qr_lib = vec2_bezier_quadratic(qp0, qp1, qp2, t_demo);
+    vec2 qr_lib = vec2_bezier_quadratic(QP0, QP1, QP2, t_demo);
     SDL_Log("Library:   vec2_bezier_quadratic(p0, p1, p2, 0.5)");
     print_vec2("  result", qr_lib);
     SDL_Log(" ");
@@ -118,36 +116,32 @@ int main(int argc, char *argv[])
     vec2 quad_samples[SAMPLE_COUNT];
     for (int i = 0; i < SAMPLE_COUNT; i++) {
         float t = (float)i / (float)(SAMPLE_COUNT - 1);
-        quad_samples[i] = vec2_bezier_quadratic(qp0, qp1, qp2, t);
+        quad_samples[i] = vec2_bezier_quadratic(QP0, QP1, QP2, t);
     }
     print_curve_samples("Quadratic Bezier curve", quad_samples, SAMPLE_COUNT);
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  3. Cubic Bezier — De Casteljau with 4 control points              */
-    /* ================================================================== */
+static void demo_cubic(void)
+{
     SDL_Log("--- 3. Cubic Bezier Curve (4 Control Points) ---");
     SDL_Log("Three rounds of lerp for four control points.");
     SDL_Log(" ");
 
-    vec2 cp0 = vec2_create(0.0f, 0.0f);  /* Start       */
-    vec2 cp1 = vec2_create(1.0f, 3.0f);  /* Guide 1     */
-    vec2 cp2 = vec2_create(3.0f, 3.0f);  /* Guide 2     */
-    vec2 cp3 = vec2_create(4.0f, 0.0f);  /* End         */
-
     SDL_Log("Control points:");
-    print_vec2("  p0 (start)  ", cp0);
-    print_vec2("  p1 (guide 1)", cp1);
-    print_vec2("  p2 (guide 2)", cp2);
-    print_vec2("  p3 (end)    ", cp3);
+    print_vec2("  p0 (start)  ", CP0);
+    print_vec2("  p1 (guide 1)", CP1);
+    print_vec2("  p2 (guide 2)", CP2);
+    print_vec2("  p3 (end)    ", CP3);
     SDL_Log(" ");
 
     /* Show De Casteljau step by step for t = 0.5 */
+    float t_demo = 0.5f;
     SDL_Log("De Casteljau at t = %.1f:", t_demo);
 
-    vec2 cq0 = vec2_lerp(cp0, cp1, t_demo);
-    vec2 cq1 = vec2_lerp(cp1, cp2, t_demo);
-    vec2 cq2 = vec2_lerp(cp2, cp3, t_demo);
+    vec2 cq0 = vec2_lerp(CP0, CP1, t_demo);
+    vec2 cq1 = vec2_lerp(CP1, CP2, t_demo);
+    vec2 cq2 = vec2_lerp(CP2, CP3, t_demo);
     SDL_Log("  Round 1: q0 = lerp(p0, p1, 0.5) = (%.4f, %.4f)", cq0.x, cq0.y);
     SDL_Log("  Round 1: q1 = lerp(p1, p2, 0.5) = (%.4f, %.4f)", cq1.x, cq1.y);
     SDL_Log("  Round 1: q2 = lerp(p2, p3, 0.5) = (%.4f, %.4f)", cq2.x, cq2.y);
@@ -162,7 +156,7 @@ int main(int argc, char *argv[])
     SDL_Log(" ");
 
     /* Verify with library */
-    vec2 cr_lib = vec2_bezier_cubic(cp0, cp1, cp2, cp3, t_demo);
+    vec2 cr_lib = vec2_bezier_cubic(CP0, CP1, CP2, CP3, t_demo);
     SDL_Log("Library:   vec2_bezier_cubic(p0, p1, p2, p3, 0.5)");
     print_vec2("  result", cr_lib);
     SDL_Log(" ");
@@ -171,14 +165,14 @@ int main(int argc, char *argv[])
     vec2 cubic_samples[SAMPLE_COUNT];
     for (int i = 0; i < SAMPLE_COUNT; i++) {
         float t = (float)i / (float)(SAMPLE_COUNT - 1);
-        cubic_samples[i] = vec2_bezier_cubic(cp0, cp1, cp2, cp3, t);
+        cubic_samples[i] = vec2_bezier_cubic(CP0, CP1, CP2, CP3, t);
     }
     print_curve_samples("Cubic Bezier curve", cubic_samples, SAMPLE_COUNT);
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  4. Tangent vectors — direction and speed along the curve           */
-    /* ================================================================== */
+static void demo_tangent(void)
+{
     SDL_Log("--- 4. Tangent Vectors ---");
     SDL_Log("The tangent is the first derivative dB/dt.");
     SDL_Log("It tells you the direction of travel along the curve.");
@@ -188,7 +182,7 @@ int main(int argc, char *argv[])
     SDL_Log("Quadratic Bezier tangent:");
     for (int i = 0; i <= DEMO_STEPS; i++) {
         float t = (float)i / (float)DEMO_STEPS;
-        vec2 tan = vec2_bezier_quadratic_tangent(qp0, qp1, qp2, t);
+        vec2 tan = vec2_bezier_quadratic_tangent(QP0, QP1, QP2, t);
         float mag = vec2_length(tan);
         SDL_Log("  t=%.2f  tangent=(%.4f, %.4f)  |tangent|=%.4f",
                 t, tan.x, tan.y, mag);
@@ -199,7 +193,7 @@ int main(int argc, char *argv[])
     SDL_Log("Cubic Bezier tangent:");
     for (int i = 0; i <= DEMO_STEPS; i++) {
         float t = (float)i / (float)DEMO_STEPS;
-        vec2 tan = vec2_bezier_cubic_tangent(cp0, cp1, cp2, cp3, t);
+        vec2 tan = vec2_bezier_cubic_tangent(CP0, CP1, CP2, CP3, t);
         float mag = vec2_length(tan);
         SDL_Log("  t=%.2f  tangent=(%.4f, %.4f)  |tangent|=%.4f",
                 t, tan.x, tan.y, mag);
@@ -210,10 +204,10 @@ int main(int argc, char *argv[])
     SDL_Log("At t=1, the tangent points from p(n-1) toward pn.");
     SDL_Log("This is why control points determine departure/arrival direction.");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  5. Bernstein basis polynomials — the weighting functions           */
-    /* ================================================================== */
+static void demo_bernstein(void)
+{
     SDL_Log("--- 5. Bernstein Basis Polynomials ---");
     SDL_Log("Each control point's influence is weighted by a Bernstein polynomial.");
     SDL_Log("The weights are always non-negative and sum to 1 (partition of unity).");
@@ -248,10 +242,10 @@ int main(int argc, char *argv[])
     }
     SDL_Log("Every row sums to 1.0 -- the curve point is a weighted average.");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  6. Control-point influence — how guide points shape the curve      */
-    /* ================================================================== */
+static void demo_control_influence(void)
+{
     SDL_Log("--- 6. Control-Point Influence ---");
     SDL_Log("Moving a guide point changes the curve shape.");
     SDL_Log(" ");
@@ -260,44 +254,50 @@ int main(int argc, char *argv[])
     vec2 flat_guide  = vec2_create(2.0f, 1.0f);
     vec2 high_guide  = vec2_create(2.0f, 6.0f);
 
-    vec2 mid_flat = vec2_bezier_quadratic(qp0, flat_guide, qp2, 0.5f);
-    vec2 mid_high = vec2_bezier_quadratic(qp0, high_guide, qp2, 0.5f);
+    vec2 mid_flat = vec2_bezier_quadratic(QP0, flat_guide, QP2, 0.5f);
+    vec2 mid_high = vec2_bezier_quadratic(QP0, high_guide, QP2, 0.5f);
 
     SDL_Log("Same start (0,0) and end (4,0) with different guides:");
     SDL_Log("  Guide at (2, 1): midpoint = (%.4f, %.4f)", mid_flat.x, mid_flat.y);
     SDL_Log("  Guide at (2, 6): midpoint = (%.4f, %.4f)", mid_high.x, mid_high.y);
     SDL_Log("Higher guide = stronger pull = more pronounced curve.");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  7. Endpoint interpolation — the curve always passes through       */
-    /*     its first and last control points                              */
-    /* ================================================================== */
+static void demo_endpoint_property(void)
+{
     SDL_Log("--- 7. Endpoint Interpolation Property ---");
     SDL_Log("Bezier curves ALWAYS pass through the first and last control points.");
     SDL_Log(" ");
 
-    vec2 start = vec2_bezier_cubic(cp0, cp1, cp2, cp3, 0.0f);
-    vec2 end   = vec2_bezier_cubic(cp0, cp1, cp2, cp3, 1.0f);
+    vec2 start = vec2_bezier_cubic(CP0, CP1, CP2, CP3, 0.0f);
+    vec2 end   = vec2_bezier_cubic(CP0, CP1, CP2, CP3, 1.0f);
 
     SDL_Log("Cubic Bezier at t=0: (%.4f, %.4f) = p0 = (%.4f, %.4f)",
-            start.x, start.y, cp0.x, cp0.y);
+            start.x, start.y, CP0.x, CP0.y);
     SDL_Log("Cubic Bezier at t=1: (%.4f, %.4f) = p3 = (%.4f, %.4f)",
-            end.x, end.y, cp3.x, cp3.y);
+            end.x, end.y, CP3.x, CP3.y);
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  8. Convex hull property — curve stays inside control points        */
-    /* ================================================================== */
+static void demo_convex_hull(void)
+{
     SDL_Log("--- 8. Convex Hull Property ---");
     SDL_Log("A Bezier curve always lies inside the bounding box of its");
     SDL_Log("control points (and more specifically, their convex hull).");
     SDL_Log(" ");
 
+    /* Sample the cubic curve */
+    vec2 cubic_samples[SAMPLE_COUNT];
+    for (int i = 0; i < SAMPLE_COUNT; i++) {
+        float t = (float)i / (float)(SAMPLE_COUNT - 1);
+        cubic_samples[i] = vec2_bezier_cubic(CP0, CP1, CP2, CP3, t);
+    }
+
     /* Compute axis-aligned bounding box of cubic control points */
-    float bb_min_x = cp0.x, bb_max_x = cp0.x;
-    float bb_min_y = cp0.y, bb_max_y = cp0.y;
-    vec2 cpts[] = {cp1, cp2, cp3};
+    float bb_min_x = CP0.x, bb_max_x = CP0.x;
+    float bb_min_y = CP0.y, bb_max_y = CP0.y;
+    vec2 cpts[] = {CP1, CP2, CP3};
     for (int i = 0; i < 3; i++) {
         if (cpts[i].x < bb_min_x) bb_min_x = cpts[i].x;
         if (cpts[i].x > bb_max_x) bb_max_x = cpts[i].x;
@@ -322,10 +322,10 @@ int main(int argc, char *argv[])
             SAMPLE_COUNT, all_inside ? "yes" : "no");
     SDL_Log("This follows from Bernstein weights being non-negative and summing to 1.");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  9. Arc length — approximating how long the curve is               */
-    /* ================================================================== */
+static void demo_arclength(void)
+{
     SDL_Log("--- 9. Arc-Length Approximation ---");
     SDL_Log("Bezier curves have no simple formula for arc length.");
     SDL_Log("We approximate by summing short straight segments.");
@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
 
     SDL_Log("Cubic Bezier arc length with increasing segments:");
     for (int i = 0; i < num_tests; i++) {
-        float len = vec2_bezier_cubic_length(cp0, cp1, cp2, cp3,
+        float len = vec2_bezier_cubic_length(CP0, CP1, CP2, CP3,
                                              segment_counts[i]);
         SDL_Log("  %3d segments -> length = %.6f", segment_counts[i], len);
     }
@@ -345,16 +345,16 @@ int main(int argc, char *argv[])
     SDL_Log(" ");
 
     /* Compare: straight-line distance vs arc length */
-    float straight = vec2_length(vec2_sub(cp3, cp0));
-    float arc = vec2_bezier_cubic_length(cp0, cp1, cp2, cp3, 128);
+    float straight = vec2_length(vec2_sub(CP3, CP0));
+    float arc = vec2_bezier_cubic_length(CP0, CP1, CP2, CP3, 128);
     SDL_Log("Straight-line distance p0->p3: %.4f", straight);
     SDL_Log("Curve arc length (128 segs):   %.4f", arc);
     SDL_Log("The curve is always at least as long as the straight line.");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  10. Joining curves — C0 and C1 continuity                         */
-    /* ================================================================== */
+static void demo_joining(void)
+{
     SDL_Log("--- 10. Joining Bezier Curves (Continuity) ---");
     SDL_Log("Multiple Bezier curves can be chained into a longer path.");
     SDL_Log(" ");
@@ -411,17 +411,17 @@ int main(int argc, char *argv[])
                              fabsf(tan1_c1.y - tan2_c1.y) < FLOAT_TOLERANCE)
              ? "yes" : "no");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  11. Curve splitting — De Casteljau subdivision                     */
-    /* ================================================================== */
+static void demo_split(void)
+{
     SDL_Log("--- 11. Curve Splitting (Subdivision) ---");
     SDL_Log("De Casteljau's algorithm naturally splits a curve into two halves.");
     SDL_Log("Each half is itself a valid Bezier curve.");
     SDL_Log(" ");
 
     vec2 left[4], right[4];
-    vec2_bezier_cubic_split(cp0, cp1, cp2, cp3, 0.5f, left, right);
+    vec2_bezier_cubic_split(CP0, CP1, CP2, CP3, 0.5f, left, right);
 
     SDL_Log("Splitting cubic curve at t=0.5:");
     SDL_Log("  Left half:  (%5.2f,%5.2f) (%5.2f,%5.2f) (%5.2f,%5.2f) (%5.2f,%5.2f)",
@@ -433,7 +433,7 @@ int main(int argc, char *argv[])
     SDL_Log(" ");
 
     /* Verify the split produces the same curve */
-    vec2 orig_pt = vec2_bezier_cubic(cp0, cp1, cp2, cp3, 0.25f);
+    vec2 orig_pt = vec2_bezier_cubic(CP0, CP1, CP2, CP3, 0.25f);
     vec2 left_pt = vec2_bezier_cubic(left[0], left[1], left[2], left[3], 0.5f);
     SDL_Log("Verification: original at t=0.25 vs left half at t=0.5:");
     SDL_Log("  Original: (%.4f, %.4f)", orig_pt.x, orig_pt.y);
@@ -442,20 +442,20 @@ int main(int argc, char *argv[])
             (fabsf(orig_pt.x - left_pt.x) < FLOAT_TOLERANCE &&
              fabsf(orig_pt.y - left_pt.y) < FLOAT_TOLERANCE) ? "yes" : "no");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  12. Degree elevation — quadratic to cubic                         */
-    /* ================================================================== */
+static void demo_degree_elev(void)
+{
     SDL_Log("--- 12. Degree Elevation (Quadratic -> Cubic) ---");
     SDL_Log("Every quadratic Bezier can be exactly represented as a cubic.");
     SDL_Log("TrueType fonts use quadratic curves; this converts them to cubic.");
     SDL_Log(" ");
 
     vec2 cubic_equiv[4];
-    vec2_bezier_quadratic_to_cubic(qp0, qp1, qp2, cubic_equiv);
+    vec2_bezier_quadratic_to_cubic(QP0, QP1, QP2, cubic_equiv);
 
     SDL_Log("Quadratic: p0=(%.1f,%.1f) p1=(%.1f,%.1f) p2=(%.1f,%.1f)",
-            qp0.x, qp0.y, qp1.x, qp1.y, qp2.x, qp2.y);
+            QP0.x, QP0.y, QP1.x, QP1.y, QP2.x, QP2.y);
     SDL_Log("Cubic:     p0=(%.4f,%.4f) p1=(%.4f,%.4f) p2=(%.4f,%.4f) p3=(%.4f,%.4f)",
             cubic_equiv[0].x, cubic_equiv[0].y,
             cubic_equiv[1].x, cubic_equiv[1].y,
@@ -468,7 +468,7 @@ int main(int argc, char *argv[])
     float verify_ts[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
     for (int i = 0; i < 5; i++) {
         float tv = verify_ts[i];
-        vec2 pq = vec2_bezier_quadratic(qp0, qp1, qp2, tv);
+        vec2 pq = vec2_bezier_quadratic(QP0, QP1, QP2, tv);
         vec2 pc = vec2_bezier_cubic(cubic_equiv[0], cubic_equiv[1],
                                     cubic_equiv[2], cubic_equiv[3], tv);
         SDL_Log("  t=%.2f  quad=(%.4f,%.4f)  cubic=(%.4f,%.4f)  match: %s",
@@ -477,10 +477,10 @@ int main(int argc, char *argv[])
                  fabsf(pq.y - pc.y) < FLOAT_TOLERANCE) ? "yes" : "no");
     }
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  13. Adaptive flattening — curves to line segments                  */
-    /* ================================================================== */
+static void demo_flattening(void)
+{
     SDL_Log("--- 13. Adaptive Flattening ---");
     SDL_Log("Recursively subdivide until each piece is flat enough,");
     SDL_Log("then approximate with line segments. Core of font rendering.");
@@ -494,18 +494,18 @@ int main(int argc, char *argv[])
     for (int i = 0; i < num_tol; i++) {
         vec2 flat_pts[FLATTEN_MAX_POINTS];
         int flat_count = 0;
-        flat_pts[flat_count++] = cp0;
-        vec2_bezier_cubic_flatten(cp0, cp1, cp2, cp3, tolerances[i],
+        flat_pts[flat_count++] = CP0;
+        vec2_bezier_cubic_flatten(CP0, CP1, CP2, CP3, tolerances[i],
                                   flat_pts, FLATTEN_MAX_POINTS, &flat_count);
         SDL_Log("  tolerance=%.2f -> %d line segments (%d points)",
                 tolerances[i], flat_count - 1, flat_count);
     }
     SDL_Log("Tighter tolerance = more segments = closer to the true curve.");
     SDL_Log(" ");
+}
 
-    /* ================================================================== */
-    /*  14. Summary                                                       */
-    /* ================================================================== */
+static void demo_summary(void)
+{
     SDL_Log("--- Summary ---");
     SDL_Log("Bezier curves are built entirely from linear interpolation (lerp).");
     SDL_Log("  Quadratic: 3 control points, 2 rounds of lerp");
@@ -516,7 +516,31 @@ int main(int argc, char *argv[])
     SDL_Log("  - Lie entirely within the convex hull of control points");
     SDL_Log("  - Can be chained with C0 or C1 continuity for complex paths");
     SDL_Log(" ");
+}
 
-    SDL_Quit();
+/* ── Main ────────────────────────────────────────────────────────────────── */
+
+int main(int argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+
+    SDL_Log("\n=== Bezier Curves Demo ===\n");
+
+    demo_lerp();
+    demo_quadratic();
+    demo_cubic();
+    demo_tangent();
+    demo_bernstein();
+    demo_control_influence();
+    demo_endpoint_property();
+    demo_convex_hull();
+    demo_arclength();
+    demo_joining();
+    demo_split();
+    demo_degree_elev();
+    demo_flattening();
+    demo_summary();
+
     return 0;
 }
