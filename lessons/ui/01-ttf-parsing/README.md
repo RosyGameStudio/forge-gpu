@@ -308,9 +308,9 @@ enabled faster integer arithmetic in the rasterizer).
 
 To convert font units to pixels at a given text size:
 
-```text
-pixels = font_units * (pixel_size / unitsPerEm)
-```
+$$
+\text{pixels} = \text{font}\_\text{units} \times \frac{\text{pixel}\_\text{size}}{\text{unitsPerEm}}
+$$
 
 For example, in Liberation Mono (unitsPerEm = 2048), a glyph coordinate of
 1024 at a pixel size of 16px maps to `1024 * 16 / 2048 = 8` pixels.
@@ -357,9 +357,9 @@ ascender/descender values alone to provide adequate spacing.
 
 These three values determine line height:
 
-```text
-line_height = ascender - descender + lineGap
-```
+$$
+\text{line}\_\text{height} = \text{ascender} - \text{descender} + \text{lineGap}
+$$
 
 For Liberation Mono: `1705 - (-615) + 0 = 2320` font units per line.
 
