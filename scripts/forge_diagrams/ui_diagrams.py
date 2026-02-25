@@ -356,24 +356,24 @@ def diagram_endianness():
     draw_bytes(ax, 2.0, 2.5, ["0x01", "0x00"], "Big-endian (TTF)", STYLE["accent1"])
     draw_bytes(ax, 2.0, 1.5, ["0x00", "0x01"], "Little-endian (x86)", STYLE["accent2"])
 
-    # Annotations
+    # Annotations — place above big-endian / below little-endian to avoid overlap
     ax.text(
         2.5,
-        2.5 - 0.15,
+        2.5 + cell_h + 0.05,
         "MSB first",
         color=STYLE["text_dim"],
         fontsize=6.5,
         ha="center",
-        va="top",
+        va="bottom",
     )
     ax.text(
         2.5,
-        1.5 + cell_h + 0.05,
+        1.5 - 0.05,
         "LSB first",
         color=STYLE["text_dim"],
         fontsize=6.5,
         ha="center",
-        va="bottom",
+        va="top",
     )
 
     # uint32 = 0x00010000
