@@ -276,61 +276,74 @@ static void test_glyph_space(void)
 }
 
 /* ── Test: glyph 'A' outline ─────────────────────────────────────────────── */
+/* Loads glyph 'A' once and verifies contour count, point count, bounding
+ * box, contour endpoints, and first point coordinates.  A single load
+ * avoids redundant work and ensures glyph_free is always called. */
 
-static void test_glyph_a_contours(void)
+static void test_glyph_a_outline(void)
 {
-    TEST("load_glyph: 'A' has 2 contours and 21 points");
+    TEST("load_glyph: 'A' outline (contours, bbox, endpoints, first point)");
     if (!font_loaded) return;
     Uint16 idx = forge_ui_ttf_glyph_index(&test_font, 'A');
     ForgeUiTtfGlyph glyph;
     bool result = forge_ui_ttf_load_glyph(&test_font, idx, &glyph);
-    ASSERT_TRUE(result);
-    ASSERT_EQ_U16(glyph.contour_count, 2);
-    ASSERT_EQ_U16(glyph.point_count, 21);
-    forge_ui_ttf_glyph_free(&glyph);
-}
+    if (!result) {
+        SDL_Log("    FAIL: forge_ui_ttf_load_glyph returned false (line %d)",
+                __LINE__);
+        fail_count++;
+        return;
+    }
+    pass_count++; /* load succeeded */
 
-static void test_glyph_a_bbox(void)
-{
-    TEST("load_glyph: 'A' bounding box");
-    if (!font_loaded) return;
-    Uint16 idx = forge_ui_ttf_glyph_index(&test_font, 'A');
-    ForgeUiTtfGlyph glyph;
-    bool result = forge_ui_ttf_load_glyph(&test_font, idx, &glyph);
-    ASSERT_TRUE(result);
-    ASSERT_EQ_I16(glyph.x_min, 0);
-    ASSERT_EQ_I16(glyph.y_min, 0);
-    ASSERT_EQ_I16(glyph.x_max, 1228);
-    ASSERT_EQ_I16(glyph.y_max, 1349);
-    forge_ui_ttf_glyph_free(&glyph);
-}
+    bool ok = true;
 
-static void test_glyph_a_contour_ends(void)
-{
-    TEST("load_glyph: 'A' contour endpoints");
-    if (!font_loaded) return;
-    Uint16 idx = forge_ui_ttf_glyph_index(&test_font, 'A');
-    ForgeUiTtfGlyph glyph;
-    bool result = forge_ui_ttf_load_glyph(&test_font, idx, &glyph);
-    ASSERT_TRUE(result);
-    /* Contour 0 ends at point 7, contour 1 ends at point 20 */
-    ASSERT_EQ_U16(glyph.contour_ends[0], 7);
-    ASSERT_EQ_U16(glyph.contour_ends[1], 20);
-    forge_ui_ttf_glyph_free(&glyph);
-}
+    /* Contour and point counts */
+    if (glyph.contour_count != 2) {
+        SDL_Log("    FAIL: contour_count == %u, expected 2 (line %d)",
+                glyph.contour_count, __LINE__);
+        fail_count++; ok = false;
+    } else { pass_count++; }
 
-static void test_glyph_a_first_point(void)
-{
-    TEST("load_glyph: 'A' first point coordinates");
-    if (!font_loaded) return;
-    Uint16 idx = forge_ui_ttf_glyph_index(&test_font, 'A');
-    ForgeUiTtfGlyph glyph;
-    bool result = forge_ui_ttf_load_glyph(&test_font, idx, &glyph);
-    ASSERT_TRUE(result);
+    if (glyph.point_count != 21) {
+        SDL_Log("    FAIL: point_count == %u, expected 21 (line %d)",
+                glyph.point_count, __LINE__);
+        fail_count++; ok = false;
+    } else { pass_count++; }
+
+    /* Bounding box */
+    if (glyph.x_min != 0 || glyph.y_min != 0 ||
+        glyph.x_max != 1228 || glyph.y_max != 1349) {
+        SDL_Log("    FAIL: bbox (%d,%d)-(%d,%d), expected (0,0)-(1228,1349) "
+                "(line %d)", glyph.x_min, glyph.y_min,
+                glyph.x_max, glyph.y_max, __LINE__);
+        fail_count++; ok = false;
+    } else { pass_count++; }
+
+    /* Contour endpoints (only check if contours were correct) */
+    if (ok && glyph.contour_count == 2) {
+        if (glyph.contour_ends[0] != 7 || glyph.contour_ends[1] != 20) {
+            SDL_Log("    FAIL: contour_ends [%u, %u], expected [7, 20] "
+                    "(line %d)", glyph.contour_ends[0],
+                    glyph.contour_ends[1], __LINE__);
+            fail_count++;
+        } else { pass_count++; }
+    }
+
     /* First point: (1034, 0), on-curve */
-    ASSERT_EQ_I16(glyph.points[0].x, 1034);
-    ASSERT_EQ_I16(glyph.points[0].y, 0);
-    ASSERT_TRUE((glyph.flags[0] & FORGE_UI__FLAG_ON_CURVE) != 0);
+    if (ok && glyph.point_count > 0) {
+        if (glyph.points[0].x != 1034 || glyph.points[0].y != 0) {
+            SDL_Log("    FAIL: points[0] == (%d,%d), expected (1034,0) "
+                    "(line %d)", glyph.points[0].x, glyph.points[0].y,
+                    __LINE__);
+            fail_count++;
+        } else { pass_count++; }
+
+        if (!(glyph.flags[0] & FORGE_UI__FLAG_ON_CURVE)) {
+            SDL_Log("    FAIL: points[0] not on-curve (line %d)", __LINE__);
+            fail_count++;
+        } else { pass_count++; }
+    }
+
     forge_ui_ttf_glyph_free(&glyph);
 }
 
@@ -466,10 +479,7 @@ int main(int argc, char *argv[])
     /* Glyph loading */
     test_glyph_out_of_range();
     test_glyph_space();
-    test_glyph_a_contours();
-    test_glyph_a_bbox();
-    test_glyph_a_contour_ends();
-    test_glyph_a_first_point();
+    test_glyph_a_outline();
     test_glyph_free_zeroed();
 
     /* loca validation */
