@@ -232,9 +232,11 @@ typedef struct Uniforms {            cbuffer Uniforms : register(b0, space1)
 The GPU reads raw bytes, so the memory layout must be identical. Two adjacent
 `float` fields work naturally — each is 4 bytes, and they sit one after the
 other. If you later add larger types like `float3` or `float4`, you need to be
-aware of **alignment rules**: the GPU's standard packing (called std140)
-requires `float3` and `float4` to start at 16-byte boundaries. For now, our
-two-float struct has no alignment concerns.
+aware of **alignment rules**: in HLSL `cbuffer` packing, variables align to
+4-byte boundaries inside 16-byte (four-`float`) slots. A `float3` occupies
+12 bytes within a 16-byte slot, and a field cannot straddle a 16-byte boundary
+— so a `float4` that would cross a slot boundary starts at the next 16-byte
+slot instead. For now, our two-`float` struct has no alignment concerns.
 
 ### The uniform data flow
 
