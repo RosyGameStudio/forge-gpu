@@ -365,9 +365,11 @@ static void demo_joining(void)
     vec2 s1_p2 = vec2_create(2.0f, 2.0f);
     vec2 s1_p3 = vec2_create(3.0f, 0.0f);
 
-    /* Second segment starts where the first ends (C0 continuity) */
+    /* Second segment starts where the first ends (C0 continuity only).
+     * s2_p1 is deliberately NOT the mirror of s1_p2, so the tangent
+     * directions differ at the junction — there is a visible kink. */
     vec2 s2_p0 = s1_p3;                    /* Shared endpoint */
-    vec2 s2_p1 = vec2_create(4.0f, -2.0f);
+    vec2 s2_p1 = vec2_create(4.5f, 1.0f);  /* NOT the mirror — tangent mismatch */
     vec2 s2_p2 = vec2_create(5.0f, -2.0f);
     vec2 s2_p3 = vec2_create(6.0f, 0.0f);
 
@@ -383,17 +385,21 @@ static void demo_joining(void)
              ? "yes" : "no");
     SDL_Log(" ");
 
-    /* C1 continuity: tangent direction and magnitude also match.
-     * For this, s2_p1 must be a reflection of s1_p2 across the junction. */
+    /* With only C0, the tangent directions at the junction do NOT match.
+     * This creates a visible corner/kink where the two segments meet. */
     vec2 tan1_end   = vec2_bezier_cubic_tangent(s1_p0, s1_p1, s1_p2, s1_p3, 1.0f);
     vec2 tan2_start = vec2_bezier_cubic_tangent(s2_p0, s2_p1, s2_p2, s2_p3, 0.0f);
 
-    SDL_Log("Tangent at junction:");
+    SDL_Log("Tangent at junction (C0 only — expect mismatch):");
     SDL_Log("  Segment 1 at t=1: (%.4f, %.4f)", tan1_end.x, tan1_end.y);
     SDL_Log("  Segment 2 at t=0: (%.4f, %.4f)", tan2_start.x, tan2_start.y);
+    SDL_Log("  Match: %s", (fabsf(tan1_end.x - tan2_start.x) < FLOAT_TOLERANCE &&
+                             fabsf(tan1_end.y - tan2_start.y) < FLOAT_TOLERANCE)
+             ? "yes" : "no");
     SDL_Log(" ");
 
-    /* Now make C1: place s2_p1 so the tangent matches */
+    /* Now upgrade to C1: place s2_p1 so the tangent matches.
+     * The rule is to mirror s1_p2 across the shared endpoint s1_p3. */
     SDL_Log("For C1 continuity, the first guide of segment 2 must be placed");
     SDL_Log("so that the tangent direction and speed match at the junction.");
     SDL_Log("Rule: s2_p1 = s1_p3 + (s1_p3 - s1_p2)");

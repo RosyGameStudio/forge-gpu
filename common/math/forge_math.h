@@ -4840,6 +4840,7 @@ static inline vec3 vec3_bezier_cubic_tangent(vec3 p0, vec3 p1, vec3 p2,
 static inline float vec2_bezier_cubic_length(vec2 p0, vec2 p1, vec2 p2,
                                              vec2 p3, int segments)
 {
+    if (segments < 1) segments = 1;
     float length = 0.0f;
     vec2 prev = p0;
     for (int i = 1; i <= segments; i++) {
@@ -4871,6 +4872,7 @@ static inline float vec2_bezier_cubic_length(vec2 p0, vec2 p1, vec2 p2,
 static inline float vec2_bezier_quadratic_length(vec2 p0, vec2 p1, vec2 p2,
                                                  int segments)
 {
+    if (segments < 1) segments = 1;
     float length = 0.0f;
     vec2 prev = p0;
     for (int i = 1; i <= segments; i++) {
