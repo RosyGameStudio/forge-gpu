@@ -114,13 +114,18 @@ static void test_table_lookup(void)
     TEST("required tables are present");
     if (!font_loaded) return;
 
-    /* All required tables must be found */
+    /* All required tables must be found in the public table directory */
     const char *required[] = {"head", "hhea", "maxp", "cmap", "loca", "glyf"};
     int num_required = (int)(sizeof(required) / sizeof(required[0]));
     for (int i = 0; i < num_required; i++) {
-        const ForgeUiTtfTableEntry *t = forge_ui__find_table(
-            &test_font, required[i]);
-        if (!t) {
+        bool found = false;
+        for (Uint16 j = 0; j < test_font.num_tables; j++) {
+            if (SDL_strcmp(test_font.tables[j].tag, required[i]) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
             SDL_Log("    FAIL: table '%s' not found (line %d)",
                     required[i], __LINE__);
             fail_count++;
@@ -413,14 +418,15 @@ int main(int argc, char *argv[])
     /* loca validation */
     test_loca_monotonic();
 
+    /* Print summary before tearing down SDL (SDL_Log needs SDL alive) */
+    SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
+            test_count, pass_count, fail_count);
+
     /* Cleanup */
     if (font_loaded) {
         forge_ui_ttf_free(&test_font);
     }
     SDL_Quit();
-
-    SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
-            test_count, pass_count, fail_count);
 
     return fail_count > 0 ? 1 : 0;
 }
