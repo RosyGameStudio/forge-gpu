@@ -559,6 +559,13 @@ static bool forge_ui__parse_loca(ForgeUiFont *font)
 
     Uint32 count = (Uint32)font->maxp.num_glyphs + 1;
 
+    /* indexToLocFormat must be 0 (short) or 1 (long) */
+    if (font->head.index_to_loc_fmt != 0 && font->head.index_to_loc_fmt != 1) {
+        SDL_Log("forge_ui__parse_loca: invalid index_to_loc_fmt %d "
+                "(must be 0 or 1)", font->head.index_to_loc_fmt);
+        return false;
+    }
+
     /* Validate that the loca table is large enough for all entries */
     size_t required_bytes = (font->head.index_to_loc_fmt == 0)
                                 ? (size_t)count * 2
@@ -744,6 +751,23 @@ static bool forge_ui_ttf_load_glyph(const ForgeUiFont *font,
     if (glyph_offset == next_offset) {
         /* Valid glyph with no contours (whitespace, etc.) */
         return true;
+    }
+
+    /* Validate loca entries: next must be >= current (otherwise the
+     * subtraction below would underflow), and the glyph data must
+     * fit within the file buffer. */
+    if (next_offset < glyph_offset) {
+        SDL_Log("forge_ui_ttf_load_glyph: malformed loca — "
+                "next_offset (%u) < glyph_offset (%u) for glyph %u",
+                next_offset, glyph_offset, glyph_index);
+        return false;
+    }
+    if ((Uint64)font->glyf_offset + next_offset > font->data_size) {
+        SDL_Log("forge_ui_ttf_load_glyph: glyph %u extends beyond file "
+                "bounds (glyf_offset %u + next_offset %u > data_size %zu)",
+                glyph_index, font->glyf_offset, next_offset,
+                font->data_size);
+        return false;
     }
 
     /* Compute glyph data bounds for all subsequent reads */
