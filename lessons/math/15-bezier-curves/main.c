@@ -33,7 +33,10 @@ static void print_curve_samples(const char *label, vec2 *pts, int count)
 
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
-#define SAMPLE_COUNT 9  /* Number of samples to show along each curve */
+#define SAMPLE_COUNT      9      /* Number of samples to show along each curve */
+#define DEMO_STEPS        4      /* Number of intervals for demonstration loops */
+#define FLOAT_TOLERANCE   0.001f /* Tolerance for floating-point comparison */
+#define FLATTEN_MAX_POINTS 512   /* Maximum points for adaptive flattening output */
 
 int main(int argc, char *argv[])
 {
@@ -59,8 +62,8 @@ int main(int argc, char *argv[])
     vec2 b = vec2_create(4.0f, 2.0f);
 
     SDL_Log("Endpoints:  a = (0, 0),  b = (4, 2)");
-    for (int i = 0; i <= 4; i++) {
-        float t = (float)i / 4.0f;
+    for (int i = 0; i <= DEMO_STEPS; i++) {
+        float t = (float)i / (float)DEMO_STEPS;
         vec2 p = vec2_lerp(a, b, t);
         SDL_Log("  lerp(a, b, %.2f) = (%.4f, %.4f)", t, p.x, p.y);
     }
@@ -175,8 +178,8 @@ int main(int argc, char *argv[])
 
     /* Quadratic tangent */
     SDL_Log("Quadratic Bezier tangent:");
-    for (int i = 0; i <= 4; i++) {
-        float t = (float)i / 4.0f;
+    for (int i = 0; i <= DEMO_STEPS; i++) {
+        float t = (float)i / (float)DEMO_STEPS;
         vec2 tan = vec2_bezier_quadratic_tangent(qp0, qp1, qp2, t);
         float mag = vec2_length(tan);
         SDL_Log("  t=%.2f  tangent=(%.4f, %.4f)  |tangent|=%.4f",
@@ -186,8 +189,8 @@ int main(int argc, char *argv[])
 
     /* Cubic tangent */
     SDL_Log("Cubic Bezier tangent:");
-    for (int i = 0; i <= 4; i++) {
-        float t = (float)i / 4.0f;
+    for (int i = 0; i <= DEMO_STEPS; i++) {
+        float t = (float)i / (float)DEMO_STEPS;
         vec2 tan = vec2_bezier_cubic_tangent(cp0, cp1, cp2, cp3, t);
         float mag = vec2_length(tan);
         SDL_Log("  t=%.2f  tangent=(%.4f, %.4f)  |tangent|=%.4f",
@@ -211,8 +214,8 @@ int main(int argc, char *argv[])
     /* Quadratic Bernstein basis: B(0,2)=(1-t)^2, B(1,2)=2(1-t)t, B(2,2)=t^2 */
     SDL_Log("Quadratic basis (n=2):");
     SDL_Log("  t     B(0,2)    B(1,2)    B(2,2)    sum");
-    for (int i = 0; i <= 4; i++) {
-        float t = (float)i / 4.0f;
+    for (int i = 0; i <= DEMO_STEPS; i++) {
+        float t = (float)i / (float)DEMO_STEPS;
         float u = 1.0f - t;
         float b0 = u * u;
         float b1 = 2.0f * u * t;
@@ -225,8 +228,8 @@ int main(int argc, char *argv[])
     /* Cubic Bernstein basis */
     SDL_Log("Cubic basis (n=3):");
     SDL_Log("  t     B(0,3)    B(1,3)    B(2,3)    B(3,3)    sum");
-    for (int i = 0; i <= 4; i++) {
-        float t = (float)i / 4.0f;
+    for (int i = 0; i <= DEMO_STEPS; i++) {
+        float t = (float)i / (float)DEMO_STEPS;
         float u = 1.0f - t;
         float b0 = u * u * u;
         float b1 = 3.0f * u * u * t;
@@ -299,10 +302,10 @@ int main(int argc, char *argv[])
     /* Check that all sampled curve points lie within the bounding box */
     int all_inside = 1;
     for (int i = 0; i < SAMPLE_COUNT; i++) {
-        if (cubic_samples[i].x < bb_min_x - 0.001f ||
-            cubic_samples[i].x > bb_max_x + 0.001f ||
-            cubic_samples[i].y < bb_min_y - 0.001f ||
-            cubic_samples[i].y > bb_max_y + 0.001f) {
+        if (cubic_samples[i].x < bb_min_x - FLOAT_TOLERANCE ||
+            cubic_samples[i].x > bb_max_x + FLOAT_TOLERANCE ||
+            cubic_samples[i].y < bb_min_y - FLOAT_TOLERANCE ||
+            cubic_samples[i].y > bb_max_y + FLOAT_TOLERANCE) {
             all_inside = 0;
             break;
         }
@@ -367,8 +370,8 @@ int main(int argc, char *argv[])
     SDL_Log("C0 continuity (shared endpoint):");
     SDL_Log("  Segment 1 at t=1: (%.4f, %.4f)", end1.x, end1.y);
     SDL_Log("  Segment 2 at t=0: (%.4f, %.4f)", start2.x, start2.y);
-    SDL_Log("  Match: %s", (fabsf(end1.x - start2.x) < 0.001f &&
-                             fabsf(end1.y - start2.y) < 0.001f)
+    SDL_Log("  Match: %s", (fabsf(end1.x - start2.x) < FLOAT_TOLERANCE &&
+                             fabsf(end1.y - start2.y) < FLOAT_TOLERANCE)
              ? "yes" : "no");
     SDL_Log(" ");
 
@@ -396,8 +399,8 @@ int main(int argc, char *argv[])
     vec2 tan2_c1 = vec2_bezier_cubic_tangent(s2_p0, s2_p1_c1, s2_p2, s2_p3, 0.0f);
     SDL_Log("  Tangent seg 1 end:   (%.4f, %.4f)", tan1_c1.x, tan1_c1.y);
     SDL_Log("  Tangent seg 2 start: (%.4f, %.4f)", tan2_c1.x, tan2_c1.y);
-    SDL_Log("  Match: %s", (fabsf(tan1_c1.x - tan2_c1.x) < 0.001f &&
-                             fabsf(tan1_c1.y - tan2_c1.y) < 0.001f)
+    SDL_Log("  Match: %s", (fabsf(tan1_c1.x - tan2_c1.x) < FLOAT_TOLERANCE &&
+                             fabsf(tan1_c1.y - tan2_c1.y) < FLOAT_TOLERANCE)
              ? "yes" : "no");
     SDL_Log(" ");
 
@@ -428,8 +431,8 @@ int main(int argc, char *argv[])
     SDL_Log("  Original: (%.4f, %.4f)", orig_pt.x, orig_pt.y);
     SDL_Log("  Left:     (%.4f, %.4f)  (match: %s)",
             left_pt.x, left_pt.y,
-            (fabsf(orig_pt.x - left_pt.x) < 0.001f &&
-             fabsf(orig_pt.y - left_pt.y) < 0.001f) ? "yes" : "no");
+            (fabsf(orig_pt.x - left_pt.x) < FLOAT_TOLERANCE &&
+             fabsf(orig_pt.y - left_pt.y) < FLOAT_TOLERANCE) ? "yes" : "no");
     SDL_Log(" ");
 
     /* ================================================================== */
@@ -462,8 +465,8 @@ int main(int argc, char *argv[])
                                     cubic_equiv[2], cubic_equiv[3], tv);
         SDL_Log("  t=%.2f  quad=(%.4f,%.4f)  cubic=(%.4f,%.4f)  match: %s",
                 tv, pq.x, pq.y, pc.x, pc.y,
-                (fabsf(pq.x - pc.x) < 0.001f &&
-                 fabsf(pq.y - pc.y) < 0.001f) ? "yes" : "no");
+                (fabsf(pq.x - pc.x) < FLOAT_TOLERANCE &&
+                 fabsf(pq.y - pc.y) < FLOAT_TOLERANCE) ? "yes" : "no");
     }
     SDL_Log(" ");
 
@@ -481,11 +484,11 @@ int main(int argc, char *argv[])
 
     SDL_Log("Flattening cubic Bezier at different tolerances:");
     for (int i = 0; i < num_tol; i++) {
-        vec2 flat_pts[512];
+        vec2 flat_pts[FLATTEN_MAX_POINTS];
         int flat_count = 0;
         flat_pts[flat_count++] = cp0;
         vec2_bezier_cubic_flatten(cp0, cp1, cp2, cp3, tolerances[i],
-                                  flat_pts, 512, &flat_count);
+                                  flat_pts, FLATTEN_MAX_POINTS, &flat_count);
         SDL_Log("  tolerance=%.2f -> %d line segments (%d points)",
                 tolerances[i], flat_count - 1, flat_count);
     }
