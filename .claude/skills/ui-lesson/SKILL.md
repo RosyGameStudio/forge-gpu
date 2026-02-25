@@ -396,7 +396,7 @@ flowchart LR
 For **formulas** (Bezier curves, atlas packing ratios, font scaling), use
 inline `$...$` and display `$$...$$` math notation:
 
-- Inline: `$\text{scale} = \frac{\text{pixel\_height}}{\text{units\_per\_em}}$`
+- Inline: `$\text{scale} = \frac{\text{pixel}\_\text{height}}{\text{units}\_\text{per}\_\text{em}}$`
 - Display math blocks must be split across three lines (CI enforces this):
 
 ```text
