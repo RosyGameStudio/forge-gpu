@@ -237,7 +237,7 @@ build\lessons\ui\NN-topic-name\Debug\NN-topic-name.exe
 - **Find related lessons**: Search for math (vec2, rect), engine (memory,
   structs), and GPU lessons that will consume UI output
 - **Update those lesson READMEs**: Add a note like "See
-  [UI Lesson NN](../../ui/NN-topic/) for details on [concept]"
+  [UI Lesson NN](../../ui/NN-topic-name/) for details on [concept]"
 - **Update UI lesson README**: List related lessons in "Where it's used"
 
 ### 8. Build and test
