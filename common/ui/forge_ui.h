@@ -477,8 +477,26 @@ static bool forge_ui__parse_cmap(ForgeUiFont *font)
     }
 
     Uint16 seg_count_x2 = forge_ui__read_u16(sub + 6);
+
+    /* seg_count_x2 must be nonzero and even */
+    if (seg_count_x2 == 0 || (seg_count_x2 & 1) != 0) {
+        SDL_Log("forge_ui__parse_cmap: invalid segCountX2 = %u "
+                "(must be nonzero and even)", seg_count_x2);
+        return false;
+    }
+
     Uint16 seg_count = seg_count_x2 / 2;
     font->cmap_seg_count = seg_count;
+
+    /* Validate that sub_avail has room for the four parallel arrays plus
+     * the 14-byte header and the 2-byte reservedPad between endCode and
+     * startCode:  14 + segCountX2 + 2 + segCountX2 * 3 = 16 + segCountX2*4 */
+    size_t arrays_end = 16 + (size_t)seg_count_x2 * 4;
+    if (arrays_end > sub_avail) {
+        SDL_Log("forge_ui__parse_cmap: format 4 segment arrays require "
+                "%zu bytes but subtable has %zu", arrays_end, sub_avail);
+        return false;
+    }
 
     /* Allocate arrays for the four parallel segment arrays */
     font->cmap_end_codes = (Uint16 *)SDL_malloc(
@@ -684,10 +702,16 @@ static Uint16 forge_ui_ttf_glyph_index(const ForgeUiFont *font,
              *   if (glyph_index != 0) glyph_index += idDelta[i] */
             Uint32 range_offset = font->cmap_id_range_offsets[i];
             Uint32 char_offset = (Uint32)(cp - font->cmap_start_codes[i]);
-            const Uint8 *glyph_addr = font->cmap_id_range_base +
-                                       (size_t)i * 2 +
-                                       range_offset +
-                                       char_offset * 2;
+            size_t byte_offset = (size_t)i * 2 +
+                                 (size_t)range_offset +
+                                 (size_t)char_offset * 2;
+            const Uint8 *glyph_addr = font->cmap_id_range_base + byte_offset;
+
+            /* Validate that glyph_addr + 2 is within the font buffer */
+            if (glyph_addr < font->data ||
+                glyph_addr + 2 > font->data + font->data_size) {
+                return 0; /* out-of-bounds — return .notdef */
+            }
 
             Uint16 glyph_index = forge_ui__read_u16(glyph_addr);
             if (glyph_index != 0) {

@@ -10,5 +10,14 @@ if(TARGET SDL3::SDL3-shared)
     )
 endif()
 
+# Copy test font next to executable so relative path resolves
+add_custom_command(TARGET test_ui POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:test_ui>/assets/fonts/liberation_mono
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${FORGE_ASSETS_DIR}/fonts/liberation_mono/LiberationMono-Regular.ttf
+        $<TARGET_FILE_DIR:test_ui>/assets/fonts/liberation_mono/LiberationMono-Regular.ttf
+)
+
 # Add as a CTest test
 add_test(NAME ui_ttf_parser COMMAND test_ui)

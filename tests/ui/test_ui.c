@@ -116,7 +116,8 @@ static void test_table_lookup(void)
 
     /* All required tables must be found */
     const char *required[] = {"head", "hhea", "maxp", "cmap", "loca", "glyf"};
-    for (int i = 0; i < 6; i++) {
+    int num_required = (int)(sizeof(required) / sizeof(required[0]));
+    for (int i = 0; i < num_required; i++) {
         const ForgeUiTtfTableEntry *t = forge_ui__find_table(
             &test_font, required[i]);
         if (!t) {
@@ -324,7 +325,7 @@ static void test_glyph_a_first_point(void)
     /* First point: (1034, 0), on-curve */
     ASSERT_EQ_I16(glyph.points[0].x, 1034);
     ASSERT_EQ_I16(glyph.points[0].y, 0);
-    ASSERT_TRUE((glyph.flags[0] & 0x01) != 0); /* on-curve */
+    ASSERT_TRUE((glyph.flags[0] & FORGE_UI__FLAG_ON_CURVE) != 0);
     forge_ui_ttf_glyph_free(&glyph);
 }
 
@@ -419,7 +420,7 @@ int main(int argc, char *argv[])
     SDL_Quit();
 
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
-            test_count, test_count - fail_count, fail_count);
+            test_count, pass_count, fail_count);
 
     return fail_count > 0 ? 1 : 0;
 }
