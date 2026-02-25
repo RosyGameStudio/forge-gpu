@@ -248,6 +248,25 @@ static bool forge_ui__parse_offset_table(ForgeUiFont *font)
         font->tables[i].checksum = forge_ui__read_u32(entry + 4);
         font->tables[i].offset   = forge_ui__read_u32(entry + 8);
         font->tables[i].length   = forge_ui__read_u32(entry + 12);
+
+        /* Validate that the table's offset and length fit within the file.
+         * Promote to uint64_t to avoid overflow when adding offset + length. */
+        Uint64 tbl_offset = (Uint64)font->tables[i].offset;
+        Uint64 tbl_length = (Uint64)font->tables[i].length;
+        if (tbl_offset > font->data_size ||
+            tbl_length > font->data_size ||
+            tbl_offset + tbl_length > font->data_size) {
+            SDL_Log("forge_ui__parse_offset_table: table '%.4s' "
+                    "offset+length (%u+%u) exceeds file size (%zu)",
+                    font->tables[i].tag,
+                    font->tables[i].offset,
+                    font->tables[i].length,
+                    font->data_size);
+            SDL_free(font->tables);
+            font->tables = NULL;
+            return false;
+        }
+
         entry += FORGE_UI__TABLE_ENTRY_SIZE;
     }
 
@@ -378,9 +397,25 @@ static bool forge_ui__parse_cmap(ForgeUiFont *font)
     }
 
     const Uint8 *cmap = font->data + t->offset;
+    Uint32 cmap_length = t->length;
 
-    /* The cmap header has version (uint16) and numTables (uint16) */
+    /* The cmap header has version (uint16) and numTables (uint16) -- 4 bytes */
+    if (cmap_length < 4) {
+        SDL_Log("forge_ui__parse_cmap: 'cmap' table too small for header "
+                "(%u bytes)", cmap_length);
+        return false;
+    }
+
     Uint16 num_subtables = forge_ui__read_u16(cmap + 2);
+
+    /* Validate that the subtable records fit within the cmap table.
+     * Each record is 8 bytes, starting at offset 4. */
+    size_t records_end = (size_t)num_subtables * 8 + 4;
+    if (records_end < 4 || records_end > cmap_length) {
+        SDL_Log("forge_ui__parse_cmap: %u subtable records exceed cmap "
+                "table length (%u bytes)", num_subtables, cmap_length);
+        return false;
+    }
 
     /* Search for a suitable subtable:
      * Priority 1: platform 3 (Windows), encoding 1 (Unicode BMP)
@@ -389,7 +424,13 @@ static bool forge_ui__parse_cmap(ForgeUiFont *font)
     bool found = false;
 
     for (Uint16 i = 0; i < num_subtables; i++) {
-        const Uint8 *rec = cmap + 4 + (size_t)i * 8;
+        size_t rec_off = 4 + (size_t)i * 8;
+        if (rec_off + 8 > cmap_length) {
+            SDL_Log("forge_ui__parse_cmap: subtable record %u extends past "
+                    "cmap table", i);
+            return false;
+        }
+        const Uint8 *rec = cmap + rec_off;
         Uint16 platform = forge_ui__read_u16(rec);
         Uint16 encoding = forge_ui__read_u16(rec + 2);
         Uint32 offset   = forge_ui__read_u32(rec + 4);
@@ -411,12 +452,27 @@ static bool forge_ui__parse_cmap(ForgeUiFont *font)
         return false;
     }
 
+    /* Validate subtable offset before reading the format field */
+    if (subtable_offset + 2 > cmap_length) {
+        SDL_Log("forge_ui__parse_cmap: subtable offset %u exceeds cmap "
+                "table length (%u)", subtable_offset, cmap_length);
+        return false;
+    }
+
     /* Parse the subtable -- we only support format 4 */
     const Uint8 *sub = cmap + subtable_offset;
     Uint16 format = forge_ui__read_u16(sub);
     if (format != 4) {
         SDL_Log("forge_ui__parse_cmap: unsupported cmap format %u "
                 "(only format 4 is implemented)", format);
+        return false;
+    }
+
+    /* Format 4 header is 14 bytes; validate before reading fields */
+    size_t sub_avail = cmap_length - subtable_offset;
+    if (sub_avail < 14) {
+        SDL_Log("forge_ui__parse_cmap: format 4 subtable header truncated "
+                "(%zu bytes available)", sub_avail);
         return false;
     }
 
@@ -484,6 +540,18 @@ static bool forge_ui__parse_loca(ForgeUiFont *font)
     }
 
     Uint32 count = (Uint32)font->maxp.num_glyphs + 1;
+
+    /* Validate that the loca table is large enough for all entries */
+    size_t required_bytes = (font->head.index_to_loc_fmt == 0)
+                                ? (size_t)count * 2
+                                : (size_t)count * 4;
+    if (t->length < required_bytes) {
+        SDL_Log("forge_ui__parse_loca: 'loca' table too small (%u bytes) "
+                "for %u entries (need %zu bytes)",
+                t->length, count, required_bytes);
+        return false;
+    }
+
     font->loca_offsets = (Uint32 *)SDL_malloc(sizeof(Uint32) * count);
     if (!font->loca_offsets) {
         SDL_Log("forge_ui__parse_loca: allocation failed");
@@ -654,14 +722,23 @@ static bool forge_ui_ttf_load_glyph(const ForgeUiFont *font,
         return true;
     }
 
-    const Uint8 *p = font->data + font->glyf_offset + glyph_offset;
+    /* Compute glyph data bounds for all subsequent reads */
+    const Uint8 *glyph_start = font->data + font->glyf_offset + glyph_offset;
+    const Uint8 *glyph_end   = glyph_start + (next_offset - glyph_offset);
+    const Uint8 *p = glyph_start;
 
-    /* The glyph header:
+    /* The glyph header is 10 bytes:
      *   offset 0: numberOfContours (int16) -- negative means compound
      *   offset 2: xMin (int16)
      *   offset 4: yMin (int16)
      *   offset 6: xMax (int16)
      *   offset 8: yMax (int16) */
+    if (p + 10 > glyph_end) {
+        SDL_Log("forge_ui_ttf_load_glyph: glyph %u data too small for header",
+                glyph_index);
+        return false;
+    }
+
     Sint16 num_contours = forge_ui__read_i16(p);
 
     if (num_contours < 0) {
@@ -686,6 +763,13 @@ static bool forge_ui_ttf_load_glyph(const ForgeUiFont *font,
      * giving the index of the last point in each contour. */
     const Uint8 *contour_data = p + 10;
 
+    /* Bounds check: contour endpoints array */
+    if (contour_data + (size_t)num_contours * 2 > glyph_end) {
+        SDL_Log("forge_ui_ttf_load_glyph: glyph %u contour endpoints "
+                "extend past glyph data", glyph_index);
+        return false;
+    }
+
     out_glyph->contour_ends = (Uint16 *)SDL_malloc(
         sizeof(Uint16) * (Uint16)num_contours);
     if (!out_glyph->contour_ends) {
@@ -706,7 +790,25 @@ static bool forge_ui_ttf_load_glyph(const ForgeUiFont *font,
     /* After contour endpoints: uint16 instructionLength, then that many
      * bytes of instructions.  We skip them entirely. */
     const Uint8 *instr_ptr = contour_data + (size_t)num_contours * 2;
+
+    /* Bounds check: instruction length field (2 bytes) */
+    if (instr_ptr + 2 > glyph_end) {
+        SDL_Log("forge_ui_ttf_load_glyph: glyph %u instruction length "
+                "extends past glyph data", glyph_index);
+        forge_ui_ttf_glyph_free(out_glyph);
+        return false;
+    }
+
     Uint16 instr_length = forge_ui__read_u16(instr_ptr);
+
+    /* Bounds check: instruction bytes */
+    if (instr_ptr + 2 + instr_length > glyph_end) {
+        SDL_Log("forge_ui_ttf_load_glyph: glyph %u instruction data "
+                "extends past glyph data", glyph_index);
+        forge_ui_ttf_glyph_free(out_glyph);
+        return false;
+    }
+
     const Uint8 *flag_ptr = instr_ptr + 2 + instr_length;
 
     /* ── Parse flags (with repeat expansion) ─────────────────────────── */
@@ -723,10 +825,22 @@ static bool forge_ui_ttf_load_glyph(const ForgeUiFont *font,
     Uint16 flags_read = 0;
     const Uint8 *fp = flag_ptr;
     while (flags_read < point_count) {
+        if (fp + 1 > glyph_end) {
+            SDL_Log("forge_ui_ttf_load_glyph: glyph %u flag data "
+                    "extends past glyph data", glyph_index);
+            forge_ui_ttf_glyph_free(out_glyph);
+            return false;
+        }
         Uint8 flag = *fp++;
         out_glyph->flags[flags_read++] = flag;
 
         if (flag & FORGE_UI__FLAG_REPEAT) {
+            if (fp + 1 > glyph_end) {
+                SDL_Log("forge_ui_ttf_load_glyph: glyph %u repeat count "
+                        "extends past glyph data", glyph_index);
+                forge_ui_ttf_glyph_free(out_glyph);
+                return false;
+            }
             Uint8 repeat_count = *fp++;
             for (Uint8 r = 0; r < repeat_count && flags_read < point_count; r++) {
                 out_glyph->flags[flags_read++] = flag;
@@ -754,10 +868,22 @@ static bool forge_ui_ttf_load_glyph(const ForgeUiFont *font,
     for (Uint16 i = 0; i < point_count; i++) {
         Uint8 flag = out_glyph->flags[i];
         if (flag & FORGE_UI__FLAG_X_SHORT) {
+            if (coord_ptr + 1 > glyph_end) {
+                SDL_Log("forge_ui_ttf_load_glyph: glyph %u x-coord data "
+                        "extends past glyph data", glyph_index);
+                forge_ui_ttf_glyph_free(out_glyph);
+                return false;
+            }
             Uint8 dx = *coord_ptr++;
             x += (flag & FORGE_UI__FLAG_X_SAME) ? (Sint16)dx : -(Sint16)dx;
         } else {
             if (!(flag & FORGE_UI__FLAG_X_SAME)) {
+                if (coord_ptr + 2 > glyph_end) {
+                    SDL_Log("forge_ui_ttf_load_glyph: glyph %u x-coord data "
+                            "extends past glyph data", glyph_index);
+                    forge_ui_ttf_glyph_free(out_glyph);
+                    return false;
+                }
                 x += forge_ui__read_i16(coord_ptr);
                 coord_ptr += 2;
             }
@@ -771,10 +897,22 @@ static bool forge_ui_ttf_load_glyph(const ForgeUiFont *font,
     for (Uint16 i = 0; i < point_count; i++) {
         Uint8 flag = out_glyph->flags[i];
         if (flag & FORGE_UI__FLAG_Y_SHORT) {
+            if (coord_ptr + 1 > glyph_end) {
+                SDL_Log("forge_ui_ttf_load_glyph: glyph %u y-coord data "
+                        "extends past glyph data", glyph_index);
+                forge_ui_ttf_glyph_free(out_glyph);
+                return false;
+            }
             Uint8 dy = *coord_ptr++;
             y += (flag & FORGE_UI__FLAG_Y_SAME) ? (Sint16)dy : -(Sint16)dy;
         } else {
             if (!(flag & FORGE_UI__FLAG_Y_SAME)) {
+                if (coord_ptr + 2 > glyph_end) {
+                    SDL_Log("forge_ui_ttf_load_glyph: glyph %u y-coord data "
+                            "extends past glyph data", glyph_index);
+                    forge_ui_ttf_glyph_free(out_glyph);
+                    return false;
+                }
                 y += forge_ui__read_i16(coord_ptr);
                 coord_ptr += 2;
             }

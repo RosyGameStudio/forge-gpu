@@ -7,14 +7,10 @@ here.
 Requires: pip install numpy matplotlib
 """
 
-import matplotlib
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 
-matplotlib.use("Agg")
-
-import matplotlib.patches as mpatches  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-
-from ._common import STYLE, save, setup_axes  # noqa: E402
+from ._common import STYLE, save, setup_axes
 
 # ---------------------------------------------------------------------------
 # UI Lesson 01 — TTF Parsing
@@ -155,10 +151,11 @@ def diagram_glyph_anatomy():
     outer_y = [0, 1349, 0, 0, 382, 382, 0, 0]
     on_curve_outer = [True, True, True, True, True, True, True, True]
 
-    # Inner contour (counter/hole) — simplified triangle
-    inner_x = [400, 614, 828, 400]
-    inner_y = [500, 1100, 500, 500]
-    on_curve_inner = [True, True, True, True]
+    # Inner contour (counter/hole) — includes an off-curve control point
+    # to demonstrate quadratic Bezier curves in glyph outlines
+    inner_x = [400, 510, 614, 828, 400]
+    inner_y = [500, 850, 1100, 500, 500]
+    on_curve_inner = [True, False, True, True, True]
 
     # Draw bounding box
     bbox = mpatches.FancyBboxPatch(
@@ -259,7 +256,7 @@ def diagram_glyph_anatomy():
         [],
         [],
         "s",
-        color=STYLE["accent4"],
+        color=STYLE["accent2"],
         label="off-curve point",
         markersize=6,
         markeredgecolor="white",
@@ -291,9 +288,9 @@ def diagram_glyph_anatomy():
 def diagram_endianness():
     """Show big-endian vs little-endian byte layout for uint16 and uint32."""
 
-    fig, ax = plt.subplots(figsize=(8, 3.5))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
     fig.patch.set_facecolor(STYLE["bg"])
-    setup_axes(ax, xlim=(-0.5, 9), ylim=(-0.5, 4.5), grid=False, aspect=None)
+    setup_axes(ax, xlim=(-0.5, 9), ylim=(-1.5, 4.5), grid=False, aspect=None)
     ax.axis("off")
 
     cell_w = 1.0
@@ -392,6 +389,14 @@ def diagram_endianness():
         ["0x00", "0x01", "0x00", "0x00"],
         "Big-endian (TTF)",
         STYLE["accent1"],
+    )
+    draw_bytes(
+        ax,
+        1.0,
+        -1.2,
+        ["0x00", "0x00", "0x01", "0x00"],
+        "Little-endian (x86)",
+        STYLE["accent2"],
     )
 
     save(fig, "ui/01-ttf-parsing", "endianness.png")

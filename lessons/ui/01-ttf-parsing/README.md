@@ -19,6 +19,26 @@ format, read the table directory, and extract font metrics and glyph outlines.
   delta-encoded coordinates)
 - How all this data feeds into future lessons (rasterization, text layout)
 
+## Key concepts
+
+- **Font files are table-based databases, not sequential glyph streams** — a
+  table of contents (the table directory) maps 4-character tags to byte offsets,
+  letting parsers jump directly to the data they need.
+- **Glyph indices are not Unicode codepoints** — the `cmap` table translates
+  codepoints (like U+0041 for 'A') into internal glyph indices. Without this
+  mapping, you cannot locate any glyph.
+- **TTF uses big-endian integers** — platforms like x86 store integers in
+  little-endian order, so every multi-byte read from a TTF file requires
+  explicit byte swapping.
+- **The offset table and table directory are the lookup mechanism** — the
+  12-byte offset table identifies the file as TrueType and tells you how many
+  tables exist; the table directory entries (16 bytes each) give you each
+  table's tag, offset, and length.
+- **loca/glyf relationship** — `loca` is an index of offsets pointing into
+  `glyf`. Each entry in `loca` gives the byte position of a glyph's outline
+  data (contours, on/off-curve points, delta-encoded coordinates) within the
+  `glyf` table.
+
 ## Prerequisites
 
 This is the first UI lesson — no earlier UI lessons are required. If you are
@@ -376,11 +396,13 @@ structures. The most important field is:
 **`numGlyphs`** (offset 4, `uint16`) — the total number of glyphs in the font.
 This value is critical because:
 
-1. It sizes the `loca` table — `loca` has `numGlyphs + 1` entries (the extra
-   entry lets you compute the last glyph's size by subtraction).
-2. It bounds-checks glyph indices — any index >= `numGlyphs` is invalid.
-3. It tells you the capacity of the font — Liberation Mono has 670 glyphs,
-   covering Latin, Cyrillic, and Greek characters plus symbols.
+1. The `loca` table uses this value for sizing — `loca` has `numGlyphs + 1`
+   entries (the extra entry lets you compute the last glyph's size by
+   subtraction).
+2. Glyph indices are bounds-checked against this value — any index >=
+   `numGlyphs` is invalid.
+3. Font capacity: Liberation Mono contains 670 glyphs, covering Latin,
+   Cyrillic, and Greek characters plus symbols.
 
 ### The cmap table — character-to-glyph mapping
 

@@ -29,6 +29,10 @@
 #define SEPARATOR "============================================================"
 #define THIN_SEP  "------------------------------------------------------------"
 
+/* ── Glyph preview constants ────────────────────────────────────────────── */
+#define MAX_PREVIEW_POINTS 10   /* max points to print in detail view */
+#define ON_CURVE_FLAG      0x01 /* bit 0 of glyph flags = on-curve point */
+
 int main(int argc, char *argv[])
 {
     /* Use the command-line argument if provided, otherwise fall back to
@@ -142,11 +146,11 @@ int main(int argc, char *argv[])
 
         /* Print first few points to show the coordinate data */
         Uint16 show_count = glyph_a.point_count;
-        if (show_count > 10) show_count = 10;
+        if (show_count > MAX_PREVIEW_POINTS) show_count = MAX_PREVIEW_POINTS;
 
         SDL_Log("  first %u points:", show_count);
         for (Uint16 i = 0; i < show_count; i++) {
-            bool on_curve = (glyph_a.flags[i] & 0x01) != 0;
+            bool on_curve = (glyph_a.flags[i] & ON_CURVE_FLAG) != 0;
             SDL_Log("    [%2u] (%5d, %5d) %s",
                     i,
                     glyph_a.points[i].x,
