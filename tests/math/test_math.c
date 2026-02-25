@@ -2716,6 +2716,12 @@ static void test_noise_simplex2d_mean_near_zero(void)
  * Bezier Curve Tests (Lesson 15)
  * ══════════════════════════════════════════════════════════════════════════ */
 
+#define BEZIER_SEGMENTS_SMALL   64     /* Segment count for basic length tests */
+#define BEZIER_SEGMENTS_LARGE   128    /* Segment count for convergence tests */
+#define BEZIER_FLAT_TOL         0.001f /* Tolerance for flatness checks */
+#define BEZIER_FLATTEN_OUT_MAX  64     /* Output buffer size for flatten tests */
+#define BEZIER_TEST_TS_COUNT    5      /* Number of t-values for sampling tests */
+
 /* ── Quadratic Bezier evaluation ─────────────────────────────────────── */
 
 static void test_bezier_quadratic_endpoints(void)
@@ -2786,6 +2792,8 @@ static void test_bezier_cubic_symmetric(void)
     vec2 mid = vec2_bezier_cubic(p0, p1, p2, p3, 0.5f);
     /* Midpoint x should be 2.0 by symmetry */
     ASSERT_FLOAT_EQ(mid.x, 2.0f);
+    /* Midpoint y should be average of p0.y and p3.y (both 0) by symmetry */
+    ASSERT_FLOAT_EQ(mid.y, 0.0f);
     END_TEST();
 }
 
@@ -2836,7 +2844,7 @@ static void test_bezier_quadratic_length_straight_line(void)
     vec2 p1 = vec2_create(2.0f, 0.0f);  /* On the line */
     vec2 p2 = vec2_create(4.0f, 0.0f);
 
-    float len = vec2_bezier_quadratic_length(p0, p1, p2, 64);
+    float len = vec2_bezier_quadratic_length(p0, p1, p2, BEZIER_SEGMENTS_SMALL);
     ASSERT_FLOAT_EQ(len, 4.0f);
     END_TEST();
 }
@@ -2849,7 +2857,7 @@ static void test_bezier_cubic_length_straight_line(void)
     vec2 p2 = vec2_create(2.0f, 0.0f);
     vec2 p3 = vec2_create(3.0f, 0.0f);
 
-    float len = vec2_bezier_cubic_length(p0, p1, p2, p3, 64);
+    float len = vec2_bezier_cubic_length(p0, p1, p2, p3, BEZIER_SEGMENTS_SMALL);
     ASSERT_FLOAT_EQ(len, 3.0f);
     END_TEST();
 }
@@ -2862,9 +2870,9 @@ static void test_bezier_cubic_length_convergence(void)
     vec2 p2 = vec2_create(3.0f, 3.0f);
     vec2 p3 = vec2_create(4.0f, 0.0f);
 
-    /* More segments should converge; 128 segs should be close to 64 segs */
-    float len64  = vec2_bezier_cubic_length(p0, p1, p2, p3, 64);
-    float len128 = vec2_bezier_cubic_length(p0, p1, p2, p3, 128);
+    /* More segments should converge; large count should be close to small */
+    float len64  = vec2_bezier_cubic_length(p0, p1, p2, p3, BEZIER_SEGMENTS_SMALL);
+    float len128 = vec2_bezier_cubic_length(p0, p1, p2, p3, BEZIER_SEGMENTS_LARGE);
 
     /* Difference should be very small (converging) */
     float diff = SDL_fabsf(len128 - len64);
@@ -2978,7 +2986,7 @@ static void test_bezier_quadratic_to_cubic(void)
 
     /* Evaluate both at several t values — they should match */
     float test_ts[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < BEZIER_TEST_TS_COUNT; i++) {
         float t = test_ts[i];
         vec2 quad_pt = vec2_bezier_quadratic(p0, p1, p2, t);
         vec2 cubic_pt = vec2_bezier_cubic(cubic[0], cubic[1], cubic[2],
@@ -2998,7 +3006,7 @@ static void test_bezier_quadratic_is_flat_line(void)
     vec2 p1 = vec2_create(2.0f, 0.0f);
     vec2 p2 = vec2_create(4.0f, 0.0f);
 
-    if (!vec2_bezier_quadratic_is_flat(p0, p1, p2, 0.001f)) {
+    if (!vec2_bezier_quadratic_is_flat(p0, p1, p2, BEZIER_FLAT_TOL)) {
         SDL_Log(
                      "    FAIL: Collinear quadratic should be flat");
         fail_count++;
@@ -3007,7 +3015,7 @@ static void test_bezier_quadratic_is_flat_line(void)
 
     /* Non-flat curve should not be flat with tiny tolerance */
     vec2 p1_high = vec2_create(2.0f, 4.0f);
-    if (vec2_bezier_quadratic_is_flat(p0, p1_high, p2, 0.001f)) {
+    if (vec2_bezier_quadratic_is_flat(p0, p1_high, p2, BEZIER_FLAT_TOL)) {
         SDL_Log(
                      "    FAIL: Curved quadratic should not be flat");
         fail_count++;
@@ -3024,7 +3032,7 @@ static void test_bezier_cubic_is_flat_line(void)
     vec2 p2 = vec2_create(2.0f, 0.0f);
     vec2 p3 = vec2_create(3.0f, 0.0f);
 
-    if (!vec2_bezier_cubic_is_flat(p0, p1, p2, p3, 0.001f)) {
+    if (!vec2_bezier_cubic_is_flat(p0, p1, p2, p3, BEZIER_FLAT_TOL)) {
         SDL_Log(
                      "    FAIL: Collinear cubic should be flat");
         fail_count++;
@@ -3034,7 +3042,7 @@ static void test_bezier_cubic_is_flat_line(void)
     /* Non-flat */
     vec2 p1_high = vec2_create(1.0f, 3.0f);
     vec2 p2_high = vec2_create(2.0f, 3.0f);
-    if (vec2_bezier_cubic_is_flat(p0, p1_high, p2_high, p3, 0.001f)) {
+    if (vec2_bezier_cubic_is_flat(p0, p1_high, p2_high, p3, BEZIER_FLAT_TOL)) {
         SDL_Log(
                      "    FAIL: Curved cubic should not be flat");
         fail_count++;
@@ -3050,10 +3058,10 @@ static void test_bezier_quadratic_flatten_line(void)
     vec2 p1 = vec2_create(2.0f, 0.0f);
     vec2 p2 = vec2_create(4.0f, 0.0f);
 
-    vec2 out[64];
+    vec2 out[BEZIER_FLATTEN_OUT_MAX];
     int count = 0;
     out[count++] = p0;  /* Caller writes first point */
-    vec2_bezier_quadratic_flatten(p0, p1, p2, 0.5f, out, 64, &count);
+    vec2_bezier_quadratic_flatten(p0, p1, p2, 0.5f, out, BEZIER_FLATTEN_OUT_MAX, &count);
 
     /* Straight line = only needs start + end = 2 points */
     if (count != 2) {
@@ -3075,10 +3083,10 @@ static void test_bezier_cubic_flatten_line(void)
     vec2 p2 = vec2_create(2.0f, 0.0f);
     vec2 p3 = vec2_create(3.0f, 0.0f);
 
-    vec2 out[64];
+    vec2 out[BEZIER_FLATTEN_OUT_MAX];
     int count = 0;
     out[count++] = p0;
-    vec2_bezier_cubic_flatten(p0, p1, p2, p3, 0.5f, out, 64, &count);
+    vec2_bezier_cubic_flatten(p0, p1, p2, p3, 0.5f, out, BEZIER_FLATTEN_OUT_MAX, &count);
 
     if (count != 2) {
         SDL_Log(

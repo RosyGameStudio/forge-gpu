@@ -45,9 +45,8 @@ graphics, font rendering, animation paths, and vector art.
 This lesson builds on concepts from earlier lessons:
 
 - [Lesson 01 — Vectors](../01-vectors/): vector addition, subtraction,
-  scaling, and the `vec2` type used throughout this lesson
-- [Lesson 01 — Vectors](../01-vectors/): linear interpolation (lerp) —
-  the single most important operation for understanding Bézier curves
+  scaling, the `vec2` type, and linear interpolation (lerp) — the single
+  most important operation for understanding Bézier curves
 
 ## The Math
 
