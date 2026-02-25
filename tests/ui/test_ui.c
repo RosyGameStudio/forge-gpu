@@ -364,6 +364,63 @@ static void test_loca_monotonic(void)
     pass_count++;
 }
 
+/* ── Test: index_to_loc_fmt is valid ─────────────────────────────────────── */
+
+static void test_head_index_to_loc_valid(void)
+{
+    TEST("head: index_to_loc_fmt is 0 or 1");
+    if (!font_loaded) return;
+    ASSERT_TRUE(test_font.head.index_to_loc_fmt == 0 ||
+                test_font.head.index_to_loc_fmt == 1);
+}
+
+/* ── Test: load_glyph rejects reversed loca offsets ──────────────────────── */
+
+static void test_glyph_reject_reversed_loca(void)
+{
+    TEST("load_glyph: rejects reversed loca offsets (next < current)");
+    if (!font_loaded) return;
+
+    /* Use glyph 'A' — it has outline data (non-zero length) */
+    Uint16 idx = forge_ui_ttf_glyph_index(&test_font, 'A');
+
+    /* Save originals and swap so next_offset < glyph_offset */
+    Uint32 saved_cur  = test_font.loca_offsets[idx];
+    Uint32 saved_next = test_font.loca_offsets[idx + 1];
+
+    test_font.loca_offsets[idx]     = saved_next;
+    test_font.loca_offsets[idx + 1] = saved_cur;
+
+    ForgeUiTtfGlyph glyph;
+    bool result = forge_ui_ttf_load_glyph(&test_font, idx, &glyph);
+    ASSERT_TRUE(!result);
+
+    /* Restore */
+    test_font.loca_offsets[idx]     = saved_cur;
+    test_font.loca_offsets[idx + 1] = saved_next;
+}
+
+/* ── Test: load_glyph rejects glyph that extends past file ───────────────── */
+
+static void test_glyph_reject_out_of_bounds_loca(void)
+{
+    TEST("load_glyph: rejects glyph extending past file bounds");
+    if (!font_loaded) return;
+
+    Uint16 idx = forge_ui_ttf_glyph_index(&test_font, 'A');
+
+    /* Save original and set next_offset far past file end */
+    Uint32 saved_next = test_font.loca_offsets[idx + 1];
+    test_font.loca_offsets[idx + 1] = 0xFFFFFFFF;
+
+    ForgeUiTtfGlyph glyph;
+    bool result = forge_ui_ttf_load_glyph(&test_font, idx, &glyph);
+    ASSERT_TRUE(!result);
+
+    /* Restore */
+    test_font.loca_offsets[idx + 1] = saved_next;
+}
+
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -417,6 +474,9 @@ int main(int argc, char *argv[])
 
     /* loca validation */
     test_loca_monotonic();
+    test_head_index_to_loc_valid();
+    test_glyph_reject_reversed_loca();
+    test_glyph_reject_out_of_bounds_loca();
 
     /* Print summary before tearing down SDL (SDL_Log needs SDL alive) */
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
