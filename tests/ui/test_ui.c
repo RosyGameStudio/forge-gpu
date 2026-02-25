@@ -406,11 +406,12 @@ static void test_glyph_reject_reversed_loca(void)
 
     ForgeUiTtfGlyph glyph;
     bool result = forge_ui_ttf_load_glyph(&test_font, idx, &glyph);
-    ASSERT_TRUE(!result);
 
-    /* Restore */
+    /* Restore before asserting — ASSERT_TRUE may early-return */
     test_font.loca_offsets[idx]     = saved_cur;
     test_font.loca_offsets[idx + 1] = saved_next;
+
+    ASSERT_TRUE(!result);
 }
 
 /* ── Test: load_glyph rejects glyph that extends past file ───────────────── */
@@ -428,10 +429,11 @@ static void test_glyph_reject_out_of_bounds_loca(void)
 
     ForgeUiTtfGlyph glyph;
     bool result = forge_ui_ttf_load_glyph(&test_font, idx, &glyph);
-    ASSERT_TRUE(!result);
 
-    /* Restore */
+    /* Restore before asserting — ASSERT_TRUE may early-return */
     test_font.loca_offsets[idx + 1] = saved_next;
+
+    ASSERT_TRUE(!result);
 }
 
 /* ── Main ────────────────────────────────────────────────────────────────── */

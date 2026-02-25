@@ -831,7 +831,15 @@ static bool forge_ui_ttf_load_glyph(const ForgeUiFont *font,
     }
 
     /* Total point count = last contour endpoint + 1 */
-    Uint16 point_count = out_glyph->contour_ends[num_contours - 1] + 1;
+    Uint32 raw_point_count =
+        (Uint32)out_glyph->contour_ends[num_contours - 1] + 1;
+    if (raw_point_count > UINT16_MAX) {
+        SDL_Log("forge_ui_ttf_load_glyph: glyph %u point count %u exceeds "
+                "Uint16 range", glyph_index, raw_point_count);
+        forge_ui_ttf_glyph_free(out_glyph);
+        return false;
+    }
+    Uint16 point_count = (Uint16)raw_point_count;
     out_glyph->point_count = point_count;
 
     /* ── Skip hinting instructions ───────────────────────────────────── */
