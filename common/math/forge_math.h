@@ -5134,6 +5134,13 @@ static inline void vec2_bezier_quadratic_flatten(vec2 p0, vec2 p1, vec2 p2,
 {
     if (*count >= max_out) return;
 
+    /* Guard against NaN/Inf tolerance which would never satisfy the flatness
+     * test, causing infinite recursion.  Fall back to the curve endpoint. */
+    if (!isfinite(tolerance)) {
+        out[(*count)++] = p2;
+        return;
+    }
+
     if (vec2_bezier_quadratic_is_flat(p0, p1, p2, tolerance)) {
         out[(*count)++] = p2;
         return;
@@ -5175,6 +5182,13 @@ static inline void vec2_bezier_cubic_flatten(vec2 p0, vec2 p1, vec2 p2,
                                              int *count)
 {
     if (*count >= max_out) return;
+
+    /* Guard against NaN/Inf tolerance which would never satisfy the flatness
+     * test, causing infinite recursion.  Fall back to the curve endpoint. */
+    if (!isfinite(tolerance)) {
+        out[(*count)++] = p3;
+        return;
+    }
 
     if (vec2_bezier_cubic_is_flat(p0, p1, p2, p3, tolerance)) {
         out[(*count)++] = p3;

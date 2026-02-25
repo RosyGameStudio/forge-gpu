@@ -5661,7 +5661,7 @@ def diagram_continuity():
     # Segment 1
     s1 = [np.array([0, 0]), np.array([1, 2]), np.array([2, 2]), np.array([3, 0])]
     # Segment 2 — C0 only (different tangent direction at junction)
-    s2 = [np.array([3, 0]), np.array([4, -2]), np.array([5, -2]), np.array([6, 0])]
+    s2 = [np.array([3, 0]), np.array([4, 1]), np.array([5, -2]), np.array([6, 0])]
 
     ts = np.linspace(0, 1, 100)
 

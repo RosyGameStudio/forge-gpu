@@ -24,7 +24,15 @@ static void print_vec2(const char *name, vec2 v)
 /* Print a short horizontal line of points sampled along a 2D curve. */
 static void print_curve_samples(const char *label, vec2 *pts, int count)
 {
+    if (count == 0) return;
+
     SDL_Log("%s (%d samples):", label, count);
+
+    if (count == 1) {
+        SDL_Log("  t=0.00  ->  (%.4f, %.4f)", pts[0].x, pts[0].y);
+        return;
+    }
+
     for (int i = 0; i < count; i++) {
         SDL_Log("  t=%.2f  ->  (%.4f, %.4f)",
                 (float)i / (float)(count - 1), pts[i].x, pts[i].y);
