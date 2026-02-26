@@ -50,13 +50,14 @@ when reading the byte-level parsing code.
 
 ## Result
 
-The program loads a `.ttf` file, prints its internal structure (table
-directory, font metrics, cmap lookups, glyph outline data), and rasterizes
-glyph 'A' to a BMP as visual proof that the parser produced valid outlines.
+A console program that loads a `.ttf` file and prints its internal structure:
+table directory, font metrics, cmap lookups, and parsed glyph outline data.
 
-**Rasterized glyph 'A'** (64px, 4x4 supersampled anti-aliasing):
+The program extracts the raw contour points that define each glyph shape —
+on-curve points that lie on the outline, and off-curve control points that
+define quadratic Bézier curves:
 
-![Glyph A rasterized from parsed TTF data](assets/glyph_A.bmp)
+![Glyph anatomy showing contours and points](assets/glyph_anatomy.png)
 
 ## Background
 

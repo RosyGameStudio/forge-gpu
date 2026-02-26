@@ -7,7 +7,8 @@ target_include_directories(ui-01-ttf-parsing PRIVATE ${FORGE_COMMON_DIR})
 target_link_libraries(ui-01-ttf-parsing PRIVATE SDL3::SDL3)
 
 # Link math library on platforms that require it (Linux, etc.)
-# The rasterizer uses sqrt, ceil, floor via SDL wrapper functions.
+# The header-only forge_ui.h contains static rasterization functions that
+# reference sqrt/ceil/floor -- these need libm even if main.c doesn't call them.
 if(UNIX AND NOT APPLE)
     target_link_libraries(ui-01-ttf-parsing PRIVATE m)
 endif()
