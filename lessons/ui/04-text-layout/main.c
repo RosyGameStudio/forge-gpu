@@ -171,6 +171,14 @@ int main(int argc, char *argv[])
     SDL_Log("  descender:   %d (font units)", font.hhea.descender);
     SDL_Log("  lineGap:     %d (font units)", font.hhea.line_gap);
 
+    /* Guard against malformed fonts with zero unitsPerEm */
+    if (font.head.units_per_em == 0) {
+        SDL_Log("  [!] units_per_em is 0 (invalid font), cannot compute scale");
+        forge_ui_ttf_free(&font);
+        SDL_Quit();
+        return 1;
+    }
+
     float scale = PIXEL_HEIGHT / (float)font.head.units_per_em;
     float ascender_px  = (float)font.hhea.ascender * scale;
     float descender_px = (float)font.hhea.descender * scale;

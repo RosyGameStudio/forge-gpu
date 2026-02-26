@@ -2688,10 +2688,23 @@ static bool forge_ui_text_layout(const ForgeUiFontAtlas *atlas,
         capacity = FORGE_UI__INITIAL_CHAR_CAPACITY;
     }
 
-    ForgeUiVertex *verts = (ForgeUiVertex *)SDL_malloc(
-        sizeof(ForgeUiVertex) * (size_t)capacity * FORGE_UI__VERTS_PER_QUAD);
-    Uint32 *indices = (Uint32 *)SDL_malloc(
-        sizeof(Uint32) * (size_t)capacity * FORGE_UI__INDICES_PER_QUAD);
+    /* Use size_t for allocation arithmetic to avoid overflow on 32-bit.
+     * Check before multiplying: cap * VERTS_PER_QUAD * sizeof(vertex)
+     * could exceed SIZE_MAX when capacity is large. */
+    size_t cap = (size_t)capacity;
+    if (cap > SIZE_MAX / (FORGE_UI__VERTS_PER_QUAD * sizeof(ForgeUiVertex))) {
+        SDL_Log("forge_ui_text_layout: allocation size overflow (vertices)");
+        return false;
+    }
+    if (cap > SIZE_MAX / (FORGE_UI__INDICES_PER_QUAD * sizeof(Uint32))) {
+        SDL_Log("forge_ui_text_layout: allocation size overflow (indices)");
+        return false;
+    }
+    size_t verts_bytes   = cap * FORGE_UI__VERTS_PER_QUAD * sizeof(ForgeUiVertex);
+    size_t indices_bytes = cap * FORGE_UI__INDICES_PER_QUAD * sizeof(Uint32);
+
+    ForgeUiVertex *verts = (ForgeUiVertex *)SDL_malloc(verts_bytes);
+    Uint32 *indices = (Uint32 *)SDL_malloc(indices_bytes);
 
     if (!verts || !indices) {
         SDL_Log("forge_ui_text_layout: allocation failed");

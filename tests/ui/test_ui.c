@@ -1193,7 +1193,9 @@ static void test_layout_space_no_quad(void)
 
     /* But total width should include the space advance */
     ForgeUiTextLayout layout_ab;
-    forge_ui_text_layout(&test_atlas, "AB", 0.0f, 0.0f, NULL, &layout_ab);
+    bool result_ab = forge_ui_text_layout(&test_atlas, "AB", 0.0f, 0.0f,
+                                           NULL, &layout_ab);
+    ASSERT_TRUE(result_ab);
     ASSERT_TRUE(layout.total_width > layout_ab.total_width);
 
     forge_ui_text_layout_free(&layout);
@@ -1219,7 +1221,9 @@ static void test_layout_newline(void)
 
     /* Total height should accommodate 3 lines */
     ForgeUiTextLayout single;
-    forge_ui_text_layout(&test_atlas, "A", 0.0f, 0.0f, NULL, &single);
+    bool result_s = forge_ui_text_layout(&test_atlas, "A", 0.0f, 0.0f,
+                                          NULL, &single);
+    ASSERT_TRUE(result_s);
     ASSERT_TRUE(layout.total_height > single.total_height);
 
     forge_ui_text_layout_free(&layout);
