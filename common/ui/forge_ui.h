@@ -2410,6 +2410,8 @@ static void forge_ui_atlas_free(ForgeUiFontAtlas *atlas)
 static const ForgeUiPackedGlyph *forge_ui_atlas_lookup(
     const ForgeUiFontAtlas *atlas, Uint32 codepoint)
 {
+    if (!atlas) return NULL;
+
     /* Linear search — the glyph count is small (typically < 200) */
     for (int i = 0; i < atlas->glyph_count; i++) {
         if (atlas->glyphs[i].codepoint == codepoint) {
