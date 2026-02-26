@@ -46,122 +46,21 @@ This lesson builds on:
 ## Result
 
 The example program loads Liberation Mono, rasterizes four glyphs at 64px
-height, writes each as a BMP file, and shows the difference between binary
-and anti-aliased rasterization.
+height, and writes each as a BMP file. It also produces an anti-aliasing
+comparison for the letter 'A'.
 
-**Example output:**
+**Rasterized glyphs** (64px, 4x4 supersampled anti-aliasing):
 
-```text
-INFO: UI Lesson 02 -- Glyph Rasterization
-INFO: ============================================================
-INFO: Loading font: assets/fonts/liberation_mono/LiberationMono-Regular.ttf
-INFO:   unitsPerEm:    2048
-INFO:   ascender:      1705
-INFO:   descender:     -615
-INFO: ============================================================
-INFO: GLYPH: 'A' (two contours: outer shape + triangular hole)
-INFO: ------------------------------------------------------------
-INFO:   glyph index:   36
-INFO:   contours:      2
-INFO:   points:        21
-INFO:   bbox (font):   (0, 0) to (1228, 1349)
-INFO:   on-curve pts:  13
-INFO:   off-curve pts: 8
-INFO:   scale factor:  0.031250 (64px / 2048 unitsPerEm)
-INFO:   bitmap size:   41 x 45 pixels
-INFO:   bearing:       (-1, 44)
-INFO:   anti-aliasing: 4x4 supersampling (16 samples/pixel)
-INFO:   saved:         glyph_A.bmp
-INFO: ============================================================
-INFO: GLYPH: 'O' (two contours: outer + inner counter)
-INFO: ------------------------------------------------------------
-INFO:   glyph index:   50
-INFO:   contours:      2
-INFO:   points:        30
-INFO:   bbox (font):   (102, -20) to (1126, 1370)
-INFO:   on-curve pts:  8
-INFO:   off-curve pts: 22
-INFO:   scale factor:  0.031250 (64px / 2048 unitsPerEm)
-INFO:   bitmap size:   34 x 46 pixels
-INFO:   bearing:       (2, 44)
-INFO:   anti-aliasing: 4x4 supersampling (16 samples/pixel)
-INFO:   saved:         glyph_O.bmp
-INFO: ============================================================
-INFO: GLYPH: 'g' (has descender -- extends below baseline)
-INFO: ------------------------------------------------------------
-INFO:   glyph index:   74
-INFO:   contours:      2
-INFO:   points:        70
-INFO:   bbox (font):   (143, -424) to (1054, 1099)
-INFO:   on-curve pts:  20
-INFO:   off-curve pts: 50
-INFO:   scale factor:  0.031250 (64px / 2048 unitsPerEm)
-INFO:   bitmap size:   31 x 50 pixels
-INFO:   bearing:       (3, 36)
-INFO:   anti-aliasing: 4x4 supersampling (16 samples/pixel)
-INFO:   saved:         glyph_g.bmp
-INFO: ============================================================
-INFO: GLYPH: 'i' (two contours: stem + dot)
-INFO: ------------------------------------------------------------
-INFO:   glyph index:   76
-INFO:   contours:      2
-INFO:   points:        14
-INFO:   bbox (font):   (143, 0) to (1125, 1484)
-INFO:   on-curve pts:  14
-INFO:   off-curve pts: 0
-INFO:   scale factor:  0.031250 (64px / 2048 unitsPerEm)
-INFO:   bitmap size:   33 x 49 pixels
-INFO:   bearing:       (3, 48)
-INFO:   anti-aliasing: 4x4 supersampling (16 samples/pixel)
-INFO:   saved:         glyph_i.bmp
-INFO: ============================================================
-INFO: ANTI-ALIASING COMPARISON: 'A'
-INFO: ------------------------------------------------------------
-INFO: Without anti-aliasing (1x1, binary):
-INFO:   glyph index:   36
-INFO:   contours:      2
-INFO:   points:        21
-INFO:   bbox (font):   (0, 0) to (1228, 1349)
-INFO:   on-curve pts:  13
-INFO:   off-curve pts: 8
-INFO:   scale factor:  0.031250 (64px / 2048 unitsPerEm)
-INFO:   bitmap size:   41 x 45 pixels
-INFO:   bearing:       (-1, 44)
-INFO:   anti-aliasing: 1x1 supersampling (1 samples/pixel)
-INFO:   saved:         glyph_A_noaa.bmp
-INFO:
-INFO: With anti-aliasing (4x4 supersampling):
-INFO:   glyph index:   36
-INFO:   contours:      2
-INFO:   points:        21
-INFO:   bbox (font):   (0, 0) to (1228, 1349)
-INFO:   on-curve pts:  13
-INFO:   off-curve pts: 8
-INFO:   scale factor:  0.031250 (64px / 2048 unitsPerEm)
-INFO:   bitmap size:   41 x 45 pixels
-INFO:   bearing:       (-1, 44)
-INFO:   anti-aliasing: 4x4 supersampling (16 samples/pixel)
-INFO:   saved:         glyph_A_aa.bmp
-INFO: ============================================================
-INFO: PIPELINE SUMMARY
-INFO: ------------------------------------------------------------
-INFO:   1. Load font:     forge_ui_ttf_load()
-INFO:   2. Look up glyph: forge_ui_ttf_glyph_index()
-INFO:   3. Rasterize:     forge_ui_rasterize_glyph()
-INFO:   4. Use bitmap:    width, height, pixels (alpha coverage)
-INFO:   5. Free bitmap:   forge_ui_glyph_bitmap_free()
-INFO:
-INFO: Each bitmap is a single-channel alpha coverage map:
-INFO:   0   = pixel is fully outside the glyph
-INFO:   255 = pixel is fully inside the glyph
-INFO:   1-254 = partial coverage (anti-aliased edge)
-INFO:
-INFO: The font atlas lesson (UI 03) will pack these bitmaps
-INFO: into a single texture.  The GPU samples the alpha and
-INFO: multiplies by a text color -- color is NOT in the bitmap.
-INFO: ============================================================
-INFO: Done. BMP files written to the current directory.
-```
+| A | O | g | i |
+|---|---|---|---|
+| ![A](assets/glyph_A.bmp) | ![O](assets/glyph_O.bmp) | ![g](assets/glyph_g.bmp) | ![i](assets/glyph_i.bmp) |
+
+**Anti-aliasing comparison** — 'A' without (left) and with (right) 4x4
+supersampling:
+
+| Without anti-aliasing | With anti-aliasing |
+|-----------------------|--------------------|
+| ![A without AA](assets/glyph_A_noaa.bmp) | ![A with AA](assets/glyph_A_aa.bmp) |
 
 ## Key concepts
 

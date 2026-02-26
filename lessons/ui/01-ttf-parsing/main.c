@@ -33,6 +33,103 @@
 #define MAX_PREVIEW_POINTS 10   /* max points to print in detail view */
 #define ON_CURVE_FLAG      0x01 /* bit 0 of glyph flags = on-curve point */
 
+/* ── Rasterization parameters (visual proof that parsing works) ─────────── */
+#define PIXEL_HEIGHT 64.0f       /* render at 64 pixels tall */
+#define SS_LEVEL     4           /* 4x4 supersampling for anti-aliasing */
+
+/* ── BMP file writing ────────────────────────────────────────────────────── */
+/* Write a single-channel grayscale bitmap as a BMP file.
+ *
+ * BMP format stores pixels bottom-up (row 0 = bottom of image) with each
+ * row padded to a 4-byte boundary.  We write an 8-bit indexed BMP with a
+ * 256-entry grayscale palette (0=black, 255=white). */
+
+#define BMP_HEADER_SIZE   14     /* BITMAPFILEHEADER size */
+#define BMP_INFO_SIZE     40     /* BITMAPINFOHEADER size */
+#define BMP_PALETTE_SIZE  1024   /* 256 entries * 4 bytes (BGRA) */
+
+static bool write_grayscale_bmp(const char *path,
+                                 const Uint8 *pixels,
+                                 int width, int height)
+{
+    /* Each row must be padded to a 4-byte boundary */
+    int row_stride = (width + 3) & ~3;
+    Uint32 pixel_data_size = (Uint32)(row_stride * height);
+    Uint32 file_size = BMP_HEADER_SIZE + BMP_INFO_SIZE +
+                       BMP_PALETTE_SIZE + pixel_data_size;
+
+    Uint8 *buf = (Uint8 *)SDL_calloc(file_size, 1);
+    if (!buf) {
+        SDL_Log("write_grayscale_bmp: allocation failed");
+        return false;
+    }
+
+    /* BITMAPFILEHEADER (14 bytes) */
+    buf[0] = 'B'; buf[1] = 'M';
+    buf[2] = (Uint8)(file_size);
+    buf[3] = (Uint8)(file_size >> 8);
+    buf[4] = (Uint8)(file_size >> 16);
+    buf[5] = (Uint8)(file_size >> 24);
+    Uint32 data_offset = BMP_HEADER_SIZE + BMP_INFO_SIZE + BMP_PALETTE_SIZE;
+    buf[10] = (Uint8)(data_offset);
+    buf[11] = (Uint8)(data_offset >> 8);
+    buf[12] = (Uint8)(data_offset >> 16);
+    buf[13] = (Uint8)(data_offset >> 24);
+
+    /* BITMAPINFOHEADER (40 bytes) */
+    Uint8 *info = buf + BMP_HEADER_SIZE;
+    info[0] = BMP_INFO_SIZE;
+    info[4] = (Uint8)(width);
+    info[5] = (Uint8)(width >> 8);
+    info[6] = (Uint8)(width >> 16);
+    info[7] = (Uint8)(width >> 24);
+    info[8]  = (Uint8)(height);
+    info[9]  = (Uint8)(height >> 8);
+    info[10] = (Uint8)(height >> 16);
+    info[11] = (Uint8)(height >> 24);
+    info[12] = 1;                                /* planes = 1 */
+    info[14] = 8;                                /* bits per pixel = 8 */
+    info[20] = (Uint8)(pixel_data_size);
+    info[21] = (Uint8)(pixel_data_size >> 8);
+    info[22] = (Uint8)(pixel_data_size >> 16);
+    info[23] = (Uint8)(pixel_data_size >> 24);
+
+    /* Grayscale palette: 256 entries, each (B, G, R, 0) */
+    Uint8 *palette = buf + BMP_HEADER_SIZE + BMP_INFO_SIZE;
+    for (int i = 0; i < 256; i++) {
+        palette[i * 4 + 0] = (Uint8)i;
+        palette[i * 4 + 1] = (Uint8)i;
+        palette[i * 4 + 2] = (Uint8)i;
+        palette[i * 4 + 3] = 0;
+    }
+
+    /* Pixel data: BMP stores rows bottom-up, so flip vertically */
+    Uint8 *pixel_dst = buf + data_offset;
+    for (int y = 0; y < height; y++) {
+        int bmp_row = height - 1 - y;
+        SDL_memcpy(&pixel_dst[bmp_row * row_stride],
+                   &pixels[y * width],
+                   (size_t)width);
+    }
+
+    FILE *fp = fopen(path, "wb");
+    if (!fp) {
+        SDL_Log("write_grayscale_bmp: failed to open '%s' for writing", path);
+        SDL_free(buf);
+        return false;
+    }
+    size_t written = fwrite(buf, 1, file_size, fp);
+    fclose(fp);
+    SDL_free(buf);
+
+    if (written != file_size) {
+        SDL_Log("write_grayscale_bmp: incomplete write to '%s' "
+                "(%zu of %u bytes)", path, written, file_size);
+        return false;
+    }
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
     /* Use the command-line argument if provided, otherwise fall back to
@@ -166,8 +263,34 @@ int main(int argc, char *argv[])
         SDL_Log("  Failed to load glyph 'A'");
     }
 
+    /* ── Visual proof: rasterize 'A' to a BMP ─────────────────────────── */
+    /* Rasterize the glyph we just inspected to show that the parsing
+     * produced valid outline data.  This is a preview of what
+     * UI Lesson 02 (Glyph Rasterization) covers in depth. */
     SDL_Log("%s", SEPARATOR);
-    SDL_Log("Done.");
+    SDL_Log("VISUAL PROOF: Rasterize 'A' to BMP");
+    SDL_Log("%s", THIN_SEP);
+
+    ForgeUiRasterOpts opts;
+    opts.supersample_level = SS_LEVEL;
+
+    ForgeUiGlyphBitmap bitmap;
+    if (forge_ui_rasterize_glyph(&font, a_index, PIXEL_HEIGHT,
+                                  &opts, &bitmap)) {
+        SDL_Log("  bitmap size:   %d x %d pixels", bitmap.width, bitmap.height);
+        SDL_Log("  bearing:       (%d, %d)", bitmap.bearing_x, bitmap.bearing_y);
+
+        if (write_grayscale_bmp("glyph_A.bmp", bitmap.pixels,
+                                 bitmap.width, bitmap.height)) {
+            SDL_Log("  saved:         glyph_A.bmp");
+        }
+        forge_ui_glyph_bitmap_free(&bitmap);
+    } else {
+        SDL_Log("  Failed to rasterize 'A'");
+    }
+
+    SDL_Log("%s", SEPARATOR);
+    SDL_Log("Done. BMP file written to the current directory.");
 
     /* ── Cleanup ─────────────────────────────────────────────────────── */
     forge_ui_ttf_free(&font);
