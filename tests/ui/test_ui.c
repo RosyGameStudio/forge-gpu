@@ -927,6 +927,13 @@ static void test_atlas_uv_roundtrip(void)
     int px1 = (int)(g->uv.u1 * (float)atlas.width + 0.5f);
     int py1 = (int)(g->uv.v1 * (float)atlas.height + 0.5f);
 
+    /* Validate pixel coordinates are within atlas bounds before indexing
+     * into atlas.pixels[] in the loop below. */
+    ASSERT_TRUE(px >= 0 && px < atlas.width);
+    ASSERT_TRUE(py >= 0 && py < atlas.height);
+    ASSERT_TRUE(px1 > 0 && px1 <= atlas.width);
+    ASSERT_TRUE(py1 > 0 && py1 <= atlas.height);
+
     /* The UV-derived width and height should match bitmap_w and bitmap_h */
     ASSERT_EQ_INT(px1 - px, g->bitmap_w);
     ASSERT_EQ_INT(py1 - py, g->bitmap_h);

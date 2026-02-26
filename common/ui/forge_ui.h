@@ -48,6 +48,7 @@
 #define FORGE_UI_H
 
 #include <SDL3/SDL.h>
+#include <stdio.h>   /* FILE, fopen, fwrite, fclose for BMP writing */
 
 /* ── Public Constants ────────────────────────────────────────────────────── */
 
@@ -1902,6 +1903,22 @@ static bool forge_ui__write_grayscale_bmp(const char *path,
                                            const Uint8 *pixels,
                                            int width, int height)
 {
+    /* Validate arguments — prevent negative/zero dimensions from producing
+     * invalid arithmetic for row_stride, pixel_data_size, and file_size. */
+    if (!path) {
+        SDL_Log("forge_ui__write_grayscale_bmp: path is NULL");
+        return false;
+    }
+    if (!pixels) {
+        SDL_Log("forge_ui__write_grayscale_bmp: pixels is NULL");
+        return false;
+    }
+    if (width <= 0 || height <= 0) {
+        SDL_Log("forge_ui__write_grayscale_bmp: invalid dimensions %dx%d",
+                width, height);
+        return false;
+    }
+
     /* Each row must be padded to a 4-byte boundary */
     int row_stride = (width + 3) & ~3;
     Uint32 pixel_data_size = (Uint32)(row_stride * height);
@@ -2002,6 +2019,10 @@ static bool forge_ui__write_grayscale_bmp(const char *path,
 /* White pixel region size — a 2x2 block of fully white (255) pixels
  * used for drawing solid-colored geometry without switching textures. */
 #define FORGE_UI__WHITE_SIZE     2
+
+/* Safety margin multiplied into the area estimate to account for shelf-packing
+ * inefficiency (row gaps above short glyphs, wasted ends of rows). */
+#define FORGE_UI__PACKING_SAFETY_MARGIN  1.15f
 
 /* ── Internal: temporary glyph data during atlas building ──────────────── */
 
@@ -2107,19 +2128,22 @@ static bool forge_ui__find_atlas_size(ForgeUi__GlyphEntry *entries,
                                        int *out_w, int *out_h)
 {
     /* Estimate total area needed (sum of padded glyph areas + white pixel).
-     * Multiply by 1.15 to account for shelf-packing inefficiency — rows waste
-     * the vertical gap above short glyphs, and row breaks waste horizontal
-     * space at the end of each row. */
-    int total_area = FORGE_UI__WHITE_SIZE * FORGE_UI__WHITE_SIZE;
+     * Use 64-bit arithmetic to avoid overflow when many large glyphs are
+     * present.  Multiply by the packing safety margin to account for shelf
+     * inefficiency (row gaps above short glyphs, wasted row ends). */
+    Uint64 total_area_u = (Uint64)FORGE_UI__WHITE_SIZE * FORGE_UI__WHITE_SIZE;
     for (int i = 0; i < count; i++) {
-        int pw = entries[i].bitmap.width + padding * 2;
-        int ph = entries[i].bitmap.height + padding * 2;
-        total_area += pw * ph;
+        Uint64 pw = (Uint64)(entries[i].bitmap.width + padding * 2);
+        Uint64 ph = (Uint64)(entries[i].bitmap.height + padding * 2);
+        total_area_u += pw * ph;
     }
-    total_area = (int)((float)total_area * 1.15f);
-    /* Clamp to maximum atlas area to avoid overflow */
-    int max_area = FORGE_UI__MAX_ATLAS_DIM * FORGE_UI__MAX_ATLAS_DIM;
-    if (total_area > max_area) total_area = max_area;
+    total_area_u = (Uint64)((double)total_area_u *
+                            (double)FORGE_UI__PACKING_SAFETY_MARGIN);
+    /* Clamp to maximum atlas area to avoid overflow when cast to int */
+    Uint64 max_area = (Uint64)FORGE_UI__MAX_ATLAS_DIM *
+                      (Uint64)FORGE_UI__MAX_ATLAS_DIM;
+    if (total_area_u > max_area) total_area_u = max_area;
+    int total_area = (int)total_area_u;
 
     /* Find the smallest power-of-two square that exceeds the total area */
     int size = FORGE_UI__MIN_ATLAS_DIM;
@@ -2161,10 +2185,23 @@ static bool forge_ui_atlas_build(const ForgeUiFont *font,
                                   int padding,
                                   ForgeUiFontAtlas *out_atlas)
 {
+    /* Validate public pointer arguments before any dereference */
+    if (!out_atlas) {
+        SDL_Log("forge_ui_atlas_build: out_atlas is NULL");
+        return false;
+    }
     SDL_memset(out_atlas, 0, sizeof(ForgeUiFontAtlas));
 
+    if (!font) {
+        SDL_Log("forge_ui_atlas_build: font is NULL");
+        return false;
+    }
     if (codepoint_count <= 0) {
         SDL_Log("forge_ui_atlas_build: no codepoints provided");
+        return false;
+    }
+    if (!codepoints) {
+        SDL_Log("forge_ui_atlas_build: codepoints is NULL");
         return false;
     }
     if (padding < 0) padding = 0;
