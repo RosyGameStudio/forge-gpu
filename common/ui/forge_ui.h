@@ -1076,6 +1076,14 @@ static void forge_ui_ttf_glyph_free(ForgeUiTtfGlyph *glyph)
  * being clipped at the bitmap boundary. */
 #define FORGE_UI__BITMAP_PAD    1
 
+/* Default supersampling level when no ForgeUiRasterOpts are provided.
+ * 4 means 4x4 = 16 samples per pixel — good balance of quality and speed. */
+#define FORGE_UI__DEFAULT_SS    4
+
+/* Floating-point comparison epsilon for near-zero tests in the quadratic
+ * solver and degenerate edge detection. */
+#define FORGE_UI__EPSILON       1e-6f
+
 typedef struct ForgeUi__Edge {
     int type;           /* FORGE_UI__EDGE_LINE or FORGE_UI__EDGE_QUAD */
     float x0, y0;       /* start point (scaled pixels, y-flipped) */
@@ -1087,8 +1095,8 @@ typedef struct ForgeUi__Edge {
 /* A scanline crossing: the x position and winding direction where a
  * contour edge crosses a given y-coordinate. */
 typedef struct ForgeUi__Crossing {
-    float x;
-    int   winding;
+    float x;       /* x-coordinate where the edge crosses the scanline */
+    int   winding; /* +1 (upward crossing) or -1 (downward crossing) */
 } ForgeUi__Crossing;
 
 /* ── Contour reconstruction helpers ──────────────────────────────────────── */
@@ -1300,9 +1308,9 @@ static int forge_ui__quad_crossings(
     float t_values[2];
     int t_count = 0;
 
-    if (SDL_fabsf(a) < 1e-6f) {
+    if (SDL_fabsf(a) < FORGE_UI__EPSILON) {
         /* Near-linear: solve b*t + c = 0 */
-        if (SDL_fabsf(b) > 1e-6f) {
+        if (SDL_fabsf(b) > FORGE_UI__EPSILON) {
             float t = -c / b;
             if (t >= 0.0f && t < 1.0f) {
                 t_values[t_count++] = t;
@@ -1318,7 +1326,7 @@ static int forge_ui__quad_crossings(
             float t2 = (-b + sqrt_disc) * inv_2a;
 
             if (t1 >= 0.0f && t1 < 1.0f) t_values[t_count++] = t1;
-            if (t2 >= 0.0f && t2 < 1.0f && SDL_fabsf(t2 - t1) > 1e-6f) {
+            if (t2 >= 0.0f && t2 < 1.0f && SDL_fabsf(t2 - t1) > FORGE_UI__EPSILON) {
                 t_values[t_count++] = t2;
             }
         }
@@ -1413,7 +1421,7 @@ static void forge_ui__rasterize_scanline(
 
             /* Clamp to bitmap bounds */
             int px_start = (int)fill_start;
-            int px_end   = (int)(fill_end + 0.999f);
+            int px_end   = (int)SDL_ceilf(fill_end);
             if (px_start < 0) px_start = 0;
             if (px_end > width) px_end = width;
 
@@ -1443,7 +1451,7 @@ static bool forge_ui_rasterize_glyph(const ForgeUiFont *font,
     SDL_memset(out_bitmap, 0, sizeof(ForgeUiGlyphBitmap));
 
     /* Default options: 4x4 supersampling */
-    int ss = 4;
+    int ss = FORGE_UI__DEFAULT_SS;
     if (opts && opts->supersample_level >= 1) {
         ss = opts->supersample_level;
     }

@@ -224,7 +224,7 @@ midpoint. This is not a special type of curve — it just means the font stored
 one fewer point because the on-curve point can be computed:
 
 $$
-P_{\text{mid}} = \frac{P_{\text{off}_1} + P_{\text{off}_2}}{2}
+P_{\text{mid}} = \frac{P_{\text{off1}} + P_{\text{off2}}}{2}
 $$
 
 This implicit midpoint rule is a compression technique. Most curves in letter
@@ -296,7 +296,7 @@ Mono uses 2048 units per em (typical for TrueType fonts).
 To render at a specific pixel size, you need a scale factor:
 
 $$
-\text{scale} = \frac{\text{pixel\_height}}{\text{unitsPerEm}}
+\text{scale} = \frac{\text{pixel height}}{\text{unitsPerEm}}
 $$
 
 For rendering at 64px with unitsPerEm = 2048:
