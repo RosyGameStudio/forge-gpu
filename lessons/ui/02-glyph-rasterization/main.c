@@ -205,10 +205,12 @@ static bool rasterize_and_report(const ForgeUiFont *font,
 
     /* Write BMP */
     if (bmp_path) {
-        if (write_grayscale_bmp(bmp_path, bitmap.pixels,
-                                 bitmap.width, bitmap.height)) {
-            SDL_Log("  saved:         %s", bmp_path);
+        if (!write_grayscale_bmp(bmp_path, bitmap.pixels,
+                                  bitmap.width, bitmap.height)) {
+            forge_ui_glyph_bitmap_free(&bitmap);
+            return false;
         }
+        SDL_Log("  saved:         %s", bmp_path);
     }
 
     forge_ui_glyph_bitmap_free(&bitmap);
@@ -243,34 +245,43 @@ int main(int argc, char *argv[])
     SDL_Log("  descender:     %d", font.hhea.descender);
 
     /* ── Rasterize test glyphs ──────────────────────────────────────── */
+    bool ok = true;
 
     /* 'A' -- two contours (outer triangle + inner counter/hole) */
     SDL_Log("%s", SEPARATOR);
     SDL_Log("GLYPH: 'A' (two contours: outer shape + triangular hole)");
     SDL_Log("%s", THIN_SEP);
-    rasterize_and_report(&font, 'A', "A", "glyph_A.bmp",
-                          PIXEL_HEIGHT, SS_LEVEL);
+    if (!rasterize_and_report(&font, 'A', "A", "glyph_A.bmp",
+                               PIXEL_HEIGHT, SS_LEVEL)) {
+        ok = false;
+    }
 
     /* 'O' -- two contours (outer oval + inner hole, demonstrates winding) */
     SDL_Log("%s", SEPARATOR);
     SDL_Log("GLYPH: 'O' (two contours: outer + inner counter)");
     SDL_Log("%s", THIN_SEP);
-    rasterize_and_report(&font, 'O', "O", "glyph_O.bmp",
-                          PIXEL_HEIGHT, SS_LEVEL);
+    if (!rasterize_and_report(&font, 'O', "O", "glyph_O.bmp",
+                               PIXEL_HEIGHT, SS_LEVEL)) {
+        ok = false;
+    }
 
     /* 'g' -- has a descender (extends below baseline) */
     SDL_Log("%s", SEPARATOR);
     SDL_Log("GLYPH: 'g' (has descender -- extends below baseline)");
     SDL_Log("%s", THIN_SEP);
-    rasterize_and_report(&font, 'g', "g", "glyph_g.bmp",
-                          PIXEL_HEIGHT, SS_LEVEL);
+    if (!rasterize_and_report(&font, 'g', "g", "glyph_g.bmp",
+                               PIXEL_HEIGHT, SS_LEVEL)) {
+        ok = false;
+    }
 
     /* 'i' -- simple glyph with dot (two separate contours) */
     SDL_Log("%s", SEPARATOR);
     SDL_Log("GLYPH: 'i' (two contours: stem + dot)");
     SDL_Log("%s", THIN_SEP);
-    rasterize_and_report(&font, 'i', "i", "glyph_i.bmp",
-                          PIXEL_HEIGHT, SS_LEVEL);
+    if (!rasterize_and_report(&font, 'i', "i", "glyph_i.bmp",
+                               PIXEL_HEIGHT, SS_LEVEL)) {
+        ok = false;
+    }
 
     /* ── Anti-aliasing comparison: 'A' with and without ─────────────── */
     SDL_Log("%s", SEPARATOR);
@@ -279,15 +290,19 @@ int main(int argc, char *argv[])
 
     /* No anti-aliasing (1x1 = binary on/off) */
     SDL_Log("Without anti-aliasing (1x1, binary):");
-    rasterize_and_report(&font, 'A', "A_noaa", "glyph_A_noaa.bmp",
-                          PIXEL_HEIGHT, 1);
+    if (!rasterize_and_report(&font, 'A', "A_noaa", "glyph_A_noaa.bmp",
+                               PIXEL_HEIGHT, 1)) {
+        ok = false;
+    }
 
     SDL_Log("");
 
     /* With anti-aliasing (4x4 supersampling) */
     SDL_Log("With anti-aliasing (4x4 supersampling):");
-    rasterize_and_report(&font, 'A', "A_aa", "glyph_A_aa.bmp",
-                          PIXEL_HEIGHT, SS_LEVEL);
+    if (!rasterize_and_report(&font, 'A', "A_aa", "glyph_A_aa.bmp",
+                               PIXEL_HEIGHT, SS_LEVEL)) {
+        ok = false;
+    }
 
     /* ── Summary ────────────────────────────────────────────────────── */
     SDL_Log("%s", SEPARATOR);
@@ -309,10 +324,14 @@ int main(int argc, char *argv[])
     SDL_Log("multiplies by a text color -- color is NOT in the bitmap.");
 
     SDL_Log("%s", SEPARATOR);
-    SDL_Log("Done. BMP files written to the current directory.");
+    if (ok) {
+        SDL_Log("Done. BMP files written to the current directory.");
+    } else {
+        SDL_Log("Done with errors — see messages above.");
+    }
 
     /* ── Cleanup ────────────────────────────────────────────────────── */
     forge_ui_ttf_free(&font);
     SDL_Quit();
-    return 0;
+    return ok ? 0 : 1;
 }

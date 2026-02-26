@@ -1127,6 +1127,7 @@ static int forge_ui__build_edges(
     int max_edges)
 {
     int edge_count = 0;
+    bool overflow_logged = false;
 
     for (Uint16 c = 0; c < glyph->contour_count; c++) {
         Uint16 start = (c == 0) ? 0 : (Uint16)(glyph->contour_ends[c - 1] + 1);
@@ -1180,7 +1181,14 @@ static int forge_ui__build_edges(
 
                 /* Skip degenerate zero-length lines */
                 if (px != cur_x || py != cur_y) {
-                    if (edge_count < max_edges) {
+                    if (edge_count >= max_edges) {
+                        if (!overflow_logged) {
+                            SDL_Log("forge_ui__build_edges: edge limit "
+                                    "(%d) exceeded — glyph may render "
+                                    "incorrectly", max_edges);
+                            overflow_logged = true;
+                        }
+                    } else {
                         ForgeUi__Edge *e = &edges[edge_count++];
                         e->type = FORGE_UI__EDGE_LINE;
                         e->x0 = cur_x; e->y0 = cur_y;
@@ -1224,7 +1232,14 @@ static int forge_ui__build_edges(
                 }
 
                 /* Emit a quadratic Bézier edge: cur → (cx,cy) → (nx,ny) */
-                if (edge_count < max_edges) {
+                if (edge_count >= max_edges) {
+                    if (!overflow_logged) {
+                        SDL_Log("forge_ui__build_edges: edge limit "
+                                "(%d) exceeded — glyph may render "
+                                "incorrectly", max_edges);
+                        overflow_logged = true;
+                    }
+                } else {
                     ForgeUi__Edge *e = &edges[edge_count++];
                     e->type = FORGE_UI__EDGE_QUAD;
                     e->x0 = cur_x; e->y0 = cur_y;
@@ -1242,7 +1257,14 @@ static int forge_ui__build_edges(
         /* Close the contour: emit an edge from current position back to
          * the first point (if they don't already coincide). */
         if (cur_x != first_x || cur_y != first_y) {
-            if (edge_count < max_edges) {
+            if (edge_count >= max_edges) {
+                if (!overflow_logged) {
+                    SDL_Log("forge_ui__build_edges: edge limit "
+                            "(%d) exceeded — glyph may render "
+                            "incorrectly", max_edges);
+                    overflow_logged = true;
+                }
+            } else {
                 ForgeUi__Edge *e = &edges[edge_count++];
                 e->type = FORGE_UI__EDGE_LINE;
                 e->x0 = cur_x;  e->y0 = cur_y;
@@ -1341,14 +1363,32 @@ static int forge_ui__quad_crossings(
         }
     }
 
-    /* Evaluate x at each valid t */
+    /* Evaluate x and per-root winding at each valid t.
+     *
+     * The winding direction must be computed per root, not per edge,
+     * because a non-monotonic quadratic can cross a scanline twice
+     * with opposite vertical directions.  We use the derivative:
+     *   dY/dt = 2[(1-t)(y1 - y0) + t(y2 - y1)]
+     * Positive dY/dt means the curve is moving downward in bitmap
+     * coordinates (y increases downward), so winding = +1.  Negative
+     * means upward, so winding = -1. */
     for (int i = 0; i < t_count && found < max_crossings; i++) {
         float t = t_values[i];
         float mt = 1.0f - t;
         float x = mt * mt * x0 + 2.0f * mt * t * x1 + t * t * x2;
 
+        /* dY/dt at this root determines crossing direction */
+        float dydt = 2.0f * (mt * (y1 - y0) + t * (y2 - y1));
+        int root_winding;
+        if (SDL_fabsf(dydt) < FORGE_UI__EPSILON) {
+            /* Tangent crossing — use the edge's overall direction */
+            root_winding = winding;
+        } else {
+            root_winding = (dydt > 0.0f) ? 1 : -1;
+        }
+
         crossings[found].x = x;
-        crossings[found].winding = winding;
+        crossings[found].winding = root_winding;
         found++;
     }
 
@@ -1383,24 +1423,36 @@ static void forge_ui__rasterize_scanline(
     ForgeUi__Crossing crossings[FORGE_UI__MAX_CROSSINGS];
     int num_crossings = 0;
 
-    for (int i = 0; i < edge_count && num_crossings < FORGE_UI__MAX_CROSSINGS; i++) {
+    for (int i = 0; i < edge_count; i++) {
         const ForgeUi__Edge *e = &edges[i];
 
         if (e->type == FORGE_UI__EDGE_LINE) {
             float cx;
             if (forge_ui__line_crossing(e->x0, e->y0, e->x1, e->y1,
                                          scan_y, &cx)) {
+                if (num_crossings >= FORGE_UI__MAX_CROSSINGS) {
+                    SDL_Log("forge_ui__rasterize_scanline: crossing limit "
+                            "(%d) exceeded at y=%.1f", FORGE_UI__MAX_CROSSINGS,
+                            (double)scan_y);
+                    break;
+                }
                 crossings[num_crossings].x = cx;
                 crossings[num_crossings].winding = e->winding;
                 num_crossings++;
             }
         } else {
             /* Quadratic Bézier edge */
+            int space = FORGE_UI__MAX_CROSSINGS - num_crossings;
+            if (space <= 0) {
+                SDL_Log("forge_ui__rasterize_scanline: crossing limit "
+                        "(%d) exceeded at y=%.1f", FORGE_UI__MAX_CROSSINGS,
+                        (double)scan_y);
+                break;
+            }
             int added = forge_ui__quad_crossings(
                 e->x0, e->y0, e->x1, e->y1, e->x2, e->y2,
                 scan_y, e->winding,
-                &crossings[num_crossings],
-                FORGE_UI__MAX_CROSSINGS - num_crossings);
+                &crossings[num_crossings], space);
             num_crossings += added;
         }
     }
@@ -1413,23 +1465,24 @@ static void forge_ui__rasterize_scanline(
 
     /* Walk crossings and fill using the non-zero winding rule.
      * The winding number starts at 0.  Each crossing adds its winding
-     * value.  When winding != 0, we're inside the glyph. */
+     * value.  When winding transitions from 0 to non-zero we record the
+     * entry x-position; when it returns to 0 we fill from that entry
+     * to the current crossing. */
     int winding = 0;
+    float fill_start_x = 0.0f; /* x where we last entered the glyph */
     for (int i = 0; i < num_crossings; i++) {
         int prev_winding = winding;
         winding += crossings[i].winding;
 
-        /* Transition: was outside (0), now inside (non-zero) → fill starts */
-        /* Transition: was inside (non-zero), now outside (0) → fill ends */
         if (prev_winding == 0 && winding != 0) {
-            /* Fill starts at this crossing */
+            /* Entered the glyph — record start position */
+            fill_start_x = crossings[i].x;
         } else if (prev_winding != 0 && winding == 0) {
-            /* Fill region: from the previous transition to this crossing */
-            float fill_start = crossings[i - 1].x;
-            float fill_end   = crossings[i].x;
+            /* Exited the glyph — fill from recorded entry to here */
+            float fill_end = crossings[i].x;
 
             /* Clamp to bitmap bounds */
-            int px_start = (int)fill_start;
+            int px_start = (int)fill_start_x;
             int px_end   = (int)SDL_ceilf(fill_end);
             if (px_start < 0) px_start = 0;
             if (px_end > width) px_end = width;
@@ -1441,10 +1494,6 @@ static void forge_ui__rasterize_scanline(
         /* When prev_winding != 0 && winding != 0 we are still inside the
          * glyph — no fill boundary to emit, so no action is needed. */
     }
-
-    /* Handle case where winding never returned to zero (malformed, but
-     * be robust): if the last crossing left us inside, fill to the end
-     * of the last transition. This is already handled above. */
 }
 
 /* ── Main rasterization function ─────────────────────────────────────────── */
@@ -1457,10 +1506,19 @@ static bool forge_ui_rasterize_glyph(const ForgeUiFont *font,
 {
     SDL_memset(out_bitmap, 0, sizeof(ForgeUiGlyphBitmap));
 
-    /* Default options: 4x4 supersampling */
+    /* Default options: 4x4 supersampling.
+     * Only powers of two up to 8 are allowed — arbitrary values could
+     * cause enormous allocations (hi-res buffer is bmp_w*ss × bmp_h*ss). */
     int ss = FORGE_UI__DEFAULT_SS;
-    if (opts && opts->supersample_level >= 1) {
-        ss = opts->supersample_level;
+    if (opts) {
+        int req = opts->supersample_level;
+        if (req == 1 || req == 2 || req == 4 || req == 8) {
+            ss = req;
+        } else if (req >= 1) {
+            SDL_Log("forge_ui_rasterize_glyph: invalid supersample_level "
+                    "%d — must be 1, 2, 4, or 8; using default %d",
+                    req, FORGE_UI__DEFAULT_SS);
+        }
     }
 
     /* Load the glyph outline */
@@ -1559,6 +1617,16 @@ static bool forge_ui_rasterize_glyph(const ForgeUiFont *font,
 
         int hi_w = bmp_w * ss;
         int hi_h = bmp_h * ss;
+
+        /* Guard against integer overflow in the scaled dimensions */
+        if (hi_w / ss != bmp_w || hi_h / ss != bmp_h) {
+            SDL_Log("forge_ui_rasterize_glyph: supersample dimensions "
+                    "overflow (%d × %d × %d)", bmp_w, bmp_h, ss);
+            SDL_free(pixels);
+            SDL_free(edges);
+            forge_ui_ttf_glyph_free(&glyph);
+            return false;
+        }
 
         /* Use a single row buffer for the high-res scanline, then
          * accumulate into a per-pixel coverage counter. */
