@@ -496,6 +496,21 @@ The program writes BMP files to the current working directory. Run from the
 repository root so it can find the bundled font at
 `assets/fonts/liberation_mono/LiberationMono-Regular.ttf`.
 
+## AI skill
+
+This lesson has a matching Claude Code skill:
+[`ui-lesson`](../../../.claude/skills/ui-lesson/SKILL.md) — invoke it to
+scaffold new UI lessons covering font parsing, rasterization, atlas packing,
+text layout, and interactive controls.
+
+## What's next
+
+**UI Lesson 03 — Font Atlas** will pack many individual glyph bitmaps into a
+single texture atlas. Instead of one bitmap per glyph, all glyphs share one
+large texture with UV coordinates mapping each glyph to its region. This is
+how real text renderers avoid thousands of tiny texture switches — one atlas
+texture serves an entire font at a given size.
+
 ## Exercises
 
 1. **Render the full alphabet.** Modify the demo to rasterize all 26

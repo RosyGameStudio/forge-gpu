@@ -51,8 +51,8 @@
 
 /* A 2D point in font units (integer coordinates). */
 typedef struct ForgeUiPoint {
-    Sint16 x;
-    Sint16 y;
+    Sint16 x;  /* horizontal position in font units */
+    Sint16 y;  /* vertical position in font units (y-up: ascender positive) */
 } ForgeUiPoint;
 
 /* An entry in the TTF table directory. */
@@ -88,10 +88,10 @@ typedef struct ForgeUiTtfMaxp {
 
 /* A parsed simple glyph from the glyf table. */
 typedef struct ForgeUiTtfGlyph {
-    Sint16       x_min;          /* glyph bounding box */
-    Sint16       y_min;
-    Sint16       x_max;
-    Sint16       y_max;
+    Sint16       x_min;          /* bounding box left edge (font units) */
+    Sint16       y_min;          /* bounding box bottom edge (font units) */
+    Sint16       x_max;          /* bounding box right edge (font units) */
+    Sint16       y_max;          /* bounding box top edge (font units) */
     Uint16       contour_count;  /* number of contours */
     Uint16       point_count;    /* total number of points */
     Uint16      *contour_ends;   /* last point index of each contour */
