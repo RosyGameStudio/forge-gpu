@@ -216,6 +216,7 @@ the output.
 |---|-------|-------------------|
 | 01 | [TTF Parsing](lessons/ui/01-ttf-parsing/) | TrueType binary format, table directory, font metrics, cmap character mapping, glyph outlines |
 | 02 | [Glyph Rasterization](lessons/ui/02-glyph-rasterization/) | Contour reconstruction, scanline rasterization, non-zero winding rule, quadratic Bézier crossings, supersampled anti-aliasing |
+| 03 | [Font Atlas](lessons/ui/03-font-atlas/) | Rectangle packing, shelf algorithm, atlas sizing, UV coordinates, per-glyph metadata, padding for texture bleed, white pixel technique |
 
 See [lessons/ui/README.md](lessons/ui/README.md) for details and
 [PLAN.md](PLAN.md) for the roadmap.
