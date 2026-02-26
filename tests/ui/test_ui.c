@@ -1122,7 +1122,7 @@ static void test_atlas_metrics_populated(void)
 static void test_layout_single_line(void)
 {
     TEST("text_layout: single line 'Hello' produces correct vertex/index counts");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     bool result = forge_ui_text_layout(&test_atlas, "Hello", 0.0f, 0.0f,
@@ -1146,7 +1146,7 @@ static void test_layout_single_line(void)
 static void test_layout_empty_string(void)
 {
     TEST("text_layout: empty string returns true with zero counts");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     bool result = forge_ui_text_layout(&test_atlas, "", 0.0f, 0.0f,
@@ -1164,7 +1164,7 @@ static void test_layout_empty_string(void)
 static void test_layout_null_params(void)
 {
     TEST("text_layout: NULL atlas/text/output returns false");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     ASSERT_TRUE(!forge_ui_text_layout(NULL, "test", 0.0f, 0.0f, NULL, &layout));
@@ -1179,7 +1179,7 @@ static void test_layout_null_params(void)
 static void test_layout_space_no_quad(void)
 {
     TEST("text_layout: space advances pen but emits no quad");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     /* "A B" = 2 visible glyphs (A and B), 1 space (no quad) */
     ForgeUiTextLayout layout;
@@ -1207,7 +1207,7 @@ static void test_layout_space_no_quad(void)
 static void test_layout_newline(void)
 {
     TEST("text_layout: newline creates multiple lines");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     bool result = forge_ui_text_layout(&test_atlas, "A\nB\nC", 0.0f, 0.0f,
@@ -1235,7 +1235,7 @@ static void test_layout_newline(void)
 static void test_layout_wrapping(void)
 {
     TEST("text_layout: wraps lines at max_width");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     /* Get advance width for one character to set a reasonable max_width */
     ForgeUiTextMetrics m_one = forge_ui_text_measure(&test_atlas, "A", NULL);
@@ -1268,7 +1268,7 @@ static void test_layout_wrapping(void)
 static void test_layout_origin(void)
 {
     TEST("text_layout: vertex positions offset by origin (x, y)");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     float ox = 100.0f;
     float oy = 200.0f;
@@ -1298,7 +1298,7 @@ static void test_layout_origin(void)
 static void test_layout_uv_range(void)
 {
     TEST("text_layout: vertex UVs are in [0.0, 1.0] range");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     bool result = forge_ui_text_layout(&test_atlas, "Test!", 0.0f, 0.0f,
@@ -1326,7 +1326,7 @@ static void test_layout_uv_range(void)
 static void test_layout_vertex_color(void)
 {
     TEST("text_layout: vertex colors match opts color");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextOpts opts;
     SDL_memset(&opts, 0, sizeof(opts));
@@ -1356,7 +1356,7 @@ static void test_layout_vertex_color(void)
 static void test_layout_index_bounds(void)
 {
     TEST("text_layout: all indices reference valid vertices");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     bool result = forge_ui_text_layout(&test_atlas, "Hello!", 0.0f, 0.0f,
@@ -1382,7 +1382,7 @@ static void test_layout_index_bounds(void)
 static void test_layout_ccw_winding(void)
 {
     TEST("text_layout: index pattern is (0,1,2, 2,3,0) per quad");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     bool result = forge_ui_text_layout(&test_atlas, "AB", 0.0f, 0.0f,
@@ -1411,7 +1411,7 @@ static void test_layout_ccw_winding(void)
 static void test_layout_default_opts(void)
 {
     TEST("text_layout: NULL opts uses opaque white color");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     bool result = forge_ui_text_layout(&test_atlas, "X", 0.0f, 0.0f,
@@ -1440,7 +1440,7 @@ static void test_layout_default_opts(void)
 static void test_layout_center_alignment(void)
 {
     TEST("text_layout: center alignment shifts vertices right");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextOpts opts_left;
     SDL_memset(&opts_left, 0, sizeof(opts_left));
@@ -1470,7 +1470,7 @@ static void test_layout_center_alignment(void)
 static void test_layout_right_alignment(void)
 {
     TEST("text_layout: right alignment shifts vertices further than center");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextOpts opts;
     SDL_memset(&opts, 0, sizeof(opts));
@@ -1554,7 +1554,7 @@ static void test_measure_invalid_atlas(void)
 static void test_measure_matches_layout(void)
 {
     TEST("text_measure: matches layout dimensions for 'Hello'");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextLayout layout;
     ASSERT_TRUE(forge_ui_text_layout(&test_atlas, "Hello", 0.0f, 0.0f,
@@ -1563,9 +1563,10 @@ static void test_measure_matches_layout(void)
     ForgeUiTextMetrics metrics = forge_ui_text_measure(&test_atlas, "Hello",
                                                         NULL);
 
-    /* Width and height should match */
-    ASSERT_TRUE(metrics.width == layout.total_width);
-    ASSERT_TRUE(metrics.height == layout.total_height);
+    /* Width and height should match (epsilon for float comparison) */
+    const float eps = 1e-3f;
+    ASSERT_TRUE(SDL_fabsf(metrics.width - layout.total_width) < eps);
+    ASSERT_TRUE(SDL_fabsf(metrics.height - layout.total_height) < eps);
     ASSERT_EQ_INT(metrics.line_count, layout.line_count);
 
     forge_ui_text_layout_free(&layout);
@@ -1576,7 +1577,7 @@ static void test_measure_matches_layout(void)
 static void test_measure_empty_string(void)
 {
     TEST("text_measure: empty string returns zero size, 1 line");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextMetrics m = forge_ui_text_measure(&test_atlas, "", NULL);
     ASSERT_TRUE(m.width == 0.0f);
@@ -1603,7 +1604,7 @@ static void test_measure_null_params(void)
 static void test_measure_multiline(void)
 {
     TEST("text_measure: newlines produce correct line count");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextMetrics m = forge_ui_text_measure(&test_atlas, "A\nB\nC", NULL);
     ASSERT_EQ_INT(m.line_count, 3);
@@ -1616,7 +1617,7 @@ static void test_measure_multiline(void)
 static void test_measure_wrapping(void)
 {
     TEST("text_measure: wrapping increases line count");
-    if (!atlas_built) return;
+    ASSERT_TRUE(atlas_built);
 
     ForgeUiTextMetrics m_nowrap = forge_ui_text_measure(&test_atlas,
                                                          "ABCDEFGH", NULL);

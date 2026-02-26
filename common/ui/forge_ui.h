@@ -2663,6 +2663,13 @@ static bool forge_ui_text_layout(const ForgeUiFontAtlas *atlas,
     float line_height = ((float)atlas->ascender - (float)atlas->descender +
                           (float)atlas->line_gap) * scale;
 
+    /* Guard against degenerate fonts where line_height is non-positive.
+     * A zero or negative line_height would prevent newline/wrapping from
+     * advancing the pen vertically, producing overlapping lines. */
+    if (line_height <= 0.0f) {
+        line_height = 1.0f;
+    }
+
     /* Compute space advance for tab stops */
     const ForgeUiPackedGlyph *space_glyph = forge_ui_atlas_lookup(atlas, ' ');
     float space_advance = space_glyph
@@ -2866,6 +2873,11 @@ static ForgeUiTextMetrics forge_ui_text_measure(const ForgeUiFontAtlas *atlas,
     float scale = atlas->pixel_height / (float)atlas->units_per_em;
     float line_height = ((float)atlas->ascender - (float)atlas->descender +
                           (float)atlas->line_gap) * scale;
+
+    /* Clamp to a safe minimum — same guard as forge_ui_text_layout */
+    if (line_height <= 0.0f) {
+        line_height = 1.0f;
+    }
 
     const ForgeUiPackedGlyph *space_glyph = forge_ui_atlas_lookup(atlas, ' ');
     float space_advance = space_glyph

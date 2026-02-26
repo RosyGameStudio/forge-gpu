@@ -41,6 +41,10 @@
 /* ── BMP rendering parameters ────────────────────────────────────────────── */
 #define BMP_MARGIN       8      /* pixels of margin around rendered text */
 
+/* ── Quad topology — must match the UI module contract ──────────────────── */
+#define VERTICES_PER_QUAD  4    /* 4 corners per character quad */
+#define INDICES_PER_QUAD   6    /* 2 CCW triangles per quad */
+
 /* ── Helper: render laid-out text into a grayscale BMP ───────────────────── */
 /* Composites each glyph from the atlas at its computed quad position onto a
  * black background.  Uses alpha blending (max) to combine overlapping glyphs.
@@ -51,6 +55,15 @@ static bool render_layout_to_bmp(const char *path,
                                    const ForgeUiTextLayout *layout,
                                    int img_w, int img_h)
 {
+    if (!path || !atlas || !layout) {
+        SDL_Log("render_layout_to_bmp: NULL argument");
+        return false;
+    }
+    if (img_w <= 0 || img_h <= 0) {
+        SDL_Log("render_layout_to_bmp: invalid dimensions %dx%d", img_w, img_h);
+        return false;
+    }
+
     Uint8 *pixels = (Uint8 *)SDL_calloc((size_t)img_w * (size_t)img_h, 1);
     if (!pixels) {
         SDL_Log("render_layout_to_bmp: allocation failed");
@@ -59,9 +72,9 @@ static bool render_layout_to_bmp(const char *path,
 
     /* For each quad (4 vertices), composite the glyph bitmap from the atlas.
      * Each quad's vertices define the screen-space rectangle and atlas UVs. */
-    int quad_count = layout->vertex_count / 4;
+    int quad_count = layout->vertex_count / VERTICES_PER_QUAD;
     for (int q = 0; q < quad_count; q++) {
-        const ForgeUiVertex *v = &layout->vertices[q * 4];
+        const ForgeUiVertex *v = &layout->vertices[q * VERTICES_PER_QUAD];
 
         /* Screen-space quad rectangle (from vertex positions) */
         int sx0 = (int)(v[0].pos_x + 0.5f);  /* top-left x */
@@ -240,7 +253,7 @@ int main(int argc, char *argv[])
                                 NULL, &hello_layout)) {
         SDL_Log("  [!] Layout failed");
     } else {
-        int quads = hello_layout.vertex_count / 4;
+        int quads = hello_layout.vertex_count / VERTICES_PER_QUAD;
         SDL_Log("  Layout result:");
         SDL_Log("    quads:    %d", quads);
         SDL_Log("    vertices: %d (4 per quad)", hello_layout.vertex_count);
@@ -292,7 +305,7 @@ int main(int argc, char *argv[])
         SDL_Log("  [!] Layout failed");
     } else {
         SDL_Log("  Layout result:");
-        SDL_Log("    quads:    %d", multi_layout.vertex_count / 4);
+        SDL_Log("    quads:    %d", multi_layout.vertex_count / VERTICES_PER_QUAD);
         SDL_Log("    vertices: %d", multi_layout.vertex_count);
         SDL_Log("    indices:  %d", multi_layout.index_count);
         SDL_Log("    bounds:   %.1f x %.1f px",
@@ -343,7 +356,7 @@ int main(int argc, char *argv[])
         SDL_Log("  [!] Layout failed");
     } else {
         SDL_Log("  Layout result:");
-        SDL_Log("    quads:    %d", wrap_layout.vertex_count / 4);
+        SDL_Log("    quads:    %d", wrap_layout.vertex_count / VERTICES_PER_QUAD);
         SDL_Log("    vertices: %d", wrap_layout.vertex_count);
         SDL_Log("    indices:  %d", wrap_layout.index_count);
         SDL_Log("    bounds:   %.1f x %.1f px",
@@ -386,8 +399,14 @@ int main(int argc, char *argv[])
     int align_img_w = (int)align_width + BMP_MARGIN * 2;
     int align_img_h = (int)(3.0f * line_height + 2.0f * spacing) + BMP_MARGIN * 2;
 
-    Uint8 *align_pixels = (Uint8 *)SDL_calloc(
-        (size_t)align_img_w * (size_t)align_img_h, 1);
+    Uint8 *align_pixels = NULL;
+    if (align_img_w <= 0 || align_img_h <= 0) {
+        SDL_Log("  [!] Invalid alignment image dimensions %dx%d",
+                align_img_w, align_img_h);
+    } else {
+        align_pixels = (Uint8 *)SDL_calloc(
+            (size_t)align_img_w * (size_t)align_img_h, 1);
+    }
 
     if (align_pixels) {
         float y_offset = (float)BMP_MARGIN + ascender_px;
@@ -399,14 +418,14 @@ int main(int argc, char *argv[])
                                        &align_opts[a], &align_layout)) {
                 SDL_Log("  %s: quads=%d, vertices=%d, indices=%d",
                         align_labels[a],
-                        align_layout.vertex_count / 4,
+                        align_layout.vertex_count / VERTICES_PER_QUAD,
                         align_layout.vertex_count,
                         align_layout.index_count);
 
                 /* Composite into the shared image */
-                int quad_count = align_layout.vertex_count / 4;
+                int quad_count = align_layout.vertex_count / VERTICES_PER_QUAD;
                 for (int q = 0; q < quad_count; q++) {
-                    const ForgeUiVertex *v = &align_layout.vertices[q * 4];
+                    const ForgeUiVertex *v = &align_layout.vertices[q * VERTICES_PER_QUAD];
                     int sx0 = (int)(v[0].pos_x + 0.5f);
                     int sy0 = (int)(v[0].pos_y + 0.5f);
                     int sx1 = (int)(v[2].pos_x + 0.5f);
@@ -468,13 +487,15 @@ int main(int argc, char *argv[])
     SDL_Log("  UV:       offset  8, 2 x float (vec2)");
     SDL_Log("  Color:    offset 16, 4 x float (vec4)");
     SDL_Log("");
-    SDL_Log("  Per quad:  4 vertices (%d bytes) + 6 indices (%d bytes)",
-            (int)(4 * sizeof(ForgeUiVertex)),
-            (int)(6 * sizeof(Uint32)));
+    SDL_Log("  Per quad:  %d vertices (%d bytes) + %d indices (%d bytes)",
+            VERTICES_PER_QUAD,
+            (int)(VERTICES_PER_QUAD * sizeof(ForgeUiVertex)),
+            INDICES_PER_QUAD,
+            (int)(INDICES_PER_QUAD * sizeof(Uint32)));
     SDL_Log("  100 chars: %d vertices + %d indices",
-            100 * 4, 100 * 6);
+            100 * VERTICES_PER_QUAD, 100 * INDICES_PER_QUAD);
     SDL_Log("             vs %d vertices without indexing (33%% savings)",
-            100 * 6);
+            100 * INDICES_PER_QUAD);
 
     /* ══════════════════════════════════════════════════════════════════ */
     /* ── Pipeline summary ─────────────────────────────────────────── */
