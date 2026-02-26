@@ -205,15 +205,8 @@ The wasted space is the gap above short glyphs in a row, since the row
 height equals the tallest glyph. With height-sorted input, this waste is
 minimized because each successive row is shorter than the previous one.
 
-```text
-+--atlas-width------------------------------+
-|[tallglyph][tallglyph][tall][tall][tall]    |  <- row 0 (height = tallest)
-|[medium][medium][medium][medium][med][med]  |  <- row 1 (height = medium)
-|[short][short][short][short][short][short]  |  <- row 2 (height = short)
-|                                            |
-|                    (empty)                 |
-+--------------------------------------------+
-```
+See the shelf-packing diagram above (`assets/shelf_packing.png`) for
+the row structure, row-height behavior, and wasted-space pattern.
 
 More sophisticated algorithms exist — **Skyline** tracks the actual top
 edge of placed rectangles rather than uniform row heights, **MaxRects**

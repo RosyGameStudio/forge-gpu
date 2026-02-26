@@ -1035,7 +1035,10 @@ static void test_bmp_write_basic(void)
                                      BMP_PALETTE_SIZE + row_stride * 4);
     ASSERT_EQ_U32((Uint32)file_size, expected_size);
 
-    /* Check bits per pixel is 8 */
+    /* Check bits per pixel is 8.  BMP is always little-endian, so the
+     * biBitCount field at BITMAPINFOHEADER offset 14 is a single byte
+     * for values <= 255.  This byte-index check is intentional and
+     * works correctly regardless of host endianness. */
     Uint8 *info = data + BMP_HEADER_SIZE;
     ASSERT_TRUE(info[14] == 8);
 

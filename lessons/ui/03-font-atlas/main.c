@@ -47,15 +47,15 @@ static void draw_glyph_outline(Uint8 *pixels, int atlas_w, int atlas_h,
                                  int x, int y, int w, int h)
 {
     /* Top and bottom edges */
-    for (int dx = 0; dx < w && (x + dx) < atlas_w; dx++) {
-        if (y > 0 && y - 1 < atlas_h)
+    for (int dx = 0; dx < w && x + dx < atlas_w; dx++) {
+        if (y > 0)
             pixels[(y - 1) * atlas_w + (x + dx)] = OUTLINE_VALUE;
         if (y + h < atlas_h)
             pixels[(y + h) * atlas_w + (x + dx)] = OUTLINE_VALUE;
     }
     /* Left and right edges */
-    for (int dy = 0; dy < h && (y + dy) < atlas_h; dy++) {
-        if (x > 0 && x - 1 < atlas_w)
+    for (int dy = 0; dy < h && y + dy < atlas_h; dy++) {
+        if (x > 0)
             pixels[(y + dy) * atlas_w + (x - 1)] = OUTLINE_VALUE;
         if (x + w < atlas_w)
             pixels[(y + dy) * atlas_w + (x + w)] = OUTLINE_VALUE;

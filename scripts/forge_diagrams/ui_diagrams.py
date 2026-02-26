@@ -1769,18 +1769,23 @@ def diagram_uv_coordinates():
         zorder=5,
     )
 
-    # UV coordinate labels
+    # UV coordinate labels — top-left origin convention:
+    #   u0 = x / W,  v0 = y / H,  u1 = (x+w) / W,  v1 = (y+h) / H
+    # The glyph positions in the diagram use matplotlib coordinates where
+    # y increases upward, but the UV formula treats y as increasing downward
+    # from the top-left origin.  For the highlighted glyph at (hx, hy) the
+    # atlas-space y equals hy (the diagram values are chosen so this holds).
     inv = 1.0 / atlas_size
     u0 = hx * inv
-    v0 = (atlas_size - hy - hh) * inv  # flip for UV (top=0)
+    v0 = hy * inv
     u1 = (hx + hw) * inv
-    v1 = (atlas_size - hy) * inv
+    v1 = (hy + hh) * inv
 
-    # Corner labels
+    # Corner labels (display UVs directly, no double-flip)
     ax.text(
         hx - 0.1,
         hy + hh + 0.1,
-        f"({u0:.2f}, {1 - v1:.2f})",
+        f"({u0:.2f}, {v0:.2f})",
         color=STYLE["accent2"],
         fontsize=8,
         fontweight="bold",
@@ -1790,7 +1795,7 @@ def diagram_uv_coordinates():
     ax.text(
         hx + hw + 0.1,
         hy - 0.1,
-        f"({u1:.2f}, {1 - v0:.2f})",
+        f"({u1:.2f}, {v1:.2f})",
         color=STYLE["accent2"],
         fontsize=8,
         fontweight="bold",
@@ -1819,22 +1824,29 @@ def diagram_uv_coordinates():
         rotation=90,
     )
 
-    # Origin and extent labels
+    # Origin and extent labels — top-left UV convention:
+    # (0,0) at top-left, (1,0) at top-right, (0,1) at bottom-left
     ax.text(
-        0, -0.15, "(0,0)", color=STYLE["text_dim"], fontsize=8, ha="center", va="top"
+        0,
+        atlas_size + 0.15,
+        "(0,0)",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="center",
+        va="bottom",
     )
     ax.text(
         atlas_size,
-        -0.15,
+        atlas_size + 0.15,
         "(1,0)",
         color=STYLE["text_dim"],
         fontsize=8,
         ha="center",
-        va="top",
+        va="bottom",
     )
     ax.text(
         -0.15,
-        atlas_size,
+        0,
         "(0,1)",
         color=STYLE["text_dim"],
         fontsize=8,
