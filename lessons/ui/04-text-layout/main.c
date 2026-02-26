@@ -440,6 +440,8 @@ int main(int argc, char *argv[])
         }
 
         SDL_free(align_pixels);
+    } else {
+        SDL_Log("  [!] Allocation failed for alignment test image");
     }
 
     /* ══════════════════════════════════════════════════════════════════ */
