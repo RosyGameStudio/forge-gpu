@@ -305,7 +305,7 @@ character `\n` is encountered, the layout system starts a new line:
 **Line height** is derived from the font's `hhea` metrics:
 
 $$
-\text{line\_height} = (\text{ascender} - \text{descender} + \text{lineGap}) \times \text{scale}
+\text{line}\_\text{height} = (\text{ascender} - \text{descender} + \text{lineGap}) \times \text{scale}
 $$
 
 For Liberation Mono at 32 px: `(1705 − (−615) + 0) × 0.015625 = 36.25 px`.
