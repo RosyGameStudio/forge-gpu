@@ -504,6 +504,21 @@ pass a custom font path as the first argument:
 ./build/lessons/ui/03-font-atlas/ui-03-font-atlas path/to/font.ttf
 ```
 
+## AI skill
+
+This lesson has a matching Claude Code skill:
+[`ui-lesson`](../../../.claude/skills/ui-lesson/SKILL.md) — invoke it to
+scaffold new UI lessons covering font parsing, rasterization, atlas packing,
+text layout, and interactive controls.
+
+## What's next
+
+**UI Lesson 04 — Text Layout** will use the glyph table from this lesson to
+build positioned quads for rendering text. Given a string, the layout system
+walks each character, looks up its `ForgeUiPackedGlyph`, applies bearing
+offsets and advance widths to position each glyph quad, and outputs vertex
+data (positions + UV coordinates) ready for a GPU renderer.
+
 ## Exercises
 
 1. **Larger character set**: Extend the codepoint array to include Latin

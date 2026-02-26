@@ -36,7 +36,7 @@
 #define ASCII_COUNT      (ASCII_END - ASCII_START + 1)  /* 95 glyphs */
 
 /* ── Helper: draw a debug outline around a glyph in the atlas ────────────── */
-/* Draws a 1px white (255) border around the given rectangle in the atlas.
+/* Draws a 1px mid-gray border around the given rectangle in the atlas.
  * Used for the debug BMP that visualizes shelf rows and glyph placement. */
 
 /* Outline brightness — use a mid-gray value so the outline contrasts against

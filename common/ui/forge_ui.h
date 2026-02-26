@@ -1996,6 +1996,9 @@ static bool forge_ui__write_grayscale_bmp(const char *path,
  * hardware.  A 4096x4096 single-channel atlas is 16MB. */
 #define FORGE_UI__MAX_ATLAS_DIM  4096
 
+/* Minimum atlas dimension — starting size for the power-of-two search. */
+#define FORGE_UI__MIN_ATLAS_DIM  64
+
 /* White pixel region size — a 2x2 block of fully white (255) pixels
  * used for drawing solid-colored geometry without switching textures. */
 #define FORGE_UI__WHITE_SIZE     2
@@ -2112,7 +2115,7 @@ static bool forge_ui__find_atlas_size(ForgeUi__GlyphEntry *entries,
     }
 
     /* Find the smallest power-of-two square that exceeds the total area */
-    int size = 64; /* minimum atlas size */
+    int size = FORGE_UI__MIN_ATLAS_DIM;
     while (size * size < total_area && size < FORGE_UI__MAX_ATLAS_DIM) {
         size *= 2;
     }
