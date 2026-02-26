@@ -166,7 +166,7 @@ static bool rasterize_and_report(const ForgeUiFont *font,
     int on_curve_count = 0;
     int off_curve_count = 0;
     for (Uint16 i = 0; i < glyph.point_count; i++) {
-        if (glyph.flags[i] & FORGE_UI__FLAG_ON_CURVE) {
+        if (glyph.flags[i] & FORGE_UI_FLAG_ON_CURVE) {
             on_curve_count++;
         } else {
             off_curve_count++;

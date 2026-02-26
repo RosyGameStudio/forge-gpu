@@ -47,6 +47,12 @@
 
 #include <SDL3/SDL.h>
 
+/* ── Public Constants ────────────────────────────────────────────────────── */
+
+/* Per-point flag: set when the point lies on the contour curve.
+ * Off-curve points are quadratic Bézier control points. */
+#define FORGE_UI_FLAG_ON_CURVE  0x01
+
 /* ── Public Types ────────────────────────────────────────────────────────── */
 
 /* A 2D point in font units (integer coordinates). */
@@ -680,7 +686,7 @@ static bool forge_ui__cache_glyf_offset(ForgeUiFont *font)
  * These control whether the point is on-curve and how its coordinates
  * are encoded. */
 
-#define FORGE_UI__FLAG_ON_CURVE    0x01  /* point is on the curve */
+#define FORGE_UI__FLAG_ON_CURVE    FORGE_UI_FLAG_ON_CURVE
 #define FORGE_UI__FLAG_X_SHORT     0x02  /* x coordinate is 1 byte */
 #define FORGE_UI__FLAG_Y_SHORT     0x04  /* y coordinate is 1 byte */
 #define FORGE_UI__FLAG_REPEAT      0x08  /* next byte is repeat count */
@@ -1200,10 +1206,13 @@ static int forge_ui__build_edges(
                     /* off → on: standard quadratic Bézier */
                     nx = (float)glyph->points[next_i].x * scale;
                     ny = y_offset - (float)glyph->points[next_i].y * scale;
-                    i += 2; /* skip past the off-curve and the on-curve */
+                    /* Advance past both the off-curve (i) and the on-curve
+                     * (next_i).  When next_i wrapped to start, the contour
+                     * has closed — override i to end+1 so the while-loop
+                     * exits cleanly (the +2 alone could overshoot end). */
+                    i += 2;
                     if (next_i == start) {
-                        /* We wrapped around — contour is closing */
-                        i = end + 1; /* exit the loop */
+                        i = end + 1;
                     }
                 } else {
                     /* off → off: implicit midpoint is on-curve */
@@ -1429,10 +1438,8 @@ static void forge_ui__rasterize_scanline(
                 row[px] = 255;
             }
         }
-        /* Track where the "inside" region started */
-        if (prev_winding != 0 && winding != 0 && i > 0) {
-            /* Still inside — continuing through a crossing */
-        }
+        /* When prev_winding != 0 && winding != 0 we are still inside the
+         * glyph — no fill boundary to emit, so no action is needed. */
     }
 
     /* Handle case where winding never returned to zero (malformed, but
