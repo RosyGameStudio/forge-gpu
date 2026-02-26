@@ -111,6 +111,10 @@ static bool render_layout_to_bmp(const char *path,
 
 static void print_pen_advance(const ForgeUiFontAtlas *atlas, const char *text)
 {
+    if (atlas->units_per_em == 0) {
+        SDL_Log("  print_pen_advance: units_per_em is 0 (invalid atlas)");
+        return;
+    }
     float scale = atlas->pixel_height / (float)atlas->units_per_em;
     float pen_x = 0.0f;
 
