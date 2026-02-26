@@ -343,12 +343,18 @@ coordinates** with:
 
 This matches bitmap coordinates and how UI systems think about layout. It is
 the same coordinate space that the atlas bearings use (y-down: bitmap top at
-`pen_y − bearing_y`).
+`pen_y − bearing_y`). See
+[Math Lesson 02 — Coordinate Spaces](../../math/02-coordinate-spaces/) for a
+deeper treatment of coordinate system conventions.
 
 The GPU lesson that renders this data will need an **orthographic projection
-matrix** to map these pixel coordinates to clip space (the `[−1, +1]` range
-the GPU expects). But that is the GPU lesson's concern — this lesson outputs
-pixel positions only.
+matrix** — a transform that maps pixel coordinates to the GPU's clip space
+(the `[−1, +1]` range that rasterization expects). Unlike a perspective
+projection, an orthographic projection preserves parallel lines and has no
+foreshortening, which is exactly what 2D UI rendering needs. See
+[Math Lesson 06 — Projections](../../math/06-projections/) for the math behind
+projection matrices. That transform is the GPU lesson's concern — this lesson
+outputs pixel positions only.
 
 ### Putting it all together
 
@@ -480,6 +486,20 @@ The program writes BMP files to the current directory:
 - `layout_multiline.bmp` — four lines with explicit `\n` breaks
 - `layout_wrapped.bmp` — long text wrapped at 300 px
 - `layout_alignment.bmp` — left, center, and right alignment side by side
+
+## AI skill
+
+This lesson has a matching Claude Code skill:
+[`ui-lesson`](../../../.claude/skills/ui-lesson/SKILL.md) — invoke it to
+scaffold new UI lessons covering font parsing, rasterization, atlas packing,
+text layout, and interactive controls.
+
+## What's next
+
+**UI Lesson 05** (immediate-mode basics) will use text layout as a building
+block for UI controls like buttons, labels, and text input. The
+`ForgeUiVertex` format and `forge_ui_text_layout()` function introduced here
+become the foundation for all interactive UI rendering.
 
 ## Exercises
 
