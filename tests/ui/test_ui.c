@@ -1511,6 +1511,36 @@ static void test_layout_free_null(void)
     pass_count++;
 }
 
+/* ── Test: layout rejects atlas with units_per_em == 0 ───────────────────── */
+
+static void test_layout_invalid_atlas(void)
+{
+    TEST("text_layout: returns false for atlas with units_per_em == 0");
+
+    /* Construct a zeroed atlas — simulates a corrupt or uninitialized atlas */
+    ForgeUiFontAtlas bad_atlas;
+    SDL_memset(&bad_atlas, 0, sizeof(bad_atlas));
+
+    ForgeUiTextLayout layout;
+    bool result = forge_ui_text_layout(&bad_atlas, "test", 0.0f, 0.0f,
+                                        NULL, &layout);
+    ASSERT_TRUE(!result);
+}
+
+/* ── Test: measure returns zero for atlas with units_per_em == 0 ─────────── */
+
+static void test_measure_invalid_atlas(void)
+{
+    TEST("text_measure: returns zero metrics for atlas with units_per_em == 0");
+
+    ForgeUiFontAtlas bad_atlas;
+    SDL_memset(&bad_atlas, 0, sizeof(bad_atlas));
+
+    ForgeUiTextMetrics m = forge_ui_text_measure(&bad_atlas, "test", NULL);
+    ASSERT_EQ_INT(m.line_count, 0);
+    ASSERT_TRUE(m.width == 0.0f);
+}
+
 /* ══════════════════════════════════════════════════════════════════════════ */
 /* ── Text Measure Tests ────────────────────────────────────────────────── */
 /* ══════════════════════════════════════════════════════════════════════════ */
@@ -1708,6 +1738,10 @@ int main(int argc, char *argv[])
     /* Text layout — forge_ui_text_layout_free */
     test_layout_free_zeroed();
     test_layout_free_null();
+
+    /* Text layout — invalid atlas (units_per_em == 0) */
+    test_layout_invalid_atlas();
+    test_measure_invalid_atlas();
 
     /* Text layout — forge_ui_text_measure */
     test_measure_matches_layout();

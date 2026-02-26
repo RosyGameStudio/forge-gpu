@@ -49,6 +49,7 @@
 
 #include <SDL3/SDL.h>
 #include <stdio.h>   /* FILE, fopen, fwrite, fclose for BMP writing */
+#include <limits.h>  /* INT_MAX for text layout validation */
 
 /* ── Public Constants ────────────────────────────────────────────────────── */
 
@@ -2558,7 +2559,7 @@ static const ForgeUiTextOpts FORGE_UI__DEFAULT_TEXT_OPTS = {
 /* Number of indices per character quad (two CCW triangles) */
 #define FORGE_UI__INDICES_PER_QUAD 6
 
-/* Initial capacity for vertex/index arrays (grows as needed) */
+/* Minimum capacity for vertex/index arrays (avoids tiny allocations) */
 #define FORGE_UI__INITIAL_CHAR_CAPACITY 128
 
 /* Tab stop width in multiples of space advance */
@@ -2644,6 +2645,11 @@ static bool forge_ui_text_layout(const ForgeUiFontAtlas *atlas,
 
     SDL_memset(out_layout, 0, sizeof(ForgeUiTextLayout));
 
+    if (atlas->units_per_em == 0) {
+        SDL_Log("forge_ui_text_layout: atlas has units_per_em == 0 (invalid)");
+        return false;
+    }
+
     const ForgeUiTextOpts *o = opts ? opts : &FORGE_UI__DEFAULT_TEXT_OPTS;
 
     /* Compute the font scale: converts font units to pixel units.
@@ -2665,7 +2671,12 @@ static bool forge_ui_text_layout(const ForgeUiFontAtlas *atlas,
 
     /* Count visible characters to pre-allocate arrays.
      * We allocate for worst case (all characters visible). */
-    int text_len = (int)SDL_strlen(text);
+    size_t raw_len = SDL_strlen(text);
+    if (raw_len > (size_t)INT_MAX) {
+        SDL_Log("forge_ui_text_layout: text too long (%zu bytes)", raw_len);
+        return false;
+    }
+    int text_len = (int)raw_len;
     if (text_len == 0) {
         out_layout->line_count = 1;
         return true;
@@ -2724,10 +2735,13 @@ static bool forge_ui_text_layout(const ForgeUiFontAtlas *atlas,
         /* ── Tab: advance to next tab stop ────────────────────────── */
         if (ch == '\t') {
             float tab_width = space_advance * FORGE_UI__TAB_STOP_WIDTH;
-            float rel_x = pen_x - origin_x;
-            float next_stop = tab_width * (SDL_floorf(rel_x / tab_width) + 1.0f);
-            pen_x = origin_x + next_stop;
-            line_width = pen_x - origin_x;
+            if (tab_width > 0.0f) {
+                float rel_x = pen_x - origin_x;
+                float next_stop = tab_width *
+                    (SDL_floorf(rel_x / tab_width) + 1.0f);
+                pen_x = origin_x + next_stop;
+                line_width = pen_x - origin_x;
+            }
             continue;
         }
 
@@ -2832,6 +2846,8 @@ static ForgeUiTextMetrics forge_ui_text_measure(const ForgeUiFontAtlas *atlas,
 
     if (!atlas || !text) return result;
 
+    if (atlas->units_per_em == 0) return result;
+
     const ForgeUiTextOpts *o = opts ? opts : &FORGE_UI__DEFAULT_TEXT_OPTS;
 
     float scale = atlas->pixel_height / (float)atlas->units_per_em;
@@ -2843,7 +2859,9 @@ static ForgeUiTextMetrics forge_ui_text_measure(const ForgeUiFontAtlas *atlas,
         ? (float)space_glyph->advance_width * scale
         : atlas->pixel_height * 0.5f;
 
-    int text_len = (int)SDL_strlen(text);
+    size_t raw_len = SDL_strlen(text);
+    if (raw_len > (size_t)INT_MAX) return result;
+    int text_len = (int)raw_len;
     if (text_len == 0) {
         result.line_count = 1;
         return result;
@@ -2865,8 +2883,11 @@ static ForgeUiTextMetrics forge_ui_text_measure(const ForgeUiFontAtlas *atlas,
 
         if (ch == '\t') {
             float tab_width = space_advance * FORGE_UI__TAB_STOP_WIDTH;
-            float next_stop = tab_width * (SDL_floorf(pen_x / tab_width) + 1.0f);
-            pen_x = next_stop;
+            if (tab_width > 0.0f) {
+                float next_stop = tab_width *
+                    (SDL_floorf(pen_x / tab_width) + 1.0f);
+                pen_x = next_stop;
+            }
             continue;
         }
 
