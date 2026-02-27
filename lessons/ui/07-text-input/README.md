@@ -336,6 +336,45 @@ build\lessons\ui\07-text-input\Debug\07-text-input.exe
 ./build/lessons/ui/07-text-input/07-text-input
 ```
 
+## Fuzz testing
+
+The text input buffer manipulation is a high-risk surface for memory
+safety bugs (off-by-one writes, negative memmove sizes, cursor
+out-of-bounds). A dedicated fuzz harness exercises the insertion,
+deletion, and cursor movement paths with random data and random
+operation sequences:
+
+```bash
+cmake -B build -DFORGE_FUZZ_ITERATIONS=100000
+cmake --build build --target fuzz_text_input
+
+# Run with default seed and iteration count
+./build/tests/ui/fuzz_text_input
+
+# Run with a specific seed and iteration count
+./build/tests/ui/fuzz_text_input 0xCAFE 1000000
+```
+
+The fuzzer uses a deterministic xorshift32 PRNG seeded from the command
+line (or a fixed default). Each iteration allocates a small buffer with
+8 canary sentinel bytes past the end, runs 1--200 random operations, and
+asserts invariants after every single operation:
+
+- `0 <= cursor <= length`
+- `0 <= length < capacity`
+- `buffer[length] == '\0'`
+- Canary bytes untouched (detects off-by-one writes without
+  AddressSanitizer)
+
+On failure, the harness prints the seed and iteration number so the
+failure can be reproduced exactly.
+
+Override the default iteration count at configure time:
+
+```bash
+cmake -DFORGE_FUZZ_ITERATIONS=1000000 -B build
+```
+
 ## Exercises
 
 1. **Text selection** — Track a `selection_start` index alongside `cursor`.
