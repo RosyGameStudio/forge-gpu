@@ -278,7 +278,7 @@ $$
 The normalized parameter t maps the mouse position to [0, 1]:
 
 $$
-t = \text{clamp}\left(\frac{\text{mouse}\_\text{x} - \text{track}\_\text{x}}{\text{track}\_\text{w}},\; 0,\; 1\right)
+t = \text{clamp}\left(\frac{\text{mouse}\_\text{x} - \text{track}\_\text{x}}{\text{track}\_\text{w}}, 0, 1\right)
 $$
 
 Then t maps linearly to the user value:
