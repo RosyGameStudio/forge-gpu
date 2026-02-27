@@ -4661,8 +4661,8 @@ def diagram_text_input_anatomy():
 
 
 def diagram_cursor_positioning():
-    """The word 'Hello' with cursor bar drawn between 'l' and 'o',
-    showing pen_x computed from layout of substring 'Hel'."""
+    """The word 'Hello' with cursor bar drawn after the first 'l'
+    (between the two l's), showing pen_x = sum(widths[:3]) for 'Hel'."""
 
     fig, ax = plt.subplots(figsize=(9, 4))
     fig.patch.set_facecolor(STYLE["bg"])
@@ -4726,7 +4726,7 @@ def diagram_cursor_positioning():
         ax.add_patch(box)
         pen_x += w
 
-    # Cursor position (after 'l', before 'o')
+    # Cursor position (after first 'l', between the two l's)
     cursor_x = padding_x + sum(widths[:3])
     cursor_rect = mpatches.Rectangle(
         (cursor_x, 0.7),
