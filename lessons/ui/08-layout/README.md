@@ -318,6 +318,19 @@ build\lessons\ui\08-layout\Debug\08-layout.exe
 ./build/lessons/ui/08-layout/08-layout
 ```
 
+## AI skill
+
+The **[auto-widget-layout](../../../.claude/skills/auto-widget-layout/SKILL.md)**
+skill (`/auto-widget-layout`) teaches Claude the layout pattern from this
+lesson. Use it in your own projects to add automatic widget positioning with
+vertical/horizontal stacking, padding, spacing, and nesting.
+
+## What's next
+
+- **[UI Lesson 09 — Panels and Clipping](../09-panels-and-clipping/)** —
+  static containers with scroll regions, scissor rect output for the renderer,
+  scroll offset and content bounds
+
 ## Exercises
 
 1. **Add a second horizontal row** — add a row of three buttons (Save, Load,
@@ -334,12 +347,6 @@ build\lessons\ui\08-layout\Debug\08-layout.exe
 4. **Layout debug overlay** — after declaring all widgets, draw wireframe
    rectangles showing each layout region's bounds and cursor position.
    This helps visualize how nested layouts divide space.
-
-## What's next
-
-- **[UI Lesson 09 — Panels and Clipping](../09-panels-and-clipping/)** —
-  static containers with scroll regions, scissor rect output for the renderer,
-  scroll offset and content bounds
 
 ## Further reading
 

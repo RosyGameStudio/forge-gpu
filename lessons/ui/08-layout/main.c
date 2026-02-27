@@ -101,11 +101,22 @@
 #define PANEL_BG_A      1.00f
 
 /* ── Mouse cursor dot ────────────────────────────────────────────────────── */
+#define CURSOR_DOT_RADIUS     2   /* pixel radius for the circular dot */
 #define CURSOR_DOT_RADIUS_SQ  5   /* squared pixel radius for circular shape */
 #define CURSOR_DOT_R    255       /* red channel (uint8) */
 #define CURSOR_DOT_G    220       /* green channel (uint8) */
 #define CURSOR_DOT_B     50       /* blue channel (uint8) */
 #define CURSOR_DOT_A    255       /* alpha channel (uint8) */
+
+/* ── Slider demo parameters ─────────────────────────────────────────────── */
+#define VOLUME_MIN       0.0f    /* slider minimum value */
+#define VOLUME_MAX     100.0f    /* slider maximum value */
+#define INITIAL_VOLUME  50.0f    /* default volume level */
+
+/* ── Simulated interaction targets ──────────────────────────────────────── */
+#define CB_BOX_CENTER_X     10.0f   /* approx horizontal center of checkbox box */
+#define STATUS_LABEL_GAP    16.0f   /* pixels below panel to status text */
+#define SLIDER_DRAG_FRAC     0.75f  /* fraction along slider track for drag demo */
 
 /* ── Simulated frame input ───────────────────────────────────────────────── */
 
@@ -149,8 +160,8 @@ static bool render_frame_bmp(const char *path,
     /* Draw a small yellow dot at the mouse position */
     int mx = (int)(mouse_x + 0.5f);
     int my = (int)(mouse_y + 0.5f);
-    for (int dy = -2; dy <= 2; dy++) {
-        for (int dx = -2; dx <= 2; dx++) {
+    for (int dy = -CURSOR_DOT_RADIUS; dy <= CURSOR_DOT_RADIUS; dy++) {
+        for (int dx = -CURSOR_DOT_RADIUS; dx <= CURSOR_DOT_RADIUS; dx++) {
             if (dx * dx + dy * dy > CURSOR_DOT_RADIUS_SQ) continue;
             int px = mx + dx;
             int py = my + dy;
@@ -224,7 +235,7 @@ static void declare_settings_panel_layout(ForgeUiContext *ctx,
     /* Slider for volume (return value = changed this frame; the value
      * itself is tracked via the float pointer) */
     (void)forge_ui_ctx_slider_layout(ctx, ID_SLIDER_VOL, volume,
-                                     0.0f, 100.0f, SLIDER_HEIGHT);
+                                     VOLUME_MIN, VOLUME_MAX, SLIDER_HEIGHT);
 
     forge_ui_ctx_layout_pop(ctx);  /* end outer vertical layout */
 }
@@ -295,7 +306,7 @@ static void declare_settings_panel_manual(ForgeUiContext *ctx,
     {
         ForgeUiRect r = { cx, cy, inner_w, SLIDER_HEIGHT };
         (void)forge_ui_ctx_slider(ctx, ID_SLIDER_VOL, volume,
-                                 0.0f, 100.0f, r);
+                                 VOLUME_MIN, VOLUME_MAX, r);
     }
 }
 
@@ -362,7 +373,7 @@ int main(int argc, char *argv[])
     bool vsync_on = true;
     bool fullscreen_on = false;
     bool aa_on = true;
-    float volume = 50.0f;
+    float volume = INITIAL_VOLUME;
 
     bool had_render_error = false;
 
@@ -382,7 +393,7 @@ int main(int argc, char *argv[])
     /* Manual version */
     {
         bool m_vsync = true, m_fs = false, m_aa = true;
-        float m_vol = 50.0f;
+        float m_vol = INITIAL_VOLUME;
 
         forge_ui_ctx_begin(&ctx, idle_mx, idle_my, false);
         declare_settings_panel_manual(&ctx, &m_vsync, &m_fs, &m_aa, &m_vol);
@@ -407,7 +418,7 @@ int main(int argc, char *argv[])
     /* Layout version */
     {
         bool l_vsync = true, l_fs = false, l_aa = true;
-        float l_vol = 50.0f;
+        float l_vol = INITIAL_VOLUME;
 
         forge_ui_ctx_begin(&ctx, idle_mx, idle_my, false);
         declare_settings_panel_layout(&ctx, &l_vsync, &l_fs, &l_aa, &l_vol);
@@ -472,11 +483,11 @@ int main(int argc, char *argv[])
     cy += BUTTON_ROW_H + WIDGET_SPACING;
 
     /* Slider center -- use right side of track for a ~75% value */
-    float slider_cx = left + inner_w * 0.75f;
+    float slider_cx = left + inner_w * SLIDER_DRAG_FRAC;
     float slider_cy = cy + SLIDER_HEIGHT * 0.5f;
 
     /* Checkbox x center (the box is at the left edge) */
-    float cb_cx = left + 10.0f;
+    float cb_cx = left + CB_BOX_CENTER_X;
 
     FrameInput frames[] = {
         /* Frame 0: Mouse idle -- no interaction */
@@ -545,7 +556,7 @@ int main(int argc, char *argv[])
                          (double)volume);
 
             forge_ui_ctx_label(&ctx, status_buf,
-                               PANEL_X, PANEL_Y + PANEL_H + 16.0f + ascender_px,
+                               PANEL_X, PANEL_Y + PANEL_H + STATUS_LABEL_GAP + ascender_px,
                                STATUS_R, STATUS_G, STATUS_B, STATUS_A);
         }
 
