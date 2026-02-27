@@ -583,6 +583,12 @@ static inline void forge_ui__emit_border(ForgeUiContext *ctx,
                                           float border_w,
                                           float r, float g, float b, float a)
 {
+    if (!ctx) return;
+    /* Reject degenerate borders: width must be positive and must fit
+     * within half the rect dimension to avoid inverted geometry. */
+    if (border_w <= 0.0f) return;
+    if (border_w > rect.w * 0.5f || border_w > rect.h * 0.5f) return;
+
     /* Top edge */
     forge_ui__emit_rect(ctx,
         (ForgeUiRect){ rect.x, rect.y, rect.w, border_w },
@@ -720,6 +726,9 @@ static inline void forge_ui_ctx_end(ForgeUiContext *ctx)
         }
         if (ctx->key_escape) {
             ctx->focused = FORGE_UI_ID_NONE;
+            /* Clear active to prevent a pending click release from
+             * re-acquiring focus on the next frame. */
+            ctx->active = FORGE_UI_ID_NONE;
         }
     }
 
@@ -1079,6 +1088,13 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
     if (!ctx || !ctx->atlas || !state || !state->buffer
         || id == FORGE_UI_ID_NONE) return false;
 
+    /* Validate state invariants to prevent out-of-bounds access.
+     * The application owns these fields; reject if they violate the
+     * contract:  capacity > 0,  0 <= length < capacity,  0 <= cursor <= length. */
+    if (state->capacity <= 0) return false;
+    if (state->length < 0 || state->length >= state->capacity) return false;
+    if (state->cursor < 0 || state->cursor > state->length) return false;
+
     bool content_changed = false;
     bool is_focused = (ctx->focused == id);
 
@@ -1089,8 +1105,10 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
     }
 
     /* ── State transitions (press-release-over, same as button) ──────── */
+    /* Use ctx->next_hot == id (not mouse_over) so that overlapping widgets
+     * resolve activation by draw order, matching the button/slider pattern. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
-    if (mouse_pressed && mouse_over) {
+    if (mouse_pressed && ctx->next_hot == id) {
         ctx->active = id;
         /* Mark that a text input claimed this press -- prevents ctx_end
          * from clearing focused on this frame (click-outside detection). */
@@ -1108,26 +1126,15 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
 
     /* ── Keyboard input processing (only when focused) ────────────────── */
     if (is_focused) {
-        /* Character insertion: splice typed characters into the buffer
-         * at the cursor position.  Trailing bytes shift right to make
-         * room, then the new bytes are written at cursor. */
-        if (ctx->text_input && ctx->text_input[0] != '\0') {
-            int insert_len = (int)SDL_strlen(ctx->text_input);
-            if (state->length + insert_len < state->capacity) {
-                SDL_memmove(state->buffer + state->cursor + insert_len,
-                            state->buffer + state->cursor,
-                            (size_t)(state->length - state->cursor));
-                SDL_memcpy(state->buffer + state->cursor,
-                           ctx->text_input, (size_t)insert_len);
-                state->cursor += insert_len;
-                state->length += insert_len;
-                state->buffer[state->length] = '\0';
-                content_changed = true;
-            }
-        }
+        /* Editing operations are mutually exclusive within a single frame.
+         * When SDL delivers both a text input event and a key event in the
+         * same frame, applying both would operate on inconsistent state
+         * (e.g., backspace would delete the just-inserted character instead
+         * of the pre-existing one).  Deletion keys take priority. */
+        bool did_edit = false;
 
         /* Backspace: remove the byte before cursor, shift trailing left */
-        if (ctx->key_backspace && state->cursor > 0) {
+        if (!did_edit && ctx->key_backspace && state->cursor > 0) {
             SDL_memmove(state->buffer + state->cursor - 1,
                         state->buffer + state->cursor,
                         (size_t)(state->length - state->cursor));
@@ -1135,30 +1142,62 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
             state->length--;
             state->buffer[state->length] = '\0';
             content_changed = true;
+            did_edit = true;
         }
 
         /* Delete: remove the byte at cursor, shift trailing left */
-        if (ctx->key_delete && state->cursor < state->length) {
+        if (!did_edit && ctx->key_delete && state->cursor < state->length) {
             SDL_memmove(state->buffer + state->cursor,
                         state->buffer + state->cursor + 1,
                         (size_t)(state->length - state->cursor - 1));
             state->length--;
             state->buffer[state->length] = '\0';
             content_changed = true;
+            did_edit = true;
         }
 
-        /* Cursor movement */
-        if (ctx->key_left && state->cursor > 0) {
-            state->cursor--;
+        /* Character insertion: splice typed characters into the buffer
+         * at the cursor position.  Trailing bytes shift right to make
+         * room, then the new bytes are written at cursor. */
+        if (!did_edit && ctx->text_input && ctx->text_input[0] != '\0') {
+            size_t raw_len = SDL_strlen(ctx->text_input);
+            /* Guard: reject input longer than the buffer can ever hold.
+             * Cast is safe because capacity > 0 (validated above). */
+            if (raw_len <= (size_t)(state->capacity - 1)) {
+                int insert_len = (int)raw_len;
+                /* Use subtraction form to avoid signed overflow:
+                 * insert_len < capacity - length  (both sides positive). */
+                if (insert_len < state->capacity - state->length) {
+                    SDL_memmove(state->buffer + state->cursor + insert_len,
+                                state->buffer + state->cursor,
+                                (size_t)(state->length - state->cursor));
+                    SDL_memcpy(state->buffer + state->cursor,
+                               ctx->text_input, (size_t)insert_len);
+                    state->cursor += insert_len;
+                    state->length += insert_len;
+                    state->buffer[state->length] = '\0';
+                    content_changed = true;
+                    did_edit = true;
+                }
+            }
         }
-        if (ctx->key_right && state->cursor < state->length) {
-            state->cursor++;
-        }
-        if (ctx->key_home) {
-            state->cursor = 0;
-        }
-        if (ctx->key_end) {
-            state->cursor = state->length;
+
+        /* Cursor movement -- also mutually exclusive with edits.
+         * If an edit (backspace/delete/insert) already ran this frame,
+         * skip cursor movement to avoid double-shifting the cursor. */
+        if (!did_edit) {
+            if (ctx->key_left && state->cursor > 0) {
+                state->cursor--;
+            }
+            if (ctx->key_right && state->cursor < state->length) {
+                state->cursor++;
+            }
+            if (ctx->key_home) {
+                state->cursor = 0;
+            }
+            if (ctx->key_end) {
+                state->cursor = state->length;
+            }
         }
     }
 
