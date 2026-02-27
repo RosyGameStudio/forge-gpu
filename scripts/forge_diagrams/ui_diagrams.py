@@ -5320,6 +5320,7 @@ def diagram_layout_cursor_model():
         fontweight="bold",
         ha="center",
         va="bottom",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # Draw widgets from top down
@@ -5370,6 +5371,7 @@ def diagram_layout_cursor_model():
         fontsize=8,
         ha="center",
         va="bottom",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # Spacing annotation between widget 0 and 1
@@ -5390,6 +5392,7 @@ def diagram_layout_cursor_model():
         fontsize=8,
         ha="left",
         va="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # Cursor arrow on the left showing downward progression
@@ -5406,6 +5409,7 @@ def diagram_layout_cursor_model():
         ha="right",
         va="center",
         rotation=90,
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
     # Vertical line showing cursor path
     ax.plot(
@@ -5434,7 +5438,7 @@ def diagram_horizontal_vs_vertical():
     for ax, title, direction in [(ax1, "VERTICAL", "v"), (ax2, "HORIZONTAL", "h")]:
         setup_axes(ax, xlim=(-0.5, 8), ylim=(-0.5, 8), grid=False, aspect=None)
         ax.axis("off")
-        ax.set_title(title, color=STYLE["text"], fontsize=13, fontweight="bold", pad=10)
+        ax.set_title(title, color=STYLE["text"], fontsize=13, fontweight="bold", pad=12)
 
         lx, ly, lw, lh = 0.5, 0.5, 6.5, 6.5
         pad = 0.4
@@ -5483,6 +5487,7 @@ def diagram_horizontal_vs_vertical():
                     fontweight="bold",
                     ha="center",
                     va="center",
+                    path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
                 )
                 cy = wy - sp
             # Arrow showing cursor direction
@@ -5501,6 +5506,7 @@ def diagram_horizontal_vs_vertical():
                 ha="right",
                 va="center",
                 rotation=90,
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             )
         else:
             # Horizontal: full height, varying widths
@@ -5526,6 +5532,7 @@ def diagram_horizontal_vs_vertical():
                     fontweight="bold",
                     ha="center",
                     va="center",
+                    path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
                 )
                 cx += w + sp
             # Arrow showing cursor direction
@@ -5543,6 +5550,7 @@ def diagram_horizontal_vs_vertical():
                 fontsize=8,
                 ha="center",
                 va="top",
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             )
 
     fig.tight_layout()
@@ -5586,6 +5594,7 @@ def diagram_nested_layout():
         fontweight="bold",
         ha="center",
         va="bottom",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     inner_x = ox + pad
@@ -5664,6 +5673,7 @@ def diagram_nested_layout():
             fontweight="bold",
             ha="center",
             va="center",
+            path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
         )
 
     # push/pop annotation for horizontal row
@@ -5676,6 +5686,7 @@ def diagram_nested_layout():
         ha="left",
         va="top",
         fontstyle="italic",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
     ax.text(
         inner_x + inner_w + 0.3,
@@ -5686,6 +5697,7 @@ def diagram_nested_layout():
         ha="left",
         va="bottom",
         fontstyle="italic",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     cy = row_y - sp
@@ -5731,6 +5743,7 @@ def diagram_nested_layout():
             fontsize=8,
             ha="left",
             va="center",
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
 
     fig.tight_layout()
@@ -5755,7 +5768,7 @@ def diagram_layout_stack_visualization():
     for ax, (title, entries, depth) in zip(axes, states):
         setup_axes(ax, xlim=(-0.5, 4), ylim=(-0.5, 5.5), grid=False, aspect=None)
         ax.axis("off")
-        ax.set_title(title, color=STYLE["text"], fontsize=10, fontweight="bold", pad=8)
+        ax.set_title(title, color=STYLE["text"], fontsize=10, fontweight="bold", pad=12)
 
         slot_w = 3.0
         slot_h = 0.9
@@ -5797,6 +5810,7 @@ def diagram_layout_stack_visualization():
                 fontsize=8,
                 ha="right",
                 va="center",
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             )
 
             if is_active:
@@ -5808,6 +5822,7 @@ def diagram_layout_stack_visualization():
                     fontsize=9,
                     ha="center",
                     va="center",
+                    path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
                 )
                 if is_top:
                     ax.text(
@@ -5819,6 +5834,9 @@ def diagram_layout_stack_visualization():
                         ha="left",
                         va="center",
                         fontweight="bold",
+                        path_effects=[
+                            pe.withStroke(linewidth=3, foreground=STYLE["bg"])
+                        ],
                     )
             else:
                 ax.text(
@@ -5830,6 +5848,7 @@ def diagram_layout_stack_visualization():
                     ha="center",
                     va="center",
                     fontstyle="italic",
+                    path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
                 )
 
         # Depth label
@@ -5842,6 +5861,7 @@ def diagram_layout_stack_visualization():
             ha="center",
             va="top",
             fontweight="bold",
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
 
     fig.tight_layout()
@@ -5856,6 +5876,13 @@ def diagram_padding_and_spacing():
     fig.patch.set_facecolor(STYLE["bg"])
     setup_axes(ax, xlim=(-1, 12), ylim=(-0.5, 9), grid=False, aspect=None)
     ax.axis("off")
+    ax.set_title(
+        "Padding vs Spacing",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
+    )
 
     # Layout rect
     lx, ly, lw, lh = 1, 0.5, 8, 7.5
@@ -5916,6 +5943,7 @@ def diagram_padding_and_spacing():
             fontweight="bold",
             ha="center",
             va="center",
+            path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
         )
         rects.append((inner_x, wy, inner_w, widget_h))
 
@@ -5948,6 +5976,7 @@ def diagram_padding_and_spacing():
         fontweight="bold",
         ha="left",
         va="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # Left padding
@@ -5965,6 +5994,7 @@ def diagram_padding_and_spacing():
         fontsize=9,
         ha="center",
         va="top",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # Spacing annotation
@@ -5994,6 +6024,7 @@ def diagram_padding_and_spacing():
         fontweight="bold",
         ha="left",
         va="center",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     fig.tight_layout()
@@ -6029,7 +6060,7 @@ def diagram_layout_next_sequence():
             color=STYLE["text"],
             fontsize=9,
             fontweight="bold",
-            pad=5,
+            pad=12,
         )
 
         # Outer rect
@@ -6085,6 +6116,7 @@ def diagram_layout_next_sequence():
                     fontweight="bold",
                     ha="center",
                     va="center",
+                    path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
                 )
 
             cy = wy - sp
@@ -6110,6 +6142,7 @@ def diagram_layout_next_sequence():
             ha="right",
             va="center",
             fontfamily="monospace",
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
 
     fig.tight_layout()

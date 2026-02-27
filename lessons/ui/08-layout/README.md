@@ -64,8 +64,8 @@ interaction:
   layouts advance rightward
 - **Padding** — uniform inset from all four edges of the layout rect, creating
   a content region smaller than the layout rect
-- **Spacing** — gap between consecutive widgets, added after each
-  `layout_next()` call
+- **Spacing** — gap between consecutive widgets, added before each widget
+  (except the first) by `layout_next()`
 - **Remaining space** — the layout tracks how much width/height is left for
   additional widgets
 - **Layout stack** — an array of `ForgeUiLayout` structs with a depth counter,
@@ -87,7 +87,8 @@ In a **vertical** layout, the cursor moves downward:
 - Widget y = `cursor_y`
 - Widget width = `remaining_w` (full content width)
 - Widget height = `size` (caller-specified)
-- After placement: `cursor_y += size + spacing`
+- Before placement (except the first widget): `cursor_y += spacing`
+- After placement: `cursor_y += size`
 
 In a **horizontal** layout, the cursor moves rightward:
 
@@ -95,7 +96,8 @@ In a **horizontal** layout, the cursor moves rightward:
 - Widget y = `cursor_y` (top edge of content area)
 - Widget width = `size` (caller-specified)
 - Widget height = `remaining_h` (full content height)
-- After placement: `cursor_x += size + spacing`
+- Before placement (except the first widget): `cursor_x += spacing`
+- After placement: `cursor_x += size`
 
 ### Vertical vs horizontal directions
 
@@ -120,9 +122,10 @@ typedef enum ForgeUiLayoutDirection {
 rect `(x, y, w, h)` and `padding = p` has a content area starting at
 `(x + p, y + p)` with size `(w - 2p, h - 2p)`.
 
-**Spacing** is the gap inserted between consecutive widgets. After each
-`layout_next()` call, the cursor advances by `size + spacing`, not just
-`size`. This keeps widgets evenly separated without the caller tracking gaps.
+**Spacing** is the gap inserted between consecutive widgets. Before each
+widget (except the first), the cursor advances by `spacing`. After the widget,
+it advances by `size`. This spacing-before-item model avoids a phantom gap
+after the last widget, keeping `remaining_h` accurate.
 
 ![Padding and spacing](assets/padding_and_spacing.png)
 
@@ -140,6 +143,7 @@ typedef struct ForgeUiLayout {
     float                    cursor_y;     /* current placement y position */
     float                    remaining_w;  /* width left for more widgets */
     float                    remaining_h;  /* height left for more widgets */
+    int                      item_count;   /* widgets placed so far (for spacing) */
 } ForgeUiLayout;
 ```
 
@@ -149,8 +153,12 @@ and the remaining dimensions match the content area size:
 ```c
 layout->cursor_x   = rect.x + padding;
 layout->cursor_y   = rect.y + padding;
-layout->remaining_w = rect.w - 2.0f * padding;  /* clamped to >= 0 */
-layout->remaining_h = rect.h - 2.0f * padding;
+layout->item_count = 0;
+
+float inner_w = rect.w - 2.0f * padding;
+float inner_h = rect.h - 2.0f * padding;
+layout->remaining_w = (inner_w > 0.0f) ? inner_w : 0.0f;
+layout->remaining_h = (inner_h > 0.0f) ? inner_h : 0.0f;
 ```
 
 ### The layout stack
@@ -185,24 +193,29 @@ layout, then pushing a new layout *inside* that rect:
 
 ```c
 /* Outer vertical layout */
-forge_ui_ctx_layout_push(ctx, panel_rect,
-                         FORGE_UI_LAYOUT_VERTICAL,
-                         padding, spacing);
+if (!forge_ui_ctx_layout_push(ctx, panel,
+                              FORGE_UI_LAYOUT_VERTICAL,
+                              PANEL_PADDING, WIDGET_SPACING)) {
+    return;
+}
 
 /* Widgets placed by the outer layout */
 forge_ui_ctx_label_layout(ctx, "Settings", ...);
 forge_ui_ctx_checkbox_layout(ctx, ...);
 
 /* Reserve a rect for the button row */
-ForgeUiRect button_row = forge_ui_ctx_layout_next(ctx, ROW_HEIGHT);
+ForgeUiRect button_row = forge_ui_ctx_layout_next(ctx, BUTTON_ROW_H);
 
 /* Push horizontal layout inside that rect */
-forge_ui_ctx_layout_push(ctx, button_row,
-                         FORGE_UI_LAYOUT_HORIZONTAL,
-                         0.0f, button_spacing);
+if (!forge_ui_ctx_layout_push(ctx, button_row,
+                              FORGE_UI_LAYOUT_HORIZONTAL,
+                              0.0f, BUTTON_SPACING)) {
+    forge_ui_ctx_layout_pop(ctx);  /* pop outer before returning */
+    return;
+}
 
-forge_ui_ctx_button_layout(ctx, ID_OK, "OK", btn_width);
-forge_ui_ctx_button_layout(ctx, ID_CANCEL, "Cancel", btn_width);
+(void)forge_ui_ctx_button_layout(ctx, ID_BTN_OK, "OK", btn_w);
+(void)forge_ui_ctx_button_layout(ctx, ID_BTN_CANCEL, "Cancel", btn_w);
 
 forge_ui_ctx_layout_pop(ctx);  /* end horizontal */
 
@@ -219,8 +232,9 @@ a four-step sequence in a vertical layout:
 
 ![layout_next sequence](assets/layout_next_sequence.png)
 
-After each call, the cursor moves down by the widget height plus spacing.
-The returned rect has full content width and the caller-specified height.
+Before each call (except the first), the cursor advances by the spacing gap.
+The returned rect has full content width and the caller-specified height, and
+the cursor then advances by the widget height.
 
 ### Layout-aware widget variants
 
@@ -230,8 +244,8 @@ widget has a `_layout()` variant that calls `layout_next()` internally:
 | Standard API | Layout API |
 |---|---|
 | `forge_ui_ctx_button(ctx, id, text, rect)` | `forge_ui_ctx_button_layout(ctx, id, text, size)` |
-| `forge_ui_ctx_checkbox(ctx, id, label, &val, rect)` | `forge_ui_ctx_checkbox_layout(ctx, id, label, &val, size)` |
-| `forge_ui_ctx_slider(ctx, id, &val, min, max, rect)` | `forge_ui_ctx_slider_layout(ctx, id, &val, min, max, size)` |
+| `forge_ui_ctx_checkbox(ctx, id, label, val, rect)` | `forge_ui_ctx_checkbox_layout(ctx, id, label, val, size)` |
+| `forge_ui_ctx_slider(ctx, id, val, min, max, rect)` | `forge_ui_ctx_slider_layout(ctx, id, val, min, max, size)` |
 | `forge_ui_ctx_label(ctx, text, x, y, r, g, b, a)` | `forge_ui_ctx_label_layout(ctx, text, size, r, g, b, a)` |
 
 The `size` parameter is the widget's height in a vertical layout or width in
@@ -245,20 +259,22 @@ The demo program renders the same settings panel both ways. The manual
 version computes every rect by hand:
 
 ```c
-float cursor_y = PANEL_Y + PANEL_PADDING;
-ForgeUiRect cb_rect = { cx, cursor_y, inner_w, CHECKBOX_HEIGHT };
-forge_ui_ctx_checkbox(ctx, ID_CB_VSYNC, "V-Sync", &vsync, cb_rect);
-cursor_y += CHECKBOX_HEIGHT + WIDGET_SPACING;
+float cy = PANEL_Y + PANEL_PADDING;
+ForgeUiRect r = { cx, cy, inner_w, CHECKBOX_HEIGHT };
+(void)forge_ui_ctx_checkbox(ctx, ID_CB_VSYNC, "V-Sync", vsync, r);
+cy += CHECKBOX_HEIGHT + WIDGET_SPACING;
 /* ... repeat for every widget ... */
 ```
 
 The layout version replaces all of that with:
 
 ```c
-forge_ui_ctx_layout_push(ctx, panel, FORGE_UI_LAYOUT_VERTICAL,
-                         PANEL_PADDING, WIDGET_SPACING);
-forge_ui_ctx_checkbox_layout(ctx, ID_CB_VSYNC, "V-Sync",
-                             &vsync, CHECKBOX_HEIGHT);
+if (!forge_ui_ctx_layout_push(ctx, panel, FORGE_UI_LAYOUT_VERTICAL,
+                              PANEL_PADDING, WIDGET_SPACING)) {
+    return;
+}
+(void)forge_ui_ctx_checkbox_layout(ctx, ID_CB_VSYNC, "V-Sync",
+                                   vsync, CHECKBOX_HEIGHT);
 /* ... just call widgets, no rect math ... */
 forge_ui_ctx_layout_pop(ctx);
 ```

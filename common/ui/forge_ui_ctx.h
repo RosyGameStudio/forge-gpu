@@ -136,7 +136,8 @@
 #define FORGE_UI_SL_TRACK_B     0.35f
 #define FORGE_UI_SL_TRACK_A     1.00f
 
-/* Thumb colors by state */
+/* Thumb color varies with interaction state to give visual feedback
+ * during drag: normal (idle), hot (cursor hovering), active (dragging). */
 #define FORGE_UI_SL_NORMAL_R    0.50f
 #define FORGE_UI_SL_NORMAL_G    0.50f
 #define FORGE_UI_SL_NORMAL_B    0.58f
@@ -154,7 +155,10 @@
 
 /* ── Text input style ─────────────────────────────────────────────────── */
 
-/* Text input layout dimensions */
+/* Text input layout dimensions.  Padding keeps text away from the field
+ * edge so characters are readable near the border.  The cursor bar is
+ * thin (2 px) to mimic a standard text insertion caret.  The border is
+ * 1 px to provide a focused-state indicator without obscuring content. */
 #define FORGE_UI_TI_PADDING       6.0f   /* left padding in pixels before text starts */
 #define FORGE_UI_TI_CURSOR_WIDTH  2.0f   /* cursor bar width in pixels */
 #define FORGE_UI_TI_BORDER_WIDTH  1.0f   /* focused border edge width in pixels */
@@ -202,7 +206,9 @@
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
-/* A simple rectangle for widget bounds. */
+/* A rectangle used for both hit testing and draw emission.  The layout
+ * system produces ForgeUiRects, and widget functions consume them --
+ * this is the common currency for positioning in the UI. */
 typedef struct ForgeUiRect {
     float x;  /* left edge */
     float y;  /* top edge */
@@ -299,7 +305,11 @@ typedef struct ForgeUiContext {
     Uint32 hot;           /* widget under the cursor (or FORGE_UI_ID_NONE) */
     Uint32 active;        /* widget being pressed (or FORGE_UI_ID_NONE) */
 
-    Uint32 next_hot;      /* hot candidate for this frame (resolved in ctx_end) */
+    /* Hot candidate for this frame.  Widgets write to next_hot during
+     * processing (last writer wins = topmost in draw order).  In ctx_end,
+     * next_hot is copied to hot -- this two-phase approach prevents hot
+     * from flickering mid-frame as widgets are evaluated. */
+    Uint32 next_hot;
 
     /* Focused widget (receives keyboard input).  Only one widget can be
      * focused at a time.  Focus is acquired when a text input is clicked
@@ -335,12 +345,16 @@ typedef struct ForgeUiContext {
     ForgeUiLayout layout_stack[FORGE_UI_LAYOUT_MAX_DEPTH];
     int           layout_depth;  /* number of active layouts on the stack */
 
-    /* Draw data (reset each frame by forge_ui_ctx_begin) */
-    ForgeUiVertex *vertices;   /* dynamically growing vertex buffer */
+    /* Draw data -- accumulated across all widget calls during a frame.
+     * Each widget appends its quads to these buffers.  At frame end the
+     * caller uploads the entire batch to the GPU (or software rasterizer)
+     * in a single draw call.  Buffers are reset (not freed) each frame
+     * by forge_ui_ctx_begin to reuse allocated memory. */
+    ForgeUiVertex *vertices;        /* dynamically growing vertex buffer */
     int            vertex_count;    /* number of vertices emitted this frame */
     int            vertex_capacity; /* allocated size of vertex buffer */
 
-    Uint32        *indices;    /* dynamically growing index buffer */
+    Uint32        *indices;         /* dynamically growing index buffer */
     int            index_count;     /* number of indices emitted this frame */
     int            index_capacity;  /* allocated size of index buffer */
 } ForgeUiContext;
@@ -687,13 +701,16 @@ static inline void forge_ui__emit_text_layout(ForgeUiContext *ctx,
 
     Uint32 base = (Uint32)ctx->vertex_count;
 
-    /* Copy vertices directly */
+    /* Copy vertices into the shared buffer without modification --
+     * vertex positions are absolute screen coordinates. */
     SDL_memcpy(&ctx->vertices[ctx->vertex_count],
                layout->vertices,
                (size_t)layout->vertex_count * sizeof(ForgeUiVertex));
     ctx->vertex_count += layout->vertex_count;
 
-    /* Copy indices with offset */
+    /* Rebase indices by the current vertex count so they reference the
+     * correct positions in the shared vertex buffer (text layouts produce
+     * indices starting from zero). */
     for (int i = 0; i < layout->index_count; i++) {
         ctx->indices[ctx->index_count + i] = layout->indices[i] + base;
     }
@@ -800,7 +817,9 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
     /* Track the previous frame's mouse state for edge detection */
     ctx->mouse_down_prev = ctx->mouse_down;
 
-    /* Update input state */
+    /* Snapshot the mouse state for this frame.  All widget calls see the
+     * same position and button state, ensuring consistent hit-testing even
+     * if the OS delivers new input events between widget calls. */
     ctx->mouse_x = mouse_x;
     ctx->mouse_y = mouse_y;
     ctx->mouse_down = mouse_down;
