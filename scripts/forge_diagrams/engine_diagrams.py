@@ -1994,7 +1994,7 @@ def diagram_rasterization_pipeline():
     """Rasterization pipeline flow: vertices -> triangles -> pixels."""
     fig, ax = plt.subplots(figsize=(12, 4), facecolor=STYLE["bg"])
     ax.set_facecolor(STYLE["bg"])
-    ax.set_xlim(-0.5, 14)
+    ax.set_xlim(-1.0, 14)
     ax.set_ylim(-0.5, 3.5)
     ax.set_aspect("equal")
     ax.axis("off")
