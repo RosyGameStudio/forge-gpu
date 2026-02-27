@@ -40,6 +40,7 @@
 #define FORGE_UI_CTX_H
 
 #include <assert.h>
+#include <math.h>
 #include <SDL3/SDL.h>
 #include "forge_ui.h"
 
@@ -240,6 +241,7 @@ typedef struct ForgeUiLayout {
     float                    cursor_y;     /* current placement y position */
     float                    remaining_w;  /* width left for more widgets */
     float                    remaining_h;  /* height left for more widgets */
+    int                      item_count;   /* widgets placed so far (for spacing) */
 } ForgeUiLayout;
 
 /* Application-owned text input state.
@@ -493,30 +495,33 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
  *
  * rect:      the rectangular area this layout occupies
  * direction: FORGE_UI_LAYOUT_VERTICAL or FORGE_UI_LAYOUT_HORIZONTAL
- * padding:   inset from all four edges of rect (pixels)
- * spacing:   gap between consecutive widgets (pixels)
+ * padding:   inset from all four edges of rect (pixels); clamped to >= 0
+ * spacing:   gap between consecutive widgets (pixels); clamped to >= 0
  *
  * The cursor starts at (rect.x + padding, rect.y + padding).  Available
  * space is (rect.w - 2*padding) wide and (rect.h - 2*padding) tall.
- * Asserts if the stack overflows (depth >= FORGE_UI_LAYOUT_MAX_DEPTH). */
-static inline void forge_ui_ctx_layout_push(ForgeUiContext *ctx,
+ *
+ * Returns true on success, false if ctx is NULL, the stack is full
+ * (depth >= FORGE_UI_LAYOUT_MAX_DEPTH), or parameters are invalid. */
+static inline bool forge_ui_ctx_layout_push(ForgeUiContext *ctx,
                                              ForgeUiRect rect,
                                              ForgeUiLayoutDirection direction,
                                              float padding,
                                              float spacing);
 
 /* Pop the current layout region and return to the parent layout.
- * Asserts if the stack is empty (layout_depth == 0). */
-static inline void forge_ui_ctx_layout_pop(ForgeUiContext *ctx);
+ * Returns true on success, false if the stack is empty or ctx is NULL. */
+static inline bool forge_ui_ctx_layout_pop(ForgeUiContext *ctx);
 
 /* Return the next widget rect from the current layout.
  *
  * size: the widget's height (in vertical layout) or width (in horizontal
  *       layout).  The other dimension is filled automatically from the
- *       layout's available space.
+ *       layout's available space.  Negative sizes are clamped to 0.
  *
  * Returns a ForgeUiRect positioned at the cursor, then advances the
- * cursor by (size + spacing).  Asserts if no layout is active. */
+ * cursor by (size + spacing).  Returns a zero rect if no layout is
+ * active or ctx is NULL. */
 static inline ForgeUiRect forge_ui_ctx_layout_next(ForgeUiContext *ctx,
                                                     float size);
 
@@ -783,6 +788,7 @@ static inline void forge_ui_ctx_free(ForgeUiContext *ctx)
     ctx->active = FORGE_UI_ID_NONE;
     ctx->next_hot = FORGE_UI_ID_NONE;
     ctx->focused = FORGE_UI_ID_NONE;
+    ctx->layout_depth = 0;
 }
 
 static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
@@ -814,7 +820,12 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
     ctx->key_escape = false;
     ctx->_ti_press_claimed = false;
 
-    /* Reset layout stack for this frame */
+    /* Reset layout stack for this frame.  Warn if the previous frame had
+     * unmatched push/pop calls -- this is a programming error. */
+    if (ctx->layout_depth != 0) {
+        SDL_Log("forge_ui_ctx_begin: layout_depth=%d at frame start "
+                "(unmatched push/pop last frame)", ctx->layout_depth);
+    }
     ctx->layout_depth = 0;
 
     /* Reset draw buffers (keep allocated memory) */
@@ -862,6 +873,14 @@ static inline void forge_ui_ctx_end(ForgeUiContext *ctx)
      * if the cursor slides off during a press. */
     if (ctx->active == FORGE_UI_ID_NONE) {
         ctx->hot = ctx->next_hot;
+    }
+
+    /* Check for unmatched layout push/pop.  A non-zero depth here means
+     * the caller forgot one or more layout_pop calls this frame. */
+    if (ctx->layout_depth != 0) {
+        SDL_Log("forge_ui_ctx_end: layout_depth=%d (missing %d pop call%s)",
+                ctx->layout_depth, ctx->layout_depth,
+                ctx->layout_depth == 1 ? "" : "s");
     }
 }
 
@@ -1403,22 +1422,37 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
 
 /* ── Layout implementation ──────────────────────────────────────────────── */
 
-static inline void forge_ui_ctx_layout_push(ForgeUiContext *ctx,
+static inline bool forge_ui_ctx_layout_push(ForgeUiContext *ctx,
                                              ForgeUiRect rect,
                                              ForgeUiLayoutDirection direction,
                                              float padding,
                                              float spacing)
 {
-    if (!ctx) return;
-    assert(ctx->layout_depth < FORGE_UI_LAYOUT_MAX_DEPTH);
+    if (!ctx) return false;
+
+    /* Runtime bounds check — must not rely on assert() alone because
+     * assert() is compiled out in NDEBUG builds, which would allow
+     * an out-of-bounds write into layout_stack[]. */
+    if (ctx->layout_depth >= FORGE_UI_LAYOUT_MAX_DEPTH) {
+        SDL_Log("forge_ui_ctx_layout_push: stack overflow (depth=%d, max=%d)",
+                ctx->layout_depth, FORGE_UI_LAYOUT_MAX_DEPTH);
+        return false;
+    }
+
+    /* Reject NaN/Inf in padding and spacing; clamp negatives to 0 */
+    if (isnan(padding) || isinf(padding)) padding = 0.0f;
+    if (isnan(spacing) || isinf(spacing)) spacing = 0.0f;
+    if (padding < 0.0f) padding = 0.0f;
+    if (spacing < 0.0f) spacing = 0.0f;
 
     ForgeUiLayout *layout = &ctx->layout_stack[ctx->layout_depth];
-    layout->rect      = rect;
-    layout->direction  = direction;
-    layout->padding    = padding;
-    layout->spacing    = spacing;
-    layout->cursor_x   = rect.x + padding;
-    layout->cursor_y   = rect.y + padding;
+    layout->rect       = rect;
+    layout->direction   = direction;
+    layout->padding     = padding;
+    layout->spacing     = spacing;
+    layout->cursor_x    = rect.x + padding;
+    layout->cursor_y    = rect.y + padding;
+    layout->item_count  = 0;
 
     /* Available space after subtracting padding from both sides.
      * Clamp to zero so a very small rect does not go negative. */
@@ -1428,24 +1462,56 @@ static inline void forge_ui_ctx_layout_push(ForgeUiContext *ctx,
     layout->remaining_h = (inner_h > 0.0f) ? inner_h : 0.0f;
 
     ctx->layout_depth++;
+    return true;
 }
 
-static inline void forge_ui_ctx_layout_pop(ForgeUiContext *ctx)
+static inline bool forge_ui_ctx_layout_pop(ForgeUiContext *ctx)
 {
-    if (!ctx) return;
-    assert(ctx->layout_depth > 0);
+    if (!ctx) return false;
+
+    /* Runtime bounds check — must not rely on assert() alone because
+     * assert() is compiled out in NDEBUG builds, which would allow
+     * layout_depth to go negative and corrupt subsequent accesses. */
+    if (ctx->layout_depth <= 0) {
+        SDL_Log("forge_ui_ctx_layout_pop: stack underflow (depth=%d)",
+                ctx->layout_depth);
+        return false;
+    }
+
     ctx->layout_depth--;
+    return true;
 }
 
 static inline ForgeUiRect forge_ui_ctx_layout_next(ForgeUiContext *ctx,
                                                     float size)
 {
-    assert(ctx && ctx->layout_depth > 0);
+    ForgeUiRect empty = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    /* Runtime guards — must not rely on assert() alone because assert()
+     * is compiled out in NDEBUG builds, which would allow a NULL deref
+     * or out-of-bounds read from layout_stack[-1]. */
+    if (!ctx || ctx->layout_depth <= 0) {
+        if (ctx) {
+            SDL_Log("forge_ui_ctx_layout_next: no active layout (depth=%d)",
+                    ctx->layout_depth);
+        }
+        return empty;
+    }
+
+    /* Clamp negative or invalid sizes to zero */
+    if (size < 0.0f || isnan(size) || isinf(size)) size = 0.0f;
 
     ForgeUiLayout *layout = &ctx->layout_stack[ctx->layout_depth - 1];
     ForgeUiRect result;
 
     if (layout->direction == FORGE_UI_LAYOUT_VERTICAL) {
+        /* Add spacing gap before this widget (but not before the first) */
+        if (layout->item_count > 0) {
+            layout->cursor_y += layout->spacing;
+            layout->remaining_h -= layout->spacing;
+            if (layout->remaining_h < 0.0f) layout->remaining_h = 0.0f;
+        }
+
         /* Vertical: widget gets full available width, caller-specified height */
         result.x = layout->cursor_x;
         result.y = layout->cursor_y;
@@ -1453,10 +1519,17 @@ static inline ForgeUiRect forge_ui_ctx_layout_next(ForgeUiContext *ctx,
         result.h = size;
 
         /* Advance cursor downward */
-        layout->cursor_y += size + layout->spacing;
-        layout->remaining_h -= size + layout->spacing;
+        layout->cursor_y += size;
+        layout->remaining_h -= size;
         if (layout->remaining_h < 0.0f) layout->remaining_h = 0.0f;
     } else {
+        /* Add spacing gap before this widget (but not before the first) */
+        if (layout->item_count > 0) {
+            layout->cursor_x += layout->spacing;
+            layout->remaining_w -= layout->spacing;
+            if (layout->remaining_w < 0.0f) layout->remaining_w = 0.0f;
+        }
+
         /* Horizontal: widget gets caller-specified width, full available height */
         result.x = layout->cursor_x;
         result.y = layout->cursor_y;
@@ -1464,11 +1537,12 @@ static inline ForgeUiRect forge_ui_ctx_layout_next(ForgeUiContext *ctx,
         result.h = layout->remaining_h;
 
         /* Advance cursor rightward */
-        layout->cursor_x += size + layout->spacing;
-        layout->remaining_w -= size + layout->spacing;
+        layout->cursor_x += size;
+        layout->remaining_w -= size;
         if (layout->remaining_w < 0.0f) layout->remaining_w = 0.0f;
     }
 
+    layout->item_count++;
     return result;
 }
 
@@ -1501,7 +1575,9 @@ static inline bool forge_ui_ctx_button_layout(ForgeUiContext *ctx,
                                                const char *text,
                                                float size)
 {
-    if (!ctx) return false;
+    /* Validate all params before calling layout_next so we don't
+     * advance the cursor for a widget that will fail to draw. */
+    if (!ctx || !text || id == FORGE_UI_ID_NONE) return false;
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_button(ctx, id, text, rect);
 }
@@ -1512,7 +1588,7 @@ static inline bool forge_ui_ctx_checkbox_layout(ForgeUiContext *ctx,
                                                  bool *value,
                                                  float size)
 {
-    if (!ctx) return false;
+    if (!ctx || !label || !value || id == FORGE_UI_ID_NONE) return false;
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_checkbox(ctx, id, label, value, rect);
 }
@@ -1523,7 +1599,8 @@ static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
                                                float min_val, float max_val,
                                                float size)
 {
-    if (!ctx) return false;
+    if (!ctx || !value || id == FORGE_UI_ID_NONE) return false;
+    if (!(max_val > min_val)) return false;  /* also rejects NaN */
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_slider(ctx, id, value, min_val, max_val, rect);
 }

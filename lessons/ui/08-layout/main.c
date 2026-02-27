@@ -181,40 +181,50 @@ static void declare_settings_panel_layout(ForgeUiContext *ctx,
                         PANEL_BG_B, PANEL_BG_A);
 
     /* Push the outer vertical layout that covers the panel */
-    forge_ui_ctx_layout_push(ctx, panel,
-                             FORGE_UI_LAYOUT_VERTICAL,
-                             PANEL_PADDING, WIDGET_SPACING);
+    if (!forge_ui_ctx_layout_push(ctx, panel,
+                                  FORGE_UI_LAYOUT_VERTICAL,
+                                  PANEL_PADDING, WIDGET_SPACING)) {
+        return;
+    }
 
     /* Title label */
     forge_ui_ctx_label_layout(ctx, "Settings", LABEL_HEIGHT,
                               TITLE_R, TITLE_G, TITLE_B, TITLE_A);
 
-    /* Three checkboxes stacked vertically */
-    forge_ui_ctx_checkbox_layout(ctx, ID_CB_VSYNC, "V-Sync",
-                                 vsync, CHECKBOX_HEIGHT);
-    forge_ui_ctx_checkbox_layout(ctx, ID_CB_FULLSCREEN, "Fullscreen",
-                                 fullscreen, CHECKBOX_HEIGHT);
-    forge_ui_ctx_checkbox_layout(ctx, ID_CB_AA, "Anti-aliasing",
-                                 aa, CHECKBOX_HEIGHT);
+    /* Three checkboxes stacked vertically (return value = toggled this
+     * frame; we don't need per-frame toggle info in this demo because
+     * checkbox state is tracked via the bool pointer) */
+    (void)forge_ui_ctx_checkbox_layout(ctx, ID_CB_VSYNC, "V-Sync",
+                                       vsync, CHECKBOX_HEIGHT);
+    (void)forge_ui_ctx_checkbox_layout(ctx, ID_CB_FULLSCREEN, "Fullscreen",
+                                       fullscreen, CHECKBOX_HEIGHT);
+    (void)forge_ui_ctx_checkbox_layout(ctx, ID_CB_AA, "Anti-aliasing",
+                                       aa, CHECKBOX_HEIGHT);
 
     /* Horizontal sub-layout for OK and Cancel buttons side by side.
      * First, get the rect for the button row from the outer layout. */
     ForgeUiRect button_row = forge_ui_ctx_layout_next(ctx, BUTTON_ROW_H);
 
-    forge_ui_ctx_layout_push(ctx, button_row,
-                             FORGE_UI_LAYOUT_HORIZONTAL,
-                             0.0f, BUTTON_SPACING);
+    if (!forge_ui_ctx_layout_push(ctx, button_row,
+                                  FORGE_UI_LAYOUT_HORIZONTAL,
+                                  0.0f, BUTTON_SPACING)) {
+        forge_ui_ctx_layout_pop(ctx);  /* pop outer layout before returning */
+        return;
+    }
 
     /* Each button gets half the row width minus half the spacing */
     float btn_w = (button_row.w - BUTTON_SPACING) * 0.5f;
-    forge_ui_ctx_button_layout(ctx, ID_BTN_OK, "OK", btn_w);
-    forge_ui_ctx_button_layout(ctx, ID_BTN_CANCEL, "Cancel", btn_w);
+    /* Button return values intentionally discarded — this demo
+     * demonstrates layout positioning, not button click handling. */
+    (void)forge_ui_ctx_button_layout(ctx, ID_BTN_OK, "OK", btn_w);
+    (void)forge_ui_ctx_button_layout(ctx, ID_BTN_CANCEL, "Cancel", btn_w);
 
     forge_ui_ctx_layout_pop(ctx);  /* end horizontal button row */
 
-    /* Slider for volume */
-    forge_ui_ctx_slider_layout(ctx, ID_SLIDER_VOL, volume,
-                               0.0f, 100.0f, SLIDER_HEIGHT);
+    /* Slider for volume (return value = changed this frame; the value
+     * itself is tracked via the float pointer) */
+    (void)forge_ui_ctx_slider_layout(ctx, ID_SLIDER_VOL, volume,
+                                     0.0f, 100.0f, SLIDER_HEIGHT);
 
     forge_ui_ctx_layout_pop(ctx);  /* end outer vertical layout */
 }
@@ -256,17 +266,17 @@ static void declare_settings_panel_manual(ForgeUiContext *ctx,
     /* Three checkboxes */
     {
         ForgeUiRect r = { cx, cy, inner_w, CHECKBOX_HEIGHT };
-        forge_ui_ctx_checkbox(ctx, ID_CB_VSYNC, "V-Sync", vsync, r);
+        (void)forge_ui_ctx_checkbox(ctx, ID_CB_VSYNC, "V-Sync", vsync, r);
         cy += CHECKBOX_HEIGHT + WIDGET_SPACING;
     }
     {
         ForgeUiRect r = { cx, cy, inner_w, CHECKBOX_HEIGHT };
-        forge_ui_ctx_checkbox(ctx, ID_CB_FULLSCREEN, "Fullscreen", fullscreen, r);
+        (void)forge_ui_ctx_checkbox(ctx, ID_CB_FULLSCREEN, "Fullscreen", fullscreen, r);
         cy += CHECKBOX_HEIGHT + WIDGET_SPACING;
     }
     {
         ForgeUiRect r = { cx, cy, inner_w, CHECKBOX_HEIGHT };
-        forge_ui_ctx_checkbox(ctx, ID_CB_AA, "Anti-aliasing", aa, r);
+        (void)forge_ui_ctx_checkbox(ctx, ID_CB_AA, "Anti-aliasing", aa, r);
         cy += CHECKBOX_HEIGHT + WIDGET_SPACING;
     }
 
@@ -274,18 +284,18 @@ static void declare_settings_panel_manual(ForgeUiContext *ctx,
     {
         float btn_w = (inner_w - BUTTON_SPACING) * 0.5f;
         ForgeUiRect ok_r = { cx, cy, btn_w, BUTTON_ROW_H };
-        forge_ui_ctx_button(ctx, ID_BTN_OK, "OK", ok_r);
+        (void)forge_ui_ctx_button(ctx, ID_BTN_OK, "OK", ok_r);
         ForgeUiRect cancel_r = { cx + btn_w + BUTTON_SPACING, cy,
                                  btn_w, BUTTON_ROW_H };
-        forge_ui_ctx_button(ctx, ID_BTN_CANCEL, "Cancel", cancel_r);
+        (void)forge_ui_ctx_button(ctx, ID_BTN_CANCEL, "Cancel", cancel_r);
         cy += BUTTON_ROW_H + WIDGET_SPACING;
     }
 
     /* Slider */
     {
         ForgeUiRect r = { cx, cy, inner_w, SLIDER_HEIGHT };
-        forge_ui_ctx_slider(ctx, ID_SLIDER_VOL, volume,
-                            0.0f, 100.0f, r);
+        (void)forge_ui_ctx_slider(ctx, ID_SLIDER_VOL, volume,
+                                 0.0f, 100.0f, r);
     }
 }
 
