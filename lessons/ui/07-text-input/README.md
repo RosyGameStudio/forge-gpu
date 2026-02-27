@@ -397,6 +397,13 @@ Override the default iteration count at configure time:
 cmake -DFORGE_FUZZ_ITERATIONS=1000000 -B build
 ```
 
+## What's next
+
+- **UI Lesson 08 — Panels and Clipping** — static containers with scroll
+  regions, using scissor rects to clip child widgets to a panel boundary
+- **UI Lesson 09 — Windows** — draggable panels with z-ordering, title bars,
+  and collapse/expand
+
 ## Exercises
 
 1. **Text selection** — Track a `selection_start` index alongside `cursor`.
