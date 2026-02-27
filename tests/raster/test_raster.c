@@ -408,6 +408,238 @@ static void test_vertex_layout_size(void)
     ASSERT_EQ_INT((int)sizeof(ForgeRasterVertex), 32);
 }
 
+/* ── Safety & Validation Tests ───────────────────────────────────────────── */
+
+static void test_buffer_create_max_dim(void)
+{
+    TEST("buffer_create_max_dim: oversized dimensions rejected");
+
+    /* Width exceeding FORGE_RASTER_MAX_DIM should fail */
+    ForgeRasterBuffer buf = forge_raster_buffer_create(
+        FORGE_RASTER_MAX_DIM + 1, 64);
+    ASSERT_TRUE(buf.pixels == NULL);
+    ASSERT_EQ_INT(buf.width, 0);
+    ASSERT_EQ_INT(buf.height, 0);
+    ASSERT_EQ_INT(buf.stride, 0);
+
+    /* Height exceeding FORGE_RASTER_MAX_DIM should fail */
+    buf = forge_raster_buffer_create(64, FORGE_RASTER_MAX_DIM + 1);
+    ASSERT_TRUE(buf.pixels == NULL);
+    ASSERT_EQ_INT(buf.width, 0);
+
+    /* Exactly FORGE_RASTER_MAX_DIM should succeed (boundary test).
+     * Use a 1-pixel height to keep allocation small. */
+    buf = forge_raster_buffer_create(FORGE_RASTER_MAX_DIM, 1);
+    ASSERT_TRUE(buf.pixels != NULL);
+    ASSERT_EQ_INT(buf.width, FORGE_RASTER_MAX_DIM);
+    forge_raster_buffer_destroy(&buf);
+}
+
+static void test_buffer_create_zeroed_on_failure(void)
+{
+    TEST("buffer_create_zeroed: failed create zeros all struct fields");
+    ForgeRasterBuffer buf = forge_raster_buffer_create(-10, 64);
+    ASSERT_TRUE(buf.pixels == NULL);
+    ASSERT_EQ_INT(buf.width, 0);
+    ASSERT_EQ_INT(buf.height, 0);
+    ASSERT_EQ_INT(buf.stride, 0);
+
+    buf = forge_raster_buffer_create(64, -5);
+    ASSERT_TRUE(buf.pixels == NULL);
+    ASSERT_EQ_INT(buf.width, 0);
+    ASSERT_EQ_INT(buf.height, 0);
+    ASSERT_EQ_INT(buf.stride, 0);
+}
+
+static void test_null_vertex_pointers(void)
+{
+    TEST("null_vertex_pointers: NULL v0/v1/v2 do not crash");
+    ForgeRasterBuffer buf = forge_raster_buffer_create(8, 8);
+    ASSERT_TRUE(buf.pixels != NULL);
+    forge_raster_clear(&buf, 0.0f, 0.0f, 0.0f, 1.0f);
+
+    ForgeRasterVertex v = { 4.0f, 4.0f, 0, 0, 1, 1, 1, 1 };
+
+    /* Each of these should return silently without crashing */
+    forge_raster_triangle(&buf, NULL, &v, &v, NULL);
+    forge_raster_triangle(&buf, &v, NULL, &v, NULL);
+    forge_raster_triangle(&buf, &v, &v, NULL, NULL);
+
+    /* Buffer should be unmodified (still black) */
+    Uint8 r, g, b, a;
+    get_pixel(&buf, 4, 4, &r, &g, &b, &a);
+    ASSERT_EQ_BYTE(r, 0);
+    ASSERT_EQ_BYTE(g, 0);
+    ASSERT_EQ_BYTE(b, 0);
+
+    forge_raster_buffer_destroy(&buf);
+}
+
+static void test_nan_inf_vertex_coords(void)
+{
+    TEST("nan_inf_vertex_coords: non-finite coordinates rejected");
+    ForgeRasterBuffer buf = forge_raster_buffer_create(8, 8);
+    ASSERT_TRUE(buf.pixels != NULL);
+    forge_raster_clear(&buf, 0.0f, 0.0f, 0.0f, 1.0f);
+
+    /* Construct NaN and Infinity without <math.h> */
+    volatile float zero = 0.0f;
+    float nan_val = zero / zero;   /* NaN */
+    float inf_val = 1.0f / zero;   /* +Infinity */
+
+    ForgeRasterVertex good_v1 = { 0.0f, 8.0f, 0, 0, 1, 0, 0, 1 };
+    ForgeRasterVertex good_v2 = { 8.0f, 8.0f, 0, 0, 1, 0, 0, 1 };
+
+    /* NaN x-coordinate -- should be rejected */
+    ForgeRasterVertex nan_v = { nan_val, 4.0f, 0, 0, 1, 0, 0, 1 };
+    forge_raster_triangle(&buf, &nan_v, &good_v1, &good_v2, NULL);
+
+    /* Infinity y-coordinate -- should be rejected */
+    ForgeRasterVertex inf_v = { 4.0f, inf_val, 0, 0, 1, 0, 0, 1 };
+    forge_raster_triangle(&buf, &inf_v, &good_v1, &good_v2, NULL);
+
+    /* Negative Infinity -- should be rejected */
+    ForgeRasterVertex neg_inf_v = { -inf_val, 4.0f, 0, 0, 1, 0, 0, 1 };
+    forge_raster_triangle(&buf, &neg_inf_v, &good_v1, &good_v2, NULL);
+
+    /* Buffer should be completely unmodified */
+    Uint8 r, g, b, a;
+    get_pixel(&buf, 4, 6, &r, &g, &b, &a);
+    ASSERT_EQ_BYTE(r, 0);
+    ASSERT_EQ_BYTE(g, 0);
+    ASSERT_EQ_BYTE(b, 0);
+
+    forge_raster_buffer_destroy(&buf);
+}
+
+static void test_near_degenerate_triangle(void)
+{
+    TEST("near_degenerate_triangle: nearly-collinear vertices skipped");
+    ForgeRasterBuffer buf = forge_raster_buffer_create(16, 16);
+    ASSERT_TRUE(buf.pixels != NULL);
+    forge_raster_clear(&buf, 0.0f, 0.0f, 0.0f, 1.0f);
+
+    /* Vertices almost collinear -- area ≈ 3e-7, below the 1e-6 epsilon.
+     * Without the epsilon test, 1/area would produce extreme barycentric
+     * values and garbage pixel colors. */
+    ForgeRasterVertex v0 = { 1.0f,       1.0f, 0, 0, 1, 1, 1, 1 };
+    ForgeRasterVertex v1 = { 4.0f,       4.0f, 0, 0, 1, 1, 1, 1 };
+    ForgeRasterVertex v2 = { 7.0000001f, 7.0f, 0, 0, 1, 1, 1, 1 };
+    forge_raster_triangle(&buf, &v0, &v1, &v2, NULL);
+
+    /* Should be skipped -- still black */
+    Uint8 r, g, b, a;
+    get_pixel(&buf, 4, 4, &r, &g, &b, &a);
+    ASSERT_EQ_BYTE(r, 0);
+    ASSERT_EQ_BYTE(g, 0);
+    ASSERT_EQ_BYTE(b, 0);
+
+    forge_raster_buffer_destroy(&buf);
+}
+
+static void test_index_out_of_bounds(void)
+{
+    TEST("index_out_of_bounds: OOB indices skipped, valid drawn");
+    ForgeRasterBuffer buf = forge_raster_buffer_create(16, 16);
+    ASSERT_TRUE(buf.pixels != NULL);
+    forge_raster_clear(&buf, 0.0f, 0.0f, 0.0f, 1.0f);
+
+    ForgeRasterVertex verts[3] = {
+        { 0.0f,  0.0f,  0, 0, 1, 1, 1, 1 },
+        { 16.0f, 0.0f,  0, 0, 1, 1, 1, 1 },
+        { 8.0f,  16.0f, 0, 0, 1, 1, 1, 1 },
+    };
+
+    /* First triangle has OOB index 99, second triangle is valid */
+    Uint32 indices[6] = { 0, 1, 99,  0, 1, 2 };
+    forge_raster_triangles_indexed(&buf, verts, 3, indices, 6, NULL);
+
+    /* The valid triangle (0,1,2) should still be drawn */
+    Uint8 r, g, b, a;
+    get_pixel(&buf, 8, 8, &r, &g, &b, &a);
+    ASSERT_EQ_BYTE(r, 255);
+    ASSERT_EQ_BYTE(g, 255);
+    ASSERT_EQ_BYTE(b, 255);
+
+    forge_raster_buffer_destroy(&buf);
+}
+
+static void test_negative_index_count(void)
+{
+    TEST("negative_index_count: negative count handled gracefully");
+    ForgeRasterBuffer buf = forge_raster_buffer_create(8, 8);
+    ASSERT_TRUE(buf.pixels != NULL);
+    forge_raster_clear(&buf, 0.0f, 0.0f, 0.0f, 1.0f);
+
+    ForgeRasterVertex verts[3] = {
+        { 0.0f, 0.0f, 0, 0, 1, 1, 1, 1 },
+        { 8.0f, 0.0f, 0, 0, 1, 1, 1, 1 },
+        { 4.0f, 8.0f, 0, 0, 1, 1, 1, 1 },
+    };
+    Uint32 indices[3] = { 0, 1, 2 };
+
+    /* Negative index_count should draw nothing */
+    forge_raster_triangles_indexed(&buf, verts, 3, indices, -5, NULL);
+
+    Uint8 r, g, b, a;
+    get_pixel(&buf, 4, 4, &r, &g, &b, &a);
+    ASSERT_EQ_BYTE(r, 0);
+
+    forge_raster_buffer_destroy(&buf);
+}
+
+static void test_zero_size_texture(void)
+{
+    TEST("zero_size_texture: zero-dimension texture skipped");
+    ForgeRasterBuffer buf = forge_raster_buffer_create(8, 8);
+    ASSERT_TRUE(buf.pixels != NULL);
+    forge_raster_clear(&buf, 0.0f, 0.0f, 0.0f, 1.0f);
+
+    /* Texture with zero width -- sampling should be skipped entirely,
+     * falling back to vertex colors only */
+    Uint8 tex_pixel = 128;
+    ForgeRasterTexture tex = { &tex_pixel, 0, 1 };
+
+    ForgeRasterVertex v0 = { 0.0f, 0.0f, 0, 0, 1, 1, 1, 1 };
+    ForgeRasterVertex v1 = { 8.0f, 0.0f, 0, 0, 1, 1, 1, 1 };
+    ForgeRasterVertex v2 = { 4.0f, 8.0f, 0, 0, 1, 1, 1, 1 };
+    forge_raster_triangle(&buf, &v0, &v1, &v2, &tex);
+
+    /* Center should be white (vertex color), not dimmed by texture */
+    Uint8 r, g, b, a;
+    get_pixel(&buf, 4, 3, &r, &g, &b, &a);
+    ASSERT_EQ_BYTE(r, 255);
+    ASSERT_EQ_BYTE(g, 255);
+    ASSERT_EQ_BYTE(b, 255);
+
+    forge_raster_buffer_destroy(&buf);
+}
+
+static void test_null_buffer_ops(void)
+{
+    TEST("null_buffer_ops: NULL arguments do not crash");
+
+    /* All of these should return silently without crashing */
+    forge_raster_clear(NULL, 1, 1, 1, 1);
+    forge_raster_buffer_destroy(NULL);
+
+    ForgeRasterVertex v = { 4.0f, 4.0f, 0, 0, 1, 1, 1, 1 };
+    forge_raster_triangle(NULL, &v, &v, &v, NULL);
+
+    Uint32 idx[3] = { 0, 0, 0 };
+    forge_raster_triangles_indexed(NULL, &v, 1, idx, 3, NULL);
+
+    bool ok = forge_raster_write_bmp(NULL, "test.bmp");
+    ASSERT_TRUE(!ok);
+
+    /* Also test NULL pixels buffer (created with bad dims) */
+    ForgeRasterBuffer bad = forge_raster_buffer_create(0, 0);
+    forge_raster_clear(&bad, 1, 1, 1, 1);
+    forge_raster_triangle(&bad, &v, &v, &v, NULL);
+    ok = forge_raster_write_bmp(&bad, "test.bmp");
+    ASSERT_TRUE(!ok);
+}
+
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -448,6 +680,17 @@ int main(int argc, char *argv[])
 
     SDL_Log("-- Vertex layout --");
     test_vertex_layout_size();
+
+    SDL_Log("-- Safety & validation --");
+    test_buffer_create_max_dim();
+    test_buffer_create_zeroed_on_failure();
+    test_null_vertex_pointers();
+    test_nan_inf_vertex_coords();
+    test_near_degenerate_triangle();
+    test_index_out_of_bounds();
+    test_negative_index_count();
+    test_zero_size_texture();
+    test_null_buffer_ops();
 
     SDL_Log("");
     SDL_Log("=== Results: %d tests, %d assertions passed, %d failed ===",
