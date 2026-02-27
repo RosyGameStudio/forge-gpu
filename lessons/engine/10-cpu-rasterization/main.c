@@ -104,8 +104,8 @@ static void demo_solid_triangle(void)
     ForgeRasterVertex v2 = { 432.0f, 440.0f,  0, 0,  0.20f, 0.80f, 0.75f, 1.0f };
     forge_raster_triangle(&buf, &v0, &v1, &v2, NULL);
 
-    forge_raster_write_bmp(&buf, "solid_triangle.bmp");
-    SDL_Log("Wrote solid_triangle.bmp");
+    if (forge_raster_write_bmp(&buf, "solid_triangle.bmp"))
+        SDL_Log("Wrote solid_triangle.bmp");
     forge_raster_buffer_destroy(&buf);
 }
 
@@ -125,8 +125,8 @@ static void demo_color_triangle(void)
     ForgeRasterVertex v2 = { 452.0f, 450.0f,  0, 0,  0.0f, 0.0f, 1.0f, 1.0f };
     forge_raster_triangle(&buf, &v0, &v1, &v2, NULL);
 
-    forge_raster_write_bmp(&buf, "color_triangle.bmp");
-    SDL_Log("Wrote color_triangle.bmp");
+    if (forge_raster_write_bmp(&buf, "color_triangle.bmp"))
+        SDL_Log("Wrote color_triangle.bmp");
     forge_raster_buffer_destroy(&buf);
 }
 
@@ -152,8 +152,8 @@ static void demo_indexed_quad(void)
 
     forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, NULL);
 
-    forge_raster_write_bmp(&buf, "indexed_quad.bmp");
-    SDL_Log("Wrote indexed_quad.bmp");
+    if (forge_raster_write_bmp(&buf, "indexed_quad.bmp"))
+        SDL_Log("Wrote indexed_quad.bmp");
     forge_raster_buffer_destroy(&buf);
 }
 
@@ -184,8 +184,8 @@ static void demo_textured_quad(void)
 
     forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, &tex);
 
-    forge_raster_write_bmp(&buf, "textured_quad.bmp");
-    SDL_Log("Wrote textured_quad.bmp");
+    if (forge_raster_write_bmp(&buf, "textured_quad.bmp"))
+        SDL_Log("Wrote textured_quad.bmp");
     forge_raster_buffer_destroy(&buf);
 }
 
@@ -226,8 +226,8 @@ static void demo_alpha_blend(void)
 
     forge_raster_triangles_indexed(&buf, verts, 12, indices, 18, NULL);
 
-    forge_raster_write_bmp(&buf, "alpha_blend.bmp");
-    SDL_Log("Wrote alpha_blend.bmp");
+    if (forge_raster_write_bmp(&buf, "alpha_blend.bmp"))
+        SDL_Log("Wrote alpha_blend.bmp");
     forge_raster_buffer_destroy(&buf);
 }
 
@@ -314,8 +314,8 @@ static void demo_scene(void)
         forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, NULL);
     }
 
-    forge_raster_write_bmp(&buf, "scene.bmp");
-    SDL_Log("Wrote scene.bmp");
+    if (forge_raster_write_bmp(&buf, "scene.bmp"))
+        SDL_Log("Wrote scene.bmp");
     forge_raster_buffer_destroy(&buf);
 }
 
