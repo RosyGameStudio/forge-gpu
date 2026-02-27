@@ -66,9 +66,12 @@
 /* A single vertex with position, texture coordinates, and color.
  * Matches ForgeUiVertex layout: pos(x,y), uv(u,v), color(r,g,b,a). */
 typedef struct ForgeRasterVertex {
-    float x, y;        /* position in pixel coordinates */
-    float u, v;        /* texture coordinates [0,1] */
-    float r, g, b, a;  /* vertex color (straight alpha) */
+    float x, y;        /* screen position in pixels -- no projection step,
+                        * the rasterizer works directly in framebuffer coords */
+    float u, v;        /* texture coordinates [0,1] -- interpolated across
+                        * the triangle and used to sample the texture */
+    float r, g, b, a;  /* vertex color (straight alpha) -- interpolated per
+                        * pixel and multiplied with the texture sample */
 } ForgeRasterVertex;   /* 32 bytes -- matches ForgeUiVertex layout */
 
 /* An RGBA8888 pixel buffer (framebuffer).
@@ -78,13 +81,17 @@ typedef struct ForgeRasterBuffer {
     Uint8 *pixels;   /* RGBA8888, row-major, top-left origin */
     int    width;    /* width in pixels */
     int    height;   /* height in pixels */
-    int    stride;   /* bytes per row (width * FORGE_RASTER_BPP) */
+    int    stride;   /* bytes per row -- stored separately from width so
+                      * row addressing uses a single multiply, and to
+                      * allow for potential row-alignment padding */
 } ForgeRasterBuffer;
 
 /* A single-channel (grayscale) texture for sampling.
  * Used for font atlas glyphs and other alpha-only textures. */
 typedef struct ForgeRasterTexture {
-    const Uint8 *pixels;  /* single-channel (grayscale), row-major */
+    const Uint8 *pixels;  /* single-channel (grayscale), row-major -- one byte
+                           * per texel is enough for font atlases and masks;
+                           * the texel value multiplies the vertex color */
     int          width;   /* width in texels */
     int          height;  /* height in texels */
 } ForgeRasterTexture;

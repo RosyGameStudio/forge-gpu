@@ -21,14 +21,17 @@
 
 /* ── Canvas Dimensions ───────────────────────────────────────────────────── */
 
+/* Power-of-two size large enough to show rasterization detail in the demos
+ * without producing excessively large BMP files (~1 MB each at 512x512). */
 #define CANVAS_W 512
 #define CANVAS_H 512
 
 /* ── Checkerboard Texture ────────────────────────────────────────────────── */
 
-#define CHECKER_SIZE 8   /* 8x8 texels */
-#define CHECKER_LIGHT 220
-#define CHECKER_DARK  40
+#define CHECKER_SIZE  8    /* small enough to see individual squares clearly */
+#define CHECKER_LIGHT 220  /* off-white so the pattern is visible against a
+                            * white vertex color without being too bright */
+#define CHECKER_DARK  40   /* dark gray rather than black for a softer look */
 
 /* Background clear colors -- used by every demo for a consistent dark canvas */
 #define BG_R 0.08f
@@ -93,7 +96,9 @@ static void demo_solid_triangle(void)
     if (!buf.pixels) return;
     forge_raster_clear(&buf, BG_R, BG_G, BG_B, 1.0f);
 
-    /* A single teal triangle with uniform color on all three vertices */
+    /* A single teal triangle with uniform color on all three vertices.
+     * Using the same color everywhere isolates the rasterizer's core job --
+     * the edge function inside/outside test -- without any interpolation. */
     ForgeRasterVertex v0 = { 256.0f,  60.0f,  0, 0,  0.20f, 0.80f, 0.75f, 1.0f };
     ForgeRasterVertex v1 = { 80.0f,  440.0f,  0, 0,  0.20f, 0.80f, 0.75f, 1.0f };
     ForgeRasterVertex v2 = { 432.0f, 440.0f,  0, 0,  0.20f, 0.80f, 0.75f, 1.0f };
@@ -160,7 +165,8 @@ static void demo_textured_quad(void)
     if (!buf.pixels) return;
     forge_raster_clear(&buf, BG_R, BG_G, BG_B, 1.0f);
 
-    /* Generate a small checkerboard texture */
+    /* Generate a small checkerboard texture -- its repeating pattern makes
+     * it easy to verify that UV interpolation and sampling are correct. */
     Uint8 tex_pixels[CHECKER_SIZE * CHECKER_SIZE];
     make_checkerboard(tex_pixels, CHECKER_SIZE);
     ForgeRasterTexture tex = { tex_pixels, CHECKER_SIZE, CHECKER_SIZE };
@@ -198,7 +204,9 @@ static void demo_alpha_blend(void)
     ForgeRasterVertex verts[12];
     Uint32 indices[18];
 
-    /* Red quad (back, drawn first) */
+    /* Red quad (back, drawn first).  Draw order matters for source-over
+     * compositing: later draws blend on top of earlier ones (painter's
+     * algorithm), so back-to-front ordering produces correct results. */
     make_quad(verts, 0, indices, 0,
               80.0f, 120.0f, 300.0f, 380.0f,
               0, 0, 0, 0,

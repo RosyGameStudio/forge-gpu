@@ -97,11 +97,13 @@ of rows), and **stride** (bytes per row, which may include padding for
 alignment).
 
 ```c
-typedef struct {
-    uint8_t *pixels;   /* RGBA8888, row-major, top-left origin */
-    int      width;
-    int      height;
-    int      stride;   /* bytes per row (width * 4) */
+typedef struct ForgeRasterBuffer {
+    Uint8 *pixels;   /* RGBA8888, row-major, top-left origin */
+    int    width;    /* width in pixels */
+    int    height;   /* height in pixels */
+    int    stride;   /* bytes per row -- stored separately from width so
+                      * row addressing uses a single multiply, and to
+                      * allow for potential row-alignment padding */
 } ForgeRasterBuffer;
 ```
 
@@ -238,7 +240,7 @@ ForgeRasterVertex verts[4] = {
 };
 
 /* 6 indices form 2 CCW triangles */
-uint32_t indices[6] = {
+Uint32 indices[6] = {
     0, 1, 2,   /* triangle 0: TL -> TR -> BR */
     0, 2, 3,   /* triangle 1: TL -> BR -> BL */
 };
