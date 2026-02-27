@@ -58,9 +58,11 @@ dkms.conf
 # debug information files
 *.dwo
 
-# Generated BMP files from running UI lessons (committed copies live in assets/)
-/glyph_*.bmp
-/layout_*.bmp
+# Generated BMP files from running UI lessons — unanchored so they are ignored
+# wherever the lesson executable runs (repo root, lesson dir, build dir).
+# Committed copies under assets/ are already tracked and unaffected by gitignore.
+glyph_*.bmp
+layout_*.bmp
 
 # CMake build directories
 build/
