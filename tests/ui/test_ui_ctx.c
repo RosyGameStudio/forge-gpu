@@ -68,6 +68,13 @@ static int fail_count = 0;
 #define ASSERT_NEAR(a, b, eps)                                    \
     do {                                                          \
         float _a = (a), _b = (b);                                 \
+        if (isnan(_a) || isnan(_b)) {                             \
+            SDL_Log("    FAIL: %s == %f, expected %f (NaN, "      \
+                    "line %d)", #a, (double)_a, (double)_b,       \
+                    __LINE__);                                    \
+            fail_count++;                                         \
+            return;                                               \
+        }                                                         \
         if (fabsf(_a - _b) > (eps)) {                             \
             SDL_Log("    FAIL: %s == %f, expected %f (eps=%f, "   \
                     "line %d)", #a, _a, _b, (float)(eps),         \

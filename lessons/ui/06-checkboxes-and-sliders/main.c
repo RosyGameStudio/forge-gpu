@@ -339,6 +339,8 @@ int main(int argc, char *argv[])
     SDL_Log("SIMULATING %d FRAMES", frame_count);
     SDL_Log("%s", SEPARATOR);
 
+    bool had_render_error = false;
+
     for (int f = 0; f < frame_count; f++) {
         const FrameInput *input = &frames[f];
 
@@ -425,6 +427,7 @@ int main(int argc, char *argv[])
             SDL_Log("  -> %s", bmp_path);
         } else {
             SDL_Log("  [!] Failed to write %s", bmp_path);
+            had_render_error = true;
         }
     }
 
@@ -462,5 +465,5 @@ int main(int argc, char *argv[])
     forge_ui_atlas_free(&atlas);
     forge_ui_ttf_free(&font);
     SDL_Quit();
-    return 0;
+    return had_render_error ? 1 : 0;
 }

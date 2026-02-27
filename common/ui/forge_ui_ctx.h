@@ -580,7 +580,8 @@ static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
      * Using edge detection prevents a held mouse dragged onto a button
      * from falsely activating it. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
-    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed && ctx->hot == id) {
+    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed
+            && ctx->next_hot == id) {
         ctx->active = id;
     }
 
@@ -671,7 +672,8 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
      * This prevents a held mouse dragged onto the checkbox from toggling
      * it, and lets the user cancel by dragging off before releasing. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
-    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed && ctx->hot == id) {
+    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed
+            && ctx->next_hot == id) {
         ctx->active = id;
     }
 
@@ -768,7 +770,8 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
      * Subsequent frames update the value via the drag path below, without
      * re-entering the activation branch. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
-    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed && ctx->hot == id) {
+    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed
+            && ctx->next_hot == id) {
         ctx->active = id;
     }
 
