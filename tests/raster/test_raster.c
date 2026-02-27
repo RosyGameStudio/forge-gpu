@@ -394,6 +394,7 @@ static void test_bmp_write(void)
 
     /* Verify BMP magic number */
     fp = fopen(path, "rb");
+    ASSERT_TRUE(fp != NULL);
     Uint8 magic[2];
     fread(magic, 1, 2, fp);
     fclose(fp);
