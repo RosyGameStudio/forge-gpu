@@ -30,6 +30,16 @@
 #define CHECKER_LIGHT 220
 #define CHECKER_DARK  40
 
+/* Background clear colors -- used by every demo for a consistent dark canvas */
+#define BG_R 0.08f
+#define BG_G 0.08f
+#define BG_B 0.10f
+
+/* Scene demo uses a slightly darker background for contrast */
+#define SCENE_BG_R 0.06f
+#define SCENE_BG_G 0.06f
+#define SCENE_BG_B 0.09f
+
 /* Generate an 8x8 checkerboard grayscale texture.
  * Each 1x1 texel alternates between light and dark, producing a
  * checkerboard pattern when sampled with UV coordinates. */
@@ -81,7 +91,7 @@ static void demo_solid_triangle(void)
 {
     ForgeRasterBuffer buf = forge_raster_buffer_create(CANVAS_W, CANVAS_H);
     if (!buf.pixels) return;
-    forge_raster_clear(&buf, 0.08f, 0.08f, 0.10f, 1.0f);
+    forge_raster_clear(&buf, BG_R, BG_G, BG_B, 1.0f);
 
     /* A single teal triangle with uniform color on all three vertices */
     ForgeRasterVertex v0 = { 256.0f,  60.0f,  0, 0,  0.20f, 0.80f, 0.75f, 1.0f };
@@ -100,7 +110,7 @@ static void demo_color_triangle(void)
 {
     ForgeRasterBuffer buf = forge_raster_buffer_create(CANVAS_W, CANVAS_H);
     if (!buf.pixels) return;
-    forge_raster_clear(&buf, 0.08f, 0.08f, 0.10f, 1.0f);
+    forge_raster_clear(&buf, BG_R, BG_G, BG_B, 1.0f);
 
     /* Classic RGB triangle: each vertex a different primary color.
      * Barycentric interpolation blends them smoothly across the surface --
@@ -121,7 +131,7 @@ static void demo_indexed_quad(void)
 {
     ForgeRasterBuffer buf = forge_raster_buffer_create(CANVAS_W, CANVAS_H);
     if (!buf.pixels) return;
-    forge_raster_clear(&buf, 0.08f, 0.08f, 0.10f, 1.0f);
+    forge_raster_clear(&buf, BG_R, BG_G, BG_B, 1.0f);
 
     /* A quad drawn from 4 vertices and 6 indices -- the fundamental
      * UI primitive.  Each vertex has a different color to show that
@@ -148,7 +158,7 @@ static void demo_textured_quad(void)
 {
     ForgeRasterBuffer buf = forge_raster_buffer_create(CANVAS_W, CANVAS_H);
     if (!buf.pixels) return;
-    forge_raster_clear(&buf, 0.08f, 0.08f, 0.10f, 1.0f);
+    forge_raster_clear(&buf, BG_R, BG_G, BG_B, 1.0f);
 
     /* Generate a small checkerboard texture */
     Uint8 tex_pixels[CHECKER_SIZE * CHECKER_SIZE];
@@ -179,7 +189,7 @@ static void demo_alpha_blend(void)
 {
     ForgeRasterBuffer buf = forge_raster_buffer_create(CANVAS_W, CANVAS_H);
     if (!buf.pixels) return;
-    forge_raster_clear(&buf, 0.08f, 0.08f, 0.10f, 1.0f);
+    forge_raster_clear(&buf, BG_R, BG_G, BG_B, 1.0f);
 
     /* Three overlapping semi-transparent quads demonstrate source-over
      * compositing.  Where two colors overlap, the source-over formula
@@ -219,7 +229,7 @@ static void demo_scene(void)
 {
     ForgeRasterBuffer buf = forge_raster_buffer_create(CANVAS_W, CANVAS_H);
     if (!buf.pixels) return;
-    forge_raster_clear(&buf, 0.06f, 0.06f, 0.09f, 1.0f);
+    forge_raster_clear(&buf, SCENE_BG_R, SCENE_BG_G, SCENE_BG_B, 1.0f);
 
     /* Generate checkerboard texture for the textured region */
     Uint8 tex_pixels[CHECKER_SIZE * CHECKER_SIZE];

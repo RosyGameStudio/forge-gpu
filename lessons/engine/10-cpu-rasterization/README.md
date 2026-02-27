@@ -42,7 +42,7 @@ output to BMP images instead of requiring a GPU window.
 The program produces six BMP images, each demonstrating a progressively
 more advanced concept:
 
-![Composed scene using all rasterization techniques](assets/scene.bmp)
+![Composed scene using all rasterization techniques](assets/scene.png)
 
 **Example output:**
 
