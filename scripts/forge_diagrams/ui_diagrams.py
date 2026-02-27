@@ -3529,7 +3529,9 @@ def diagram_checkbox_vs_button():
     ax = axes[0]
     setup_axes(ax, xlim=(-0.5, 6), ylim=(-0.5, 6.5), grid=False, aspect=None)
     ax.axis("off")
-    ax.set_title("Button", color=STYLE["accent2"], fontsize=11, fontweight="bold", pad=12)
+    ax.set_title(
+        "Button", color=STYLE["accent2"], fontsize=11, fontweight="bold", pad=12
+    )
 
     btn_steps = [
         ("Hit test\nmouse in rect?", STYLE["text_dim"], 5.5),
@@ -3539,28 +3541,39 @@ def diagram_checkbox_vs_button():
     ]
     for label, color, y in btn_steps:
         rect = mpatches.FancyBboxPatch(
-            (0.3, y - 0.4), 5.4, 0.8,
+            (0.3, y - 0.4),
+            5.4,
+            0.8,
             boxstyle="round,pad=0.1",
             facecolor=color + "20",
             edgecolor=color,
             linewidth=1.2,
         )
         ax.add_patch(rect)
-        ax.text(3.0, y, label, color=STYLE["text"], fontsize=9, ha="center", va="center")
+        ax.text(
+            3.0, y, label, color=STYLE["text"], fontsize=9, ha="center", va="center"
+        )
     for i in range(len(btn_steps) - 1):
         y_from = btn_steps[i][2] - 0.4
         y_to = btn_steps[i + 1][2] + 0.4
         ax.annotate(
-            "", xy=(3.0, y_to), xytext=(3.0, y_from),
-            arrowprops=dict(arrowstyle="->,head_width=0.2,head_length=0.1",
-                            color=STYLE["text_dim"], lw=1.2),
+            "",
+            xy=(3.0, y_to),
+            xytext=(3.0, y_from),
+            arrowprops=dict(
+                arrowstyle="->,head_width=0.2,head_length=0.1",
+                color=STYLE["text_dim"],
+                lw=1.2,
+            ),
         )
 
     # ---- Right: Checkbox ----
     ax = axes[1]
     setup_axes(ax, xlim=(-0.5, 6), ylim=(-0.5, 6.5), grid=False, aspect=None)
     ax.axis("off")
-    ax.set_title("Checkbox", color=STYLE["accent1"], fontsize=11, fontweight="bold", pad=12)
+    ax.set_title(
+        "Checkbox", color=STYLE["accent1"], fontsize=11, fontweight="bold", pad=12
+    )
 
     cb_steps = [
         ("Hit test\nmouse in rect?", STYLE["text_dim"], 5.5),
@@ -3570,30 +3583,50 @@ def diagram_checkbox_vs_button():
     ]
     for label, color, y in cb_steps:
         rect = mpatches.FancyBboxPatch(
-            (0.3, y - 0.4), 5.4, 0.8,
+            (0.3, y - 0.4),
+            5.4,
+            0.8,
             boxstyle="round,pad=0.1",
             facecolor=color + "20",
             edgecolor=color,
             linewidth=1.2,
         )
         ax.add_patch(rect)
-        ax.text(3.0, y, label, color=STYLE["text"], fontsize=9, ha="center", va="center")
+        ax.text(
+            3.0, y, label, color=STYLE["text"], fontsize=9, ha="center", va="center"
+        )
     for i in range(len(cb_steps) - 1):
         y_from = cb_steps[i][2] - 0.4
         y_to = cb_steps[i + 1][2] + 0.4
         ax.annotate(
-            "", xy=(3.0, y_to), xytext=(3.0, y_from),
-            arrowprops=dict(arrowstyle="->,head_width=0.2,head_length=0.1",
-                            color=STYLE["accent1"], lw=1.2),
+            "",
+            xy=(3.0, y_to),
+            xytext=(3.0, y_from),
+            arrowprops=dict(
+                arrowstyle="->,head_width=0.2,head_length=0.1",
+                color=STYLE["accent1"],
+                lw=1.2,
+            ),
         )
 
     # Highlight the difference
-    for _ax_idx, (ax_ref, color, text) in enumerate(zip(axes, [STYLE["accent2"], STYLE["accent1"]],
-                                                        ["Returns bool", "Modifies *value"])):
+    for _ax_idx, (ax_ref, color, text) in enumerate(
+        zip(
+            axes,
+            [STYLE["accent2"], STYLE["accent1"]],
+            ["Returns bool", "Modifies *value"],
+        )
+    ):
         ax_ref.text(
-            3.0, 0.0, text,
-            color=color, fontsize=9, fontweight="bold",
-            ha="center", va="top", style="italic",
+            3.0,
+            0.0,
+            text,
+            color=color,
+            fontsize=9,
+            fontweight="bold",
+            ha="center",
+            va="top",
+            style="italic",
         )
 
     fig.tight_layout(rect=[0, 0, 1, 0.92])
@@ -3620,7 +3653,9 @@ def diagram_slider_anatomy():
     # Widget rect outline
     rx, ry, rw, rh = 1.0, 1.0, 9.0, 2.4
     rect_outline = mpatches.FancyBboxPatch(
-        (rx, ry), rw, rh,
+        (rx, ry),
+        rw,
+        rh,
         boxstyle="round,pad=0.05",
         facecolor="none",
         edgecolor=STYLE["text_dim"],
@@ -3629,15 +3664,23 @@ def diagram_slider_anatomy():
     )
     ax.add_patch(rect_outline)
     ax.text(
-        rx + rw + 0.3, ry + rh / 2, "widget rect\n(hit test area)",
-        color=STYLE["text_dim"], fontsize=8, ha="left", va="center", style="italic",
+        rx + rw + 0.3,
+        ry + rh / 2,
+        "widget rect\n(hit test area)",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="left",
+        va="center",
+        style="italic",
     )
 
     # Track
     track_h = 0.3
     track_y = ry + (rh - track_h) / 2
     track = mpatches.FancyBboxPatch(
-        (rx, track_y), rw, track_h,
+        (rx, track_y),
+        rw,
+        track_h,
         boxstyle="round,pad=0.02",
         facecolor=STYLE["surface"],
         edgecolor=STYLE["text_dim"],
@@ -3656,7 +3699,9 @@ def diagram_slider_anatomy():
     thumb_y = ry + (rh - thumb_h) / 2
 
     thumb = mpatches.FancyBboxPatch(
-        (thumb_x, thumb_y), thumb_w, thumb_h,
+        (thumb_x, thumb_y),
+        thumb_w,
+        thumb_h,
         boxstyle="round,pad=0.03",
         facecolor=STYLE["accent1"] + "60",
         edgecolor=STYLE["accent1"],
@@ -3671,7 +3716,11 @@ def diagram_slider_anatomy():
         xy=(rx + rw * 0.7, track_y + track_h / 2),
         xytext=(rx + rw * 0.7, track_y - 1.2),
         arrowprops=dict(arrowstyle="->", color=STYLE["text_dim"], lw=1.0),
-        color=STYLE["text_dim"], fontsize=8.5, ha="center", va="top", fontweight="bold",
+        color=STYLE["text_dim"],
+        fontsize=8.5,
+        ha="center",
+        va="top",
+        fontweight="bold",
     )
 
     # Thumb label
@@ -3680,39 +3729,66 @@ def diagram_slider_anatomy():
         xy=(thumb_cx, thumb_y + thumb_h),
         xytext=(thumb_cx, thumb_y + thumb_h + 0.8),
         arrowprops=dict(arrowstyle="->", color=STYLE["accent1"], lw=1.0),
-        color=STYLE["accent1"], fontsize=8.5, ha="center", va="bottom", fontweight="bold",
+        color=STYLE["accent1"],
+        fontsize=8.5,
+        ha="center",
+        va="bottom",
+        fontweight="bold",
     )
 
     # Effective track range arrows
     arr_y = track_y - 0.4
     ax.annotate(
-        "", xy=(eff_start, arr_y), xytext=(rx, arr_y),
+        "",
+        xy=(eff_start, arr_y),
+        xytext=(rx, arr_y),
         arrowprops=dict(arrowstyle="<->", color=STYLE["warn"], lw=1.2),
     )
     ax.text(
-        (rx + eff_start) / 2, arr_y - 0.3, "w/2",
-        color=STYLE["warn"], fontsize=8, ha="center", va="top", fontweight="bold",
+        (rx + eff_start) / 2,
+        arr_y - 0.3,
+        "w/2",
+        color=STYLE["warn"],
+        fontsize=8,
+        ha="center",
+        va="top",
+        fontweight="bold",
     )
 
     ax.annotate(
-        "", xy=(rx + rw, arr_y), xytext=(eff_start + eff_w, arr_y),
+        "",
+        xy=(rx + rw, arr_y),
+        xytext=(eff_start + eff_w, arr_y),
         arrowprops=dict(arrowstyle="<->", color=STYLE["warn"], lw=1.2),
     )
     ax.text(
-        (rx + rw + eff_start + eff_w) / 2, arr_y - 0.3, "w/2",
-        color=STYLE["warn"], fontsize=8, ha="center", va="top", fontweight="bold",
+        (rx + rw + eff_start + eff_w) / 2,
+        arr_y - 0.3,
+        "w/2",
+        color=STYLE["warn"],
+        fontsize=8,
+        ha="center",
+        va="top",
+        fontweight="bold",
     )
 
     # Effective track range
     eff_arr_y = arr_y - 0.8
     ax.annotate(
-        "", xy=(eff_start + eff_w, eff_arr_y), xytext=(eff_start, eff_arr_y),
+        "",
+        xy=(eff_start + eff_w, eff_arr_y),
+        xytext=(eff_start, eff_arr_y),
         arrowprops=dict(arrowstyle="<->", color=STYLE["accent3"], lw=1.5),
     )
     ax.text(
-        eff_start + eff_w / 2, eff_arr_y - 0.3,
+        eff_start + eff_w / 2,
+        eff_arr_y - 0.3,
         "effective track (track_w = rect.w - thumb_w)",
-        color=STYLE["accent3"], fontsize=8.5, ha="center", va="top", fontweight="bold",
+        color=STYLE["accent3"],
+        fontsize=8.5,
+        ha="center",
+        va="top",
+        fontweight="bold",
     )
 
     fig.tight_layout()
@@ -3738,12 +3814,21 @@ def diagram_slider_value_mapping():
     mark_x = line_x0 + mark_t * (line_x1 - line_x0)
 
     labels = [
-        ("Pixel Position (mouse_x)", "track_x", "track_x + track_w",
-         "mouse_x", STYLE["accent2"]),
-        ("Normalized t  [0, 1]", "0.0", "1.0",
-         f"t = {mark_t:.1f}", STYLE["accent1"]),
-        ("User Value  [min, max]", "min (0)", "max (100)",
-         f"value = {mark_t * 100:.0f}", STYLE["accent3"]),
+        (
+            "Pixel Position (mouse_x)",
+            "track_x",
+            "track_x + track_w",
+            "mouse_x",
+            STYLE["accent2"],
+        ),
+        ("Normalized t  [0, 1]", "0.0", "1.0", f"t = {mark_t:.1f}", STYLE["accent1"]),
+        (
+            "User Value  [min, max]",
+            "min (0)",
+            "max (100)",
+            f"value = {mark_t * 100:.0f}",
+            STYLE["accent3"],
+        ),
     ]
 
     for ax, (title, left_lbl, right_lbl, mark_lbl, color) in zip(axes, labels):
@@ -3751,39 +3836,88 @@ def diagram_slider_value_mapping():
         ax.axis("off")
 
         # Title
-        ax.text(0.2, 1.2, title, color=color, fontsize=10, fontweight="bold", va="bottom")
+        ax.text(
+            0.2, 1.2, title, color=color, fontsize=10, fontweight="bold", va="bottom"
+        )
 
         # Number line
-        ax.plot([line_x0, line_x1], [0, 0], color=STYLE["text_dim"], lw=2, solid_capstyle="round")
+        ax.plot(
+            [line_x0, line_x1],
+            [0, 0],
+            color=STYLE["text_dim"],
+            lw=2,
+            solid_capstyle="round",
+        )
 
         # End ticks
         for x_pos in [line_x0, line_x1]:
             ax.plot([x_pos, x_pos], [-0.15, 0.15], color=STYLE["text_dim"], lw=1.5)
 
         # End labels
-        ax.text(line_x0, -0.4, left_lbl, color=STYLE["text_dim"], fontsize=8,
-                ha="center", va="top")
-        ax.text(line_x1, -0.4, right_lbl, color=STYLE["text_dim"], fontsize=8,
-                ha="center", va="top")
+        ax.text(
+            line_x0,
+            -0.4,
+            left_lbl,
+            color=STYLE["text_dim"],
+            fontsize=8,
+            ha="center",
+            va="top",
+        )
+        ax.text(
+            line_x1,
+            -0.4,
+            right_lbl,
+            color=STYLE["text_dim"],
+            fontsize=8,
+            ha="center",
+            va="top",
+        )
 
         # Mark position
         ax.plot(mark_x, 0, marker="o", markersize=10, color=color, zorder=5)
-        ax.text(mark_x, 0.4, mark_lbl, color=color, fontsize=9,
-                fontweight="bold", ha="center", va="bottom")
+        ax.text(
+            mark_x,
+            0.4,
+            mark_lbl,
+            color=color,
+            fontsize=9,
+            fontweight="bold",
+            ha="center",
+            va="bottom",
+        )
 
     # Formulas between the rows
-    fig.text(0.82, 0.68, "t = (mouse_x - track_x) / track_w",
-             color=STYLE["warn"], fontsize=8, family="monospace",
-             transform=fig.transFigure)
-    fig.text(0.82, 0.38, "value = min + t * (max - min)",
-             color=STYLE["warn"], fontsize=8, family="monospace",
-             transform=fig.transFigure)
+    fig.text(
+        0.82,
+        0.68,
+        "t = (mouse_x - track_x) / track_w",
+        color=STYLE["warn"],
+        fontsize=8,
+        family="monospace",
+        transform=fig.transFigure,
+    )
+    fig.text(
+        0.82,
+        0.38,
+        "value = min + t * (max - min)",
+        color=STYLE["warn"],
+        fontsize=8,
+        family="monospace",
+        transform=fig.transFigure,
+    )
 
     # Bidirectional arrows
     for y_frac in [0.68, 0.38]:
-        fig.text(0.78, y_frac, "<->",
-                 color=STYLE["warn"], fontsize=10, fontweight="bold",
-                 ha="center", transform=fig.transFigure)
+        fig.text(
+            0.78,
+            y_frac,
+            "<->",
+            color=STYLE["warn"],
+            fontsize=10,
+            fontweight="bold",
+            ha="center",
+            transform=fig.transFigure,
+        )
 
     fig.tight_layout(rect=[0, 0, 0.78, 0.93])
     save(fig, "ui/06-checkboxes-and-sliders", "slider_value_mapping.png")
@@ -3809,7 +3943,9 @@ def diagram_drag_outside_bounds():
         ("3. Release outside", 1.3, False, False, STYLE["text_dim"]),
     ]
 
-    for ax, (title, cursor_t, mouse_down, _cursor_inside, title_color) in zip(axes, panels):
+    for ax, (title, cursor_t, mouse_down, _cursor_inside, title_color) in zip(
+        axes, panels
+    ):
         setup_axes(ax, xlim=(-1, 8), ylim=(-1.5, 4), grid=False, aspect=None)
         ax.axis("off")
         ax.set_title(title, color=title_color, fontsize=10, fontweight="bold", pad=8)
@@ -3817,7 +3953,9 @@ def diagram_drag_outside_bounds():
         # Widget rect (dashed)
         wrx, wry, wrw, wrh = 0.5, 1.0, 5.5, 1.8
         wr = mpatches.FancyBboxPatch(
-            (wrx, wry), wrw, wrh,
+            (wrx, wry),
+            wrw,
+            wrh,
             boxstyle="round,pad=0.05",
             facecolor="none",
             edgecolor=STYLE["text_dim"],
@@ -3830,7 +3968,9 @@ def diagram_drag_outside_bounds():
         tk_h = 0.25
         tk_y = wry + (wrh - tk_h) / 2
         tk = mpatches.FancyBboxPatch(
-            (wrx, tk_y), wrw, tk_h,
+            (wrx, tk_y),
+            wrw,
+            tk_h,
             boxstyle="round,pad=0.02",
             facecolor=STYLE["surface"],
             edgecolor=STYLE["text_dim"],
@@ -3851,7 +3991,9 @@ def diagram_drag_outside_bounds():
         is_active = mouse_down
         thumb_color = STYLE["accent1"] if is_active else STYLE["text_dim"]
         thumb = mpatches.FancyBboxPatch(
-            (txx, ty), tw, th,
+            (txx, ty),
+            tw,
+            th,
             boxstyle="round,pad=0.03",
             facecolor=thumb_color + "50",
             edgecolor=thumb_color,
@@ -3866,20 +4008,31 @@ def diagram_drag_outside_bounds():
             cx = wrx + wrw + (cursor_t - 1.0) * eff_w
         cy = wry + wrh / 2
         marker = "v" if mouse_down else "^"
-        ax.plot(cx, cy + 1.3, marker=marker, markersize=12,
-                color=STYLE["warn"], zorder=10)
+        ax.plot(
+            cx, cy + 1.3, marker=marker, markersize=12, color=STYLE["warn"], zorder=10
+        )
         state_label = "ACTIVE" if is_active else "released"
-        ax.text(cx, cy + 1.8, state_label,
-                color=STYLE["warn"] if is_active else STYLE["text_dim"],
-                fontsize=8, fontweight="bold", ha="center", va="bottom")
+        ax.text(
+            cx,
+            cy + 1.8,
+            state_label,
+            color=STYLE["warn"] if is_active else STYLE["text_dim"],
+            fontsize=8,
+            fontweight="bold",
+            ha="center",
+            va="bottom",
+        )
 
         # Value indicator
         val = t_clamped * 100
         ax.text(
-            wrx + wrw / 2, wry - 0.4,
+            wrx + wrw / 2,
+            wry - 0.4,
             f"value = {val:.0f}  (t = {t_clamped:.1f})",
             color=STYLE["accent1"] if is_active else STYLE["text_dim"],
-            fontsize=8, ha="center", va="top",
+            fontsize=8,
+            ha="center",
+            va="top",
         )
 
     fig.tight_layout(rect=[0, 0, 1, 0.91])
@@ -3912,14 +4065,23 @@ def diagram_slider_state_colors():
         ax.axis("off")
 
         # State label
-        ax.text(0.0, 0.5, label, color=label_color, fontsize=10,
-                fontweight="bold", va="center")
+        ax.text(
+            0.0,
+            0.5,
+            label,
+            color=label_color,
+            fontsize=10,
+            fontweight="bold",
+            va="center",
+        )
 
         # Track
         trk_x, trk_w, trk_h = 3.0, 7.0, 0.2
         trk_y = 0.5 - trk_h / 2
         trk = mpatches.FancyBboxPatch(
-            (trk_x, trk_y), trk_w, trk_h,
+            (trk_x, trk_y),
+            trk_w,
+            trk_h,
             boxstyle="round,pad=0.02",
             facecolor=STYLE["surface"],
             edgecolor=STYLE["text_dim"],
@@ -3935,7 +4097,9 @@ def diagram_slider_state_colors():
         txx = tcx - tw / 2
         tyy = 0.5 - th / 2
         thumb = mpatches.FancyBboxPatch(
-            (txx, tyy), tw, th,
+            (txx, tyy),
+            tw,
+            th,
             boxstyle="round,pad=0.03",
             facecolor=thumb_color + "60",
             edgecolor=thumb_color,
@@ -3945,17 +4109,45 @@ def diagram_slider_state_colors():
 
         # RGBA values
         if label == "Normal":
-            ax.text(trk_x + trk_w + 0.3, 0.5, "(0.50, 0.50, 0.58)",
-                    color=STYLE["text_dim"], fontsize=7.5, va="center", family="monospace")
+            ax.text(
+                trk_x + trk_w + 0.3,
+                0.5,
+                "(0.50, 0.50, 0.58)",
+                color=STYLE["text_dim"],
+                fontsize=7.5,
+                va="center",
+                family="monospace",
+            )
         elif label == "Hot (hovered)":
-            ax.text(trk_x + trk_w + 0.3, 0.5, "(0.60, 0.60, 0.72)",
-                    color=STYLE["text_dim"], fontsize=7.5, va="center", family="monospace")
+            ax.text(
+                trk_x + trk_w + 0.3,
+                0.5,
+                "(0.60, 0.60, 0.72)",
+                color=STYLE["text_dim"],
+                fontsize=7.5,
+                va="center",
+                family="monospace",
+            )
         elif label == "Active (dragging)":
-            ax.text(trk_x + trk_w + 0.3, 0.5, "(0.31, 0.76, 0.97)",
-                    color=STYLE["text_dim"], fontsize=7.5, va="center", family="monospace")
+            ax.text(
+                trk_x + trk_w + 0.3,
+                0.5,
+                "(0.31, 0.76, 0.97)",
+                color=STYLE["text_dim"],
+                fontsize=7.5,
+                va="center",
+                family="monospace",
+            )
         elif label == "Disabled":
-            ax.text(trk_x + trk_w + 0.3, 0.5, "(dimmed)",
-                    color=STYLE["text_dim"], fontsize=7.5, va="center", family="monospace")
+            ax.text(
+                trk_x + trk_w + 0.3,
+                0.5,
+                "(dimmed)",
+                color=STYLE["text_dim"],
+                fontsize=7.5,
+                va="center",
+                family="monospace",
+            )
 
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     save(fig, "ui/06-checkboxes-and-sliders", "slider_state_colors.png")
@@ -3985,8 +4177,16 @@ def diagram_widget_interaction_comparison():
         ("Slider", 10.0, STYLE["accent3"]),
     ]
     for label, cx, color in cols:
-        ax.text(cx, 7.2, label, color=color, fontsize=12, fontweight="bold",
-                ha="center", va="center")
+        ax.text(
+            cx,
+            7.2,
+            label,
+            color=color,
+            fontsize=12,
+            fontweight="bold",
+            ha="center",
+            va="center",
+        )
         # Underline
         ax.plot([cx - 1.5, cx + 1.5], [6.9, 6.9], color=color, lw=2)
 
@@ -3999,8 +4199,16 @@ def diagram_widget_interaction_comparison():
         ("Draw\nelements", 1.8),
     ]
     for label, ry in rows:
-        ax.text(-0.3, ry, label, color=STYLE["text_dim"], fontsize=9,
-                fontweight="bold", ha="left", va="center")
+        ax.text(
+            -0.3,
+            ry,
+            label,
+            color=STYLE["text_dim"],
+            fontsize=9,
+            fontweight="bold",
+            ha="left",
+            va="center",
+        )
 
     # Grid data
     data = {
@@ -4034,15 +4242,24 @@ def diagram_widget_interaction_comparison():
     for ry, entries in data.items():
         for _i, (entry, (_, cx, color)) in enumerate(zip(entries, cols)):
             bg = mpatches.FancyBboxPatch(
-                (cx - 1.5, ry - 0.55), 3.0, 1.1,
+                (cx - 1.5, ry - 0.55),
+                3.0,
+                1.1,
                 boxstyle="round,pad=0.05",
                 facecolor=color + "12",
                 edgecolor=color + "40",
                 linewidth=0.8,
             )
             ax.add_patch(bg)
-            ax.text(cx, ry, entry, color=STYLE["text"], fontsize=7.5,
-                    ha="center", va="center")
+            ax.text(
+                cx,
+                ry,
+                entry,
+                color=STYLE["text"],
+                fontsize=7.5,
+                ha="center",
+                va="center",
+            )
 
     fig.tight_layout()
     save(fig, "ui/06-checkboxes-and-sliders", "widget_interaction_comparison.png")

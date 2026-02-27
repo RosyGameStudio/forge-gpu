@@ -107,7 +107,12 @@ if (forge_ui_ctx_button(&ctx, ID, "Save", rect)) {
 ```
 
 Checkboxes and sliders work differently. They modify the application's
-own variables through pointers:
+own variables through pointers. The `&` operator produces the memory
+address of a variable, and the widget function receives that address as a
+pointer parameter (e.g. `bool *value`). Inside the function, `*value`
+dereferences the pointer to read or write the caller's original variable
+(see [Engine Lesson 01 — Intro to C](../../engine/01-intro-to-c/) for
+more on pointers):
 
 ```c
 bool audio_enabled = false;

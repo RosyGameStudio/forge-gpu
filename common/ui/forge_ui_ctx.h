@@ -196,8 +196,7 @@ typedef struct ForgeUiContext {
     Uint32 hot;           /* widget under the cursor (or FORGE_UI_ID_NONE) */
     Uint32 active;        /* widget being pressed (or FORGE_UI_ID_NONE) */
 
-    /* Used internally to track hot candidates within a single frame */
-    Uint32 next_hot;
+    Uint32 next_hot;      /* hot candidate for this frame (resolved in ctx_end) */
 
     /* Draw data (reset each frame by forge_ui_ctx_begin) */
     ForgeUiVertex *vertices;   /* dynamically growing vertex buffer */
