@@ -100,14 +100,14 @@ typedef struct ForgeRasterTexture {
 
 /* Allocate an RGBA8888 framebuffer.  Returns a buffer with pixels set to
  * NULL on allocation failure.  The caller must check buf.pixels != NULL. */
-static ForgeRasterBuffer forge_raster_buffer_create(int width, int height);
+static inline ForgeRasterBuffer forge_raster_buffer_create(int width, int height);
 
 /* Free the pixel memory allocated by forge_raster_buffer_create. */
-static void forge_raster_buffer_destroy(ForgeRasterBuffer *buf);
+static inline void forge_raster_buffer_destroy(ForgeRasterBuffer *buf);
 
 /* Fill the entire framebuffer with a solid color (components in [0,1]). */
-static void forge_raster_clear(ForgeRasterBuffer *buf,
-                               float r, float g, float b, float a);
+static inline void forge_raster_clear(ForgeRasterBuffer *buf,
+                                      float r, float g, float b, float a);
 
 /* Rasterize a single triangle into the framebuffer.
  *
@@ -118,28 +118,28 @@ static void forge_raster_clear(ForgeRasterBuffer *buf,
  * If texture is non-NULL, interpolated UVs sample the grayscale texture
  * and multiply with the interpolated vertex color -- the same model Dear
  * ImGui uses: font atlas for text, white pixel for solid shapes. */
-static void forge_raster_triangle(ForgeRasterBuffer *buf,
-                                  const ForgeRasterVertex *v0,
-                                  const ForgeRasterVertex *v1,
-                                  const ForgeRasterVertex *v2,
-                                  const ForgeRasterTexture *texture);
+static inline void forge_raster_triangle(ForgeRasterBuffer *buf,
+                                         const ForgeRasterVertex *v0,
+                                         const ForgeRasterVertex *v1,
+                                         const ForgeRasterVertex *v2,
+                                         const ForgeRasterTexture *texture);
 
 /* Draw triangles from vertex and index arrays (batch draw call).
  *
  * Every three consecutive indices form one triangle.  index_count must
  * be a multiple of 3.  Each index is validated against vertex_count. */
-static void forge_raster_triangles_indexed(ForgeRasterBuffer *buf,
-                                           const ForgeRasterVertex *vertices,
-                                           int vertex_count,
-                                           const Uint32 *indices,
-                                           int index_count,
-                                           const ForgeRasterTexture *texture);
+static inline void forge_raster_triangles_indexed(ForgeRasterBuffer *buf,
+                                                  const ForgeRasterVertex *vertices,
+                                                  int vertex_count,
+                                                  const Uint32 *indices,
+                                                  int index_count,
+                                                  const ForgeRasterTexture *texture);
 
 /* Write the framebuffer to a 32-bit BMP file.  BMP stores pixels as BGRA
  * in bottom-up row order; this function handles the conversion from our
  * RGBA top-down format.  Returns true on success. */
-static bool forge_raster_write_bmp(const ForgeRasterBuffer *buf,
-                                   const char *path);
+static inline bool forge_raster_write_bmp(const ForgeRasterBuffer *buf,
+                                          const char *path);
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 /* ── Implementation ───────────────────────────────────────────────────────── */
@@ -231,7 +231,7 @@ static inline bool forge_raster__is_safe_coord(float x)
 
 /* ── Buffer Operations ───────────────────────────────────────────────────── */
 
-static ForgeRasterBuffer forge_raster_buffer_create(int width, int height)
+static inline ForgeRasterBuffer forge_raster_buffer_create(int width, int height)
 {
     ForgeRasterBuffer buf;
     buf.pixels = NULL;
@@ -262,7 +262,7 @@ static ForgeRasterBuffer forge_raster_buffer_create(int width, int height)
     return buf;
 }
 
-static void forge_raster_buffer_destroy(ForgeRasterBuffer *buf)
+static inline void forge_raster_buffer_destroy(ForgeRasterBuffer *buf)
 {
     if (buf) {
         SDL_free(buf->pixels);
@@ -273,8 +273,8 @@ static void forge_raster_buffer_destroy(ForgeRasterBuffer *buf)
     }
 }
 
-static void forge_raster_clear(ForgeRasterBuffer *buf,
-                               float r, float g, float b, float a)
+static inline void forge_raster_clear(ForgeRasterBuffer *buf,
+                                      float r, float g, float b, float a)
 {
     if (!buf || !buf->pixels) return;
 
@@ -296,11 +296,11 @@ static void forge_raster_clear(ForgeRasterBuffer *buf,
 
 /* ── Triangle Rasterization ──────────────────────────────────────────────── */
 
-static void forge_raster_triangle(ForgeRasterBuffer *buf,
-                                  const ForgeRasterVertex *v0,
-                                  const ForgeRasterVertex *v1,
-                                  const ForgeRasterVertex *v2,
-                                  const ForgeRasterTexture *texture)
+static inline void forge_raster_triangle(ForgeRasterBuffer *buf,
+                                         const ForgeRasterVertex *v0,
+                                         const ForgeRasterVertex *v1,
+                                         const ForgeRasterVertex *v2,
+                                         const ForgeRasterTexture *texture)
 {
     if (!buf || !buf->pixels || !v0 || !v1 || !v2) return;
 
@@ -449,12 +449,12 @@ static void forge_raster_triangle(ForgeRasterBuffer *buf,
 
 /* ── Indexed Drawing ─────────────────────────────────────────────────────── */
 
-static void forge_raster_triangles_indexed(ForgeRasterBuffer *buf,
-                                           const ForgeRasterVertex *vertices,
-                                           int vertex_count,
-                                           const Uint32 *indices,
-                                           int index_count,
-                                           const ForgeRasterTexture *texture)
+static inline void forge_raster_triangles_indexed(ForgeRasterBuffer *buf,
+                                                  const ForgeRasterVertex *vertices,
+                                                  int vertex_count,
+                                                  const Uint32 *indices,
+                                                  int index_count,
+                                                  const ForgeRasterTexture *texture)
 {
     if (!buf || !buf->pixels || !vertices || !indices) return;
     if (vertex_count <= 0 || index_count <= 0) return;
@@ -487,8 +487,8 @@ static void forge_raster_triangles_indexed(ForgeRasterBuffer *buf,
 #define FORGE_RASTER__BMP_FILE_HEADER  14   /* BITMAPFILEHEADER */
 #define FORGE_RASTER__BMP_INFO_HEADER  40   /* BITMAPINFOHEADER */
 
-static bool forge_raster_write_bmp(const ForgeRasterBuffer *buf,
-                                   const char *path)
+static inline bool forge_raster_write_bmp(const ForgeRasterBuffer *buf,
+                                          const char *path)
 {
     if (!buf || !buf->pixels || !path) {
         SDL_Log("forge_raster_write_bmp: invalid arguments");

@@ -12,6 +12,7 @@
  */
 
 #include <SDL3/SDL.h>
+#include <assert.h>  /* assert() for defensive bounds checks in helpers */
 #include <stdio.h>   /* remove() for cleaning up test BMP files */
 #include "raster/forge_raster.h"
 
@@ -80,6 +81,8 @@ static int fail_count = 0;
 static void get_pixel(const ForgeRasterBuffer *buf, int x, int y,
                       Uint8 *r, Uint8 *g, Uint8 *b, Uint8 *a)
 {
+    assert(x >= 0 && x < buf->width && "get_pixel: x out of bounds");
+    assert(y >= 0 && y < buf->height && "get_pixel: y out of bounds");
     const Uint8 *p = buf->pixels + y * buf->stride + x * FORGE_RASTER_BPP;
     *r = p[0];
     *g = p[1];

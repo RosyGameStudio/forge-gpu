@@ -90,6 +90,19 @@ static void make_quad(ForgeRasterVertex *verts, int vert_base,
 
 /* ── Demo 1: Solid Triangle ──────────────────────────────────────────────── */
 
+/* Triangle vertex positions (screen-space pixels) */
+#define SOLID_TRI_TOP_X    256.0f  /* top vertex, centered horizontally */
+#define SOLID_TRI_TOP_Y     60.0f
+#define SOLID_TRI_LEFT_X    80.0f  /* bottom-left vertex */
+#define SOLID_TRI_LEFT_Y   440.0f
+#define SOLID_TRI_RIGHT_X  432.0f  /* bottom-right vertex */
+#define SOLID_TRI_RIGHT_Y  440.0f
+
+/* Teal color for all three vertices (uniform -- no interpolation) */
+#define SOLID_TRI_R 0.20f
+#define SOLID_TRI_G 0.80f
+#define SOLID_TRI_B 0.75f
+
 static void demo_solid_triangle(void)
 {
     ForgeRasterBuffer buf = forge_raster_buffer_create(CANVAS_W, CANVAS_H);
@@ -99,9 +112,12 @@ static void demo_solid_triangle(void)
     /* A single teal triangle with uniform color on all three vertices.
      * Using the same color everywhere isolates the rasterizer's core job --
      * the edge function inside/outside test -- without any interpolation. */
-    ForgeRasterVertex v0 = { 256.0f,  60.0f,  0, 0,  0.20f, 0.80f, 0.75f, 1.0f };
-    ForgeRasterVertex v1 = { 80.0f,  440.0f,  0, 0,  0.20f, 0.80f, 0.75f, 1.0f };
-    ForgeRasterVertex v2 = { 432.0f, 440.0f,  0, 0,  0.20f, 0.80f, 0.75f, 1.0f };
+    ForgeRasterVertex v0 = { SOLID_TRI_TOP_X,   SOLID_TRI_TOP_Y,
+                             0, 0,  SOLID_TRI_R, SOLID_TRI_G, SOLID_TRI_B, 1.0f };
+    ForgeRasterVertex v1 = { SOLID_TRI_LEFT_X,  SOLID_TRI_LEFT_Y,
+                             0, 0,  SOLID_TRI_R, SOLID_TRI_G, SOLID_TRI_B, 1.0f };
+    ForgeRasterVertex v2 = { SOLID_TRI_RIGHT_X, SOLID_TRI_RIGHT_Y,
+                             0, 0,  SOLID_TRI_R, SOLID_TRI_G, SOLID_TRI_B, 1.0f };
     forge_raster_triangle(&buf, &v0, &v1, &v2, NULL);
 
     if (forge_raster_write_bmp(&buf, "solid_triangle.bmp"))
