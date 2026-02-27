@@ -301,8 +301,8 @@ if (forge_ui_ttf_load("font.ttf", &font)) {
 ```
 
 The immediate-mode context (`forge_ui_ctx.h`) builds on the atlas and text
-layout to provide labels, buttons, and hit testing — generating vertices and
-indices ready for a single GPU draw call:
+layout to provide labels, buttons, checkboxes, sliders, and hit testing —
+generating vertices and indices ready for a single GPU draw call:
 
 ```c
 #include "ui/forge_ui_ctx.h"
@@ -314,6 +314,8 @@ forge_ui_ctx_begin(&ctx, mouse_x, mouse_y, mouse_down);
 if (forge_ui_ctx_button(&ctx, BTN_ID, "Save", save_rect)) {
     save_file();  // runs exactly once per click
 }
+forge_ui_ctx_checkbox(&ctx, CB_ID, "Audio", &audio_enabled, cb_rect);
+forge_ui_ctx_slider(&ctx, SL_ID, &volume, 0.0f, 100.0f, sl_rect);
 
 forge_ui_ctx_end(&ctx);
 // Render ctx.vertices / ctx.indices with the atlas texture
@@ -500,7 +502,7 @@ forge-gpu/
 │   │   └── README.md      Usage guide, scene hierarchy, materials
 │   ├── ui/                UI library (font parsing, atlas, immediate-mode controls)
 │   │   ├── forge_ui.h     TTF parser, rasterizer, atlas packer (header-only)
-│   │   ├── forge_ui_ctx.h Immediate-mode context: labels, buttons, hit testing
+│   │   ├── forge_ui_ctx.h Immediate-mode context: labels, buttons, checkboxes, sliders
 │   │   └── README.md      Usage guide and supported features
 │   ├── raster/            CPU triangle rasterizer (edge function method)
 │   │   └── forge_raster.h Rasterizer implementation (header-only)

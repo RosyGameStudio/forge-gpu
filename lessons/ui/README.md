@@ -10,7 +10,7 @@ UI lessons teach how to build the **data layer** for a game or tool UI:
 - Parse TrueType fonts and extract glyph outlines
 - Rasterize glyphs into bitmap atlases
 - Lay out text with proper metrics, kerning, and line breaking
-- Build immediate-mode controls (buttons, sliders, text input, panels)
+- Build immediate-mode controls (buttons, checkboxes, sliders, text input, panels)
 - Generate vertex, index, and texture data ready for any renderer
 
 The UI library produces **textures, vertices, indices, and UVs** — it contains
