@@ -2713,15 +2713,13 @@ def diagram_hot_active_state_machine():
     setup_axes(ax, xlim=(-1, 11), ylim=(-1, 7), grid=False, aspect=None)
     ax.axis("off")
 
-    # Title
-    ax.text(
-        5.0,
-        6.5,
+    # Title with vertical padding to avoid crowding content
+    ax.set_title(
         "Hot / Active State Machine",
         color=STYLE["text"],
         fontsize=14,
         fontweight="bold",
-        ha="center",
+        pad=12,
     )
 
     # State positions and colors
@@ -2926,7 +2924,7 @@ def diagram_declare_then_draw():
         color=STYLE["accent2"],
         fontsize=11,
         fontweight="bold",
-        pad=8,
+        pad=12,
     )
 
     # Show create-once, update approach
@@ -2981,7 +2979,7 @@ def diagram_declare_then_draw():
         color=STYLE["accent1"],
         fontsize=11,
         fontweight="bold",
-        pad=8,
+        pad=12,
     )
 
     # Show per-frame declare-then-draw loop
@@ -3064,15 +3062,13 @@ def diagram_button_draw_data():
     setup_axes(ax, xlim=(-0.5, 12), ylim=(-1, 8), grid=False, aspect=None)
     ax.axis("off")
 
-    # Title
-    ax.text(
-        6.0,
-        7.5,
+    # Title with vertical padding to avoid crowding content
+    ax.set_title(
         "Button Draw Data: Background + Text in One Draw Call",
         color=STYLE["text"],
         fontsize=13,
         fontweight="bold",
-        ha="center",
+        pad=12,
     )
 
     # ---- Button visualization (left side) ----
@@ -3294,15 +3290,13 @@ def diagram_hit_testing():
     setup_axes(ax, xlim=(-0.5, 10), ylim=(-0.5, 7), grid=False, aspect=None)
     ax.axis("off")
 
-    # Title
-    ax.text(
-        5.0,
-        6.5,
+    # Title with vertical padding to avoid crowding content
+    ax.set_title(
         "Hit Testing: Point-in-Rectangle",
         color=STYLE["text"],
         fontsize=13,
         fontweight="bold",
-        ha="center",
+        pad=12,
     )
 
     # Draw three buttons

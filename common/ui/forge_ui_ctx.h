@@ -104,10 +104,14 @@ typedef struct ForgeUiRect {
  *   1. At frame start, hot is cleared to FORGE_UI_ID_NONE.
  *   2. Each widget that passes the hit test sets itself as hot (last writer
  *      wins, so draw order determines priority).
- *   3. On mouse press: if the mouse is over a widget (hot), that widget
- *      becomes active.
+ *   3. On mouse press edge (up→down transition): if the mouse is over a
+ *      widget (hot), that widget becomes active.  Edge detection prevents
+ *      a held mouse dragged onto a button from falsely activating it.
  *   4. On mouse release: if the mouse is still over the active widget,
- *      that's a click.  Active is cleared regardless. */
+ *      that's a click.  Active is cleared regardless.
+ *   5. Safety valve: if active is set but the mouse is up, active is cleared
+ *      in forge_ui_ctx_end — this prevents permanent lockup when an active
+ *      widget disappears (is not declared on a subsequent frame). */
 typedef struct ForgeUiContext {
     /* Font atlas (not owned -- must outlive the context) */
     const ForgeUiFontAtlas *atlas;
@@ -126,13 +130,13 @@ typedef struct ForgeUiContext {
     Uint32 next_hot;
 
     /* Draw data (reset each frame by forge_ui_ctx_begin) */
-    ForgeUiVertex *vertices;
-    int            vertex_count;
-    int            vertex_capacity;
+    ForgeUiVertex *vertices;   /* dynamically growing vertex buffer */
+    int            vertex_count;    /* number of vertices emitted this frame */
+    int            vertex_capacity; /* allocated size of vertex buffer */
 
-    Uint32        *indices;
-    int            index_count;
-    int            index_capacity;
+    Uint32        *indices;    /* dynamically growing index buffer */
+    int            index_count;     /* number of indices emitted this frame */
+    int            index_capacity;  /* allocated size of index buffer */
 } ForgeUiContext;
 
 /* ── Public API ─────────────────────────────────────────────────────────── */

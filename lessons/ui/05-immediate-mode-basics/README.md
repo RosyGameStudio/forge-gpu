@@ -136,8 +136,8 @@ Every frame follows four steps:
 2. **Declare widgets** — call `forge_ui_ctx_label()`, `forge_ui_ctx_button()`,
    etc. Each call performs hit testing, updates hot/active state, and appends
    vertices and indices to the context's draw buffers
-3. **`forge_ui_ctx_end()`** — finalize hot/active state transitions for the
-   frame
+3. **`forge_ui_ctx_end()`** — finalize hot/active state transitions; clear
+   stuck active state if the mouse is up (safety valve)
 4. **Render** — submit `ctx.vertices` and `ctx.indices` with the font atlas
    texture to the GPU (or the software rasterizer)
 
@@ -151,18 +151,22 @@ typedef struct ForgeUiContext {
     const ForgeUiFontAtlas *atlas;
 
     /* Per-frame input state (set by forge_ui_ctx_begin) */
-    float mouse_x, mouse_y;   /* cursor position in screen pixels */
-    bool  mouse_down;          /* true while the primary button is held */
+    float mouse_x, mouse_y;    /* cursor position in screen pixels */
+    bool  mouse_down;           /* true while the primary button is held */
+    bool  mouse_down_prev;      /* previous frame's mouse_down (for edge detection) */
 
     /* Persistent widget state (survives across frames) */
-    Uint32 hot;      /* widget under the cursor (FORGE_UI_ID_NONE if empty) */
-    Uint32 active;   /* widget being pressed (FORGE_UI_ID_NONE if empty) */
+    Uint32 hot;       /* widget under the cursor (FORGE_UI_ID_NONE if empty) */
+    Uint32 active;    /* widget being pressed (FORGE_UI_ID_NONE if empty) */
+    Uint32 next_hot;  /* candidate for hot this frame (internal) */
 
-    /* Draw data (reset each frame) */
-    ForgeUiVertex *vertices;   /* dynamically growing vertex buffer */
-    int vertex_count;
-    Uint32 *indices;           /* dynamically growing index buffer */
-    int index_count;
+    /* Draw data (reset each frame by forge_ui_ctx_begin) */
+    ForgeUiVertex *vertices;    /* dynamically growing vertex buffer */
+    int            vertex_count;
+    int            vertex_capacity;
+    Uint32        *indices;     /* dynamically growing index buffer */
+    int            index_count;
+    int            index_capacity;
 } ForgeUiContext;
 ```
 
@@ -174,6 +178,10 @@ Key design decisions:
 - **Hot and active are `Uint32` IDs** — not pointers. This avoids dangling
   references when widgets are not declared in a given frame. The reserved
   value `FORGE_UI_ID_NONE` (0) means "no widget."
+- **Edge-triggered activation** — `mouse_down_prev` tracks the previous
+  frame's mouse state so the library can detect the press edge (up→down
+  transition). This prevents false activation when a held mouse is dragged
+  onto a button.
 - **Draw buffers grow dynamically** — starting at 256 vertices and 384
   indices, doubling when full. Most frames reuse the same allocation.
 
@@ -188,20 +196,26 @@ enough to handle all mouse interaction:
   frame based on hit testing. When a widget is hot, it typically draws with
   a highlighted color to indicate interactivity.
 
-- **`active`** — the widget that the user is currently pressing. Set when the
-  mouse button goes down while a widget is hot. Cleared when the mouse
-  button is released.
+- **`active`** — the widget that the user is currently pressing. Set on the
+  frame the mouse button transitions from up to down (press edge) while a
+  widget is hot. Cleared when the mouse button is released.
 
 The state transitions work as follows:
 
 1. **Frame start**: `next_hot` is cleared to `FORGE_UI_ID_NONE`
 2. **During widget processing**: each widget that passes the hit test sets
    `next_hot` to its own ID (last writer wins)
-3. **Active acquisition**: if `mouse_down` and `hot == id` and
-   `active == NONE`, then `active = id`
+3. **Active acquisition** (edge-triggered): if the mouse button transitions
+   from up to down this frame (`mouse_down && !mouse_down_prev`) and
+   `hot == id` and `active == NONE`, then `active = id`. Using edge
+   detection (rather than level) prevents a held mouse dragged onto a button
+   from falsely activating it
 4. **Click detection**: if `active == id` and `!mouse_down`, the button was
    clicked (if the cursor is still over the widget)
-5. **Frame end**: `hot = next_hot` (unless a widget is currently active, in
+5. **Safety valve**: if `active` is set but the mouse is up, clear `active`
+   — this prevents permanent lockup when an active widget disappears (is
+   not declared on a subsequent frame)
+6. **Frame end**: `hot = next_hot` (unless a widget is currently active, in
    which case hot is frozen to prevent visual jitter)
 
 The "last writer wins" rule for hot means that **draw order determines
