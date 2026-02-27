@@ -221,6 +221,7 @@ the output.
 | 04 | [Text Layout](lessons/ui/04-text-layout/) | Pen/cursor model, advance widths, bearing offsets, baseline positioning, quad generation, index buffers, line breaking, text alignment, ForgeUiVertex format |
 | 05 | [Immediate-Mode Basics](lessons/ui/05-immediate-mode-basics/) | Retained vs immediate mode, declare-then-draw loop, ForgeUiContext, hot/active state machine, hit testing, labels, buttons, white pixel technique |
 | 06 | [Checkboxes and Sliders](lessons/ui/06-checkboxes-and-sliders/) | External mutable state, checkbox toggle, slider drag interaction, value mapping (pixel to normalized to user value), active persistence outside widget bounds |
+| 07 | [Text Input](lessons/ui/07-text-input/) | Focused ID (keyboard focus), click-to-focus / click-outside-to-unfocus, ForgeUiTextInputState, character insertion and deletion, cursor movement, cursor bar positioning via text measurement |
 
 See [lessons/ui/README.md](lessons/ui/README.md) for details and
 [PLAN.md](PLAN.md) for the roadmap.
