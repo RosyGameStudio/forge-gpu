@@ -1464,6 +1464,13 @@ static inline bool forge_ui_ctx_layout_push(ForgeUiContext *ctx,
     if (padding < 0.0f) padding = 0.0f;
     if (spacing < 0.0f) spacing = 0.0f;
 
+    /* Validate direction enum */
+    if (direction != FORGE_UI_LAYOUT_VERTICAL &&
+        direction != FORGE_UI_LAYOUT_HORIZONTAL) {
+        SDL_Log("forge_ui_ctx_layout_push: invalid direction %d", (int)direction);
+        return false;
+    }
+
     ForgeUiLayout *layout = &ctx->layout_stack[ctx->layout_depth];
     layout->rect       = rect;
     layout->direction   = direction;

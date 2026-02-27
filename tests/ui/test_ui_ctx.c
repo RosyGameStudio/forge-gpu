@@ -3848,6 +3848,40 @@ static void test_layout_item_count(void)
     forge_ui_ctx_free(&ctx);
 }
 
+/* ── Layout -- invalid direction ─────────────────────────────────────────── */
+
+static void test_layout_push_invalid_direction(void)
+{
+    TEST("layout_push rejects invalid direction");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    ForgeUiRect area = { 0, 0, 200, 200 };
+
+    /* Valid directions should succeed */
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area,
+                                          FORGE_UI_LAYOUT_VERTICAL, 0, 0));
+    forge_ui_ctx_layout_pop(&ctx);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area,
+                                          FORGE_UI_LAYOUT_HORIZONTAL, 0, 0));
+    forge_ui_ctx_layout_pop(&ctx);
+
+    /* Out-of-range direction should return false */
+    ASSERT_TRUE(!forge_ui_ctx_layout_push(&ctx, area,
+                                           (ForgeUiLayoutDirection)99, 0, 0));
+    ASSERT_TRUE(!forge_ui_ctx_layout_push(&ctx, area,
+                                           (ForgeUiLayoutDirection)-1, 0, 0));
+
+    /* Depth should not have increased from the rejected pushes */
+    ASSERT_EQ_INT(ctx.layout_depth, 0);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -4067,6 +4101,7 @@ int main(int argc, char *argv[])
     test_layout_push_negative_spacing_clamped();
     test_layout_next_negative_size_clamped();
     test_layout_push_tiny_rect_no_negative_remaining();
+    test_layout_push_invalid_direction();
 
     /* Layout -- lifecycle */
     test_layout_begin_resets_depth();
