@@ -39,6 +39,7 @@
 #ifndef FORGE_UI_CTX_H
 #define FORGE_UI_CTX_H
 
+#include <assert.h>
 #include <SDL3/SDL.h>
 #include "forge_ui.h"
 
@@ -191,6 +192,13 @@
 #define FORGE_UI_TI_TEXT_B     0.95f
 #define FORGE_UI_TI_TEXT_A     1.00f
 
+/* ── Layout constants ───────────────────────────────────────────────────── */
+
+/* Maximum nesting depth for layout regions.  8 levels is enough for most
+ * UI hierarchies (e.g. panel > row > column > widget).  The layout stack
+ * lives inside ForgeUiContext and is bounds-checked with assert(). */
+#define FORGE_UI_LAYOUT_MAX_DEPTH  8
+
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
 /* A simple rectangle for widget bounds. */
@@ -200,6 +208,39 @@ typedef struct ForgeUiRect {
     float w;  /* width */
     float h;  /* height */
 } ForgeUiRect;
+
+/* Layout direction — determines which axis the cursor advances along
+ * and which axis fills the available space. */
+typedef enum ForgeUiLayoutDirection {
+    FORGE_UI_LAYOUT_VERTICAL,    /* cursor moves downward; widgets get full width */
+    FORGE_UI_LAYOUT_HORIZONTAL   /* cursor moves rightward; widgets get full height */
+} ForgeUiLayoutDirection;
+
+/* A layout region that positions widgets automatically.
+ *
+ * A layout defines a rectangular area, a direction (vertical or horizontal),
+ * padding (inset from all four edges), spacing (gap between consecutive
+ * widgets), and a cursor that advances after each widget is placed.
+ *
+ * In a vertical layout:
+ *   - Each widget gets the full available width (rect.w - 2 * padding)
+ *   - The caller specifies the widget height via forge_ui_ctx_layout_next()
+ *   - cursor_y advances by (height + spacing) after each widget
+ *
+ * In a horizontal layout:
+ *   - Each widget gets the full available height (rect.h - 2 * padding)
+ *   - The caller specifies the widget width via forge_ui_ctx_layout_next()
+ *   - cursor_x advances by (width + spacing) after each widget */
+typedef struct ForgeUiLayout {
+    ForgeUiRect              rect;         /* total layout region */
+    ForgeUiLayoutDirection   direction;    /* vertical or horizontal */
+    float                    padding;      /* inset from all four edges */
+    float                    spacing;      /* gap between consecutive widgets */
+    float                    cursor_x;     /* current placement x position */
+    float                    cursor_y;     /* current placement y position */
+    float                    remaining_w;  /* width left for more widgets */
+    float                    remaining_h;  /* height left for more widgets */
+} ForgeUiLayout;
 
 /* Application-owned text input state.
  *
@@ -280,6 +321,17 @@ typedef struct ForgeUiContext {
      * during a press edge this frame.  Used by ctx_end to detect "click
      * outside" for focus loss. */
     bool _ti_press_claimed;
+
+    /* Layout stack — automatic widget positioning.
+     *
+     * forge_ui_ctx_layout_push() adds a layout region to the stack;
+     * forge_ui_ctx_layout_pop() removes it.  While a layout is active,
+     * forge_ui_ctx_layout_next() returns the next widget rect from the
+     * top-of-stack layout, advancing its cursor.  Nested layouts enable
+     * complex arrangements (e.g. a vertical panel with a horizontal row
+     * of buttons inside). */
+    ForgeUiLayout layout_stack[FORGE_UI_LAYOUT_MAX_DEPTH];
+    int           layout_depth;  /* number of active layouts on the stack */
 
     /* Draw data (reset each frame by forge_ui_ctx_begin) */
     ForgeUiVertex *vertices;   /* dynamically growing vertex buffer */
@@ -434,6 +486,72 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
                                             ForgeUiTextInputState *state,
                                             ForgeUiRect rect,
                                             bool cursor_visible);
+
+/* ── Layout API ────────────────────────────────────────────────────────── */
+
+/* Push a new layout region onto the stack.
+ *
+ * rect:      the rectangular area this layout occupies
+ * direction: FORGE_UI_LAYOUT_VERTICAL or FORGE_UI_LAYOUT_HORIZONTAL
+ * padding:   inset from all four edges of rect (pixels)
+ * spacing:   gap between consecutive widgets (pixels)
+ *
+ * The cursor starts at (rect.x + padding, rect.y + padding).  Available
+ * space is (rect.w - 2*padding) wide and (rect.h - 2*padding) tall.
+ * Asserts if the stack overflows (depth >= FORGE_UI_LAYOUT_MAX_DEPTH). */
+static inline void forge_ui_ctx_layout_push(ForgeUiContext *ctx,
+                                             ForgeUiRect rect,
+                                             ForgeUiLayoutDirection direction,
+                                             float padding,
+                                             float spacing);
+
+/* Pop the current layout region and return to the parent layout.
+ * Asserts if the stack is empty (layout_depth == 0). */
+static inline void forge_ui_ctx_layout_pop(ForgeUiContext *ctx);
+
+/* Return the next widget rect from the current layout.
+ *
+ * size: the widget's height (in vertical layout) or width (in horizontal
+ *       layout).  The other dimension is filled automatically from the
+ *       layout's available space.
+ *
+ * Returns a ForgeUiRect positioned at the cursor, then advances the
+ * cursor by (size + spacing).  Asserts if no layout is active. */
+static inline ForgeUiRect forge_ui_ctx_layout_next(ForgeUiContext *ctx,
+                                                    float size);
+
+/* ── Layout-aware widget variants ──────────────────────────────────────── */
+/* These call forge_ui_ctx_layout_next() internally to obtain their rect,
+ * so the caller only specifies content (label, ID, state) and a size.
+ * The size parameter means height in vertical layouts or width in
+ * horizontal layouts. */
+
+/* Label placed by the current layout.  size is the widget height (vertical)
+ * or width (horizontal).  Text color uses the same defaults as buttons. */
+static inline void forge_ui_ctx_label_layout(ForgeUiContext *ctx,
+                                              const char *text,
+                                              float size,
+                                              float r, float g, float b, float a);
+
+/* Button placed by the current layout.  Returns true on click. */
+static inline bool forge_ui_ctx_button_layout(ForgeUiContext *ctx,
+                                               Uint32 id,
+                                               const char *text,
+                                               float size);
+
+/* Checkbox placed by the current layout.  Returns true on toggle. */
+static inline bool forge_ui_ctx_checkbox_layout(ForgeUiContext *ctx,
+                                                 Uint32 id,
+                                                 const char *label,
+                                                 bool *value,
+                                                 float size);
+
+/* Slider placed by the current layout.  Returns true on value change. */
+static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
+                                               Uint32 id,
+                                               float *value,
+                                               float min_val, float max_val,
+                                               float size);
 
 /* ── Internal Helpers ───────────────────────────────────────────────────── */
 
@@ -695,6 +813,9 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
     ctx->key_end = false;
     ctx->key_escape = false;
     ctx->_ti_press_claimed = false;
+
+    /* Reset layout stack for this frame */
+    ctx->layout_depth = 0;
 
     /* Reset draw buffers (keep allocated memory) */
     ctx->vertex_count = 0;
@@ -1278,6 +1399,133 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
     }
 
     return content_changed;
+}
+
+/* ── Layout implementation ──────────────────────────────────────────────── */
+
+static inline void forge_ui_ctx_layout_push(ForgeUiContext *ctx,
+                                             ForgeUiRect rect,
+                                             ForgeUiLayoutDirection direction,
+                                             float padding,
+                                             float spacing)
+{
+    if (!ctx) return;
+    assert(ctx->layout_depth < FORGE_UI_LAYOUT_MAX_DEPTH);
+
+    ForgeUiLayout *layout = &ctx->layout_stack[ctx->layout_depth];
+    layout->rect      = rect;
+    layout->direction  = direction;
+    layout->padding    = padding;
+    layout->spacing    = spacing;
+    layout->cursor_x   = rect.x + padding;
+    layout->cursor_y   = rect.y + padding;
+
+    /* Available space after subtracting padding from both sides.
+     * Clamp to zero so a very small rect does not go negative. */
+    float inner_w = rect.w - 2.0f * padding;
+    float inner_h = rect.h - 2.0f * padding;
+    layout->remaining_w = (inner_w > 0.0f) ? inner_w : 0.0f;
+    layout->remaining_h = (inner_h > 0.0f) ? inner_h : 0.0f;
+
+    ctx->layout_depth++;
+}
+
+static inline void forge_ui_ctx_layout_pop(ForgeUiContext *ctx)
+{
+    if (!ctx) return;
+    assert(ctx->layout_depth > 0);
+    ctx->layout_depth--;
+}
+
+static inline ForgeUiRect forge_ui_ctx_layout_next(ForgeUiContext *ctx,
+                                                    float size)
+{
+    assert(ctx && ctx->layout_depth > 0);
+
+    ForgeUiLayout *layout = &ctx->layout_stack[ctx->layout_depth - 1];
+    ForgeUiRect result;
+
+    if (layout->direction == FORGE_UI_LAYOUT_VERTICAL) {
+        /* Vertical: widget gets full available width, caller-specified height */
+        result.x = layout->cursor_x;
+        result.y = layout->cursor_y;
+        result.w = layout->remaining_w;
+        result.h = size;
+
+        /* Advance cursor downward */
+        layout->cursor_y += size + layout->spacing;
+        layout->remaining_h -= size + layout->spacing;
+        if (layout->remaining_h < 0.0f) layout->remaining_h = 0.0f;
+    } else {
+        /* Horizontal: widget gets caller-specified width, full available height */
+        result.x = layout->cursor_x;
+        result.y = layout->cursor_y;
+        result.w = size;
+        result.h = layout->remaining_h;
+
+        /* Advance cursor rightward */
+        layout->cursor_x += size + layout->spacing;
+        layout->remaining_w -= size + layout->spacing;
+        if (layout->remaining_w < 0.0f) layout->remaining_w = 0.0f;
+    }
+
+    return result;
+}
+
+/* ── Layout-aware widget implementations ───────────────────────────────── */
+
+static inline void forge_ui_ctx_label_layout(ForgeUiContext *ctx,
+                                              const char *text,
+                                              float size,
+                                              float r, float g, float b, float a)
+{
+    if (!ctx || !text || !ctx->atlas) return;
+
+    ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
+
+    /* Compute baseline position within the rect: vertically center the
+     * em square, then offset by the ascender to reach the baseline. */
+    float ascender_px = 0.0f;
+    if (ctx->atlas->units_per_em > 0) {
+        float scale = ctx->atlas->pixel_height / (float)ctx->atlas->units_per_em;
+        ascender_px = (float)ctx->atlas->ascender * scale;
+    }
+    float text_y = rect.y + (rect.h - ctx->atlas->pixel_height) * 0.5f
+                   + ascender_px;
+
+    forge_ui_ctx_label(ctx, text, rect.x, text_y, r, g, b, a);
+}
+
+static inline bool forge_ui_ctx_button_layout(ForgeUiContext *ctx,
+                                               Uint32 id,
+                                               const char *text,
+                                               float size)
+{
+    if (!ctx) return false;
+    ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
+    return forge_ui_ctx_button(ctx, id, text, rect);
+}
+
+static inline bool forge_ui_ctx_checkbox_layout(ForgeUiContext *ctx,
+                                                 Uint32 id,
+                                                 const char *label,
+                                                 bool *value,
+                                                 float size)
+{
+    if (!ctx) return false;
+    ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
+    return forge_ui_ctx_checkbox(ctx, id, label, value, rect);
+}
+
+static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
+                                               Uint32 id,
+                                               float *value,
+                                               float min_val, float max_val,
+                                               float size)
+{
+    if (!ctx) return false;
+    ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
+    return forge_ui_ctx_slider(ctx, id, value, min_val, max_val, rect);
 }
 
 #endif /* FORGE_UI_CTX_H */
