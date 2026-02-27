@@ -3126,6 +3126,33 @@ static void test_text_input_overlap_last_drawn_wins(void)
     forge_ui_ctx_free(&ctx);
 }
 
+/* ── Null-termination validation test (audit fix) ───────────────────────── */
+
+static void test_text_input_bad_null_termination(void)
+{
+    TEST("text input rejects buffer with missing null terminator");
+    if (!atlas_built) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+
+    char buf[16];
+    SDL_memset(buf, 'A', sizeof(buf));  /* fill with non-zero, no '\0' at length */
+    ForgeUiTextInputState state;
+    state.buffer   = buf;
+    state.capacity = (int)sizeof(buf);
+    state.length   = 3;    /* claims 3 bytes, but buf[3] != '\0' */
+    state.cursor   = 0;
+
+    ForgeUiRect r = { 10, 10, 200, 30 };
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+    bool result = forge_ui_ctx_text_input(&ctx, 1, &state, r, true);
+    forge_ui_ctx_end(&ctx);
+    ASSERT_TRUE(!result);  /* should reject: buf[length] != '\0' */
+
+    forge_ui_ctx_free(&ctx);
+}
+
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -3320,6 +3347,9 @@ int main(int argc, char *argv[])
 
     /* Text input -- overlap priority */
     test_text_input_overlap_last_drawn_wins();
+
+    /* Text input -- null-termination validation (audit fix) */
+    test_text_input_bad_null_termination();
 
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
             test_count, pass_count, fail_count);

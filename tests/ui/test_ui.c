@@ -1635,6 +1635,171 @@ static void test_measure_wrapping(void)
     ASSERT_TRUE(m_wrap.height > m_nowrap.height);
 }
 
+/* ── Parameter validation tests (audit fixes) ───────────────────────────── */
+
+static void test_load_null_out_font(void)
+{
+    TEST("forge_ui_ttf_load rejects NULL out_font");
+    bool result = forge_ui_ttf_load(TEST_FONT_PATH, NULL);
+    ASSERT_TRUE(!result);
+}
+
+static void test_load_null_path(void)
+{
+    TEST("forge_ui_ttf_load rejects NULL path");
+    ForgeUiFont tmp;
+    bool result = forge_ui_ttf_load(NULL, &tmp);
+    ASSERT_TRUE(!result);
+}
+
+static void test_glyph_index_null_font(void)
+{
+    TEST("forge_ui_ttf_glyph_index returns 0 for NULL font");
+    Uint16 idx = forge_ui_ttf_glyph_index(NULL, 'A');
+    ASSERT_EQ_U16(idx, 0);
+}
+
+static void test_load_glyph_null_font(void)
+{
+    TEST("forge_ui_ttf_load_glyph rejects NULL font");
+    ForgeUiTtfGlyph glyph;
+    bool result = forge_ui_ttf_load_glyph(NULL, 0, &glyph);
+    ASSERT_TRUE(!result);
+}
+
+static void test_load_glyph_null_out(void)
+{
+    TEST("forge_ui_ttf_load_glyph rejects NULL out_glyph");
+    if (!font_loaded) return;
+    bool result = forge_ui_ttf_load_glyph(&test_font, 0, NULL);
+    ASSERT_TRUE(!result);
+}
+
+static void test_rasterize_null_font(void)
+{
+    TEST("forge_ui_rasterize_glyph rejects NULL font");
+    ForgeUiGlyphBitmap bmp;
+    bool result = forge_ui_rasterize_glyph(NULL, 0, 32.0f, NULL, &bmp);
+    ASSERT_TRUE(!result);
+}
+
+static void test_rasterize_null_out(void)
+{
+    TEST("forge_ui_rasterize_glyph rejects NULL out_bitmap");
+    if (!font_loaded) return;
+    bool result = forge_ui_rasterize_glyph(&test_font, 0, 32.0f, NULL, NULL);
+    ASSERT_TRUE(!result);
+}
+
+static void test_rasterize_zero_height(void)
+{
+    TEST("forge_ui_rasterize_glyph rejects zero pixel_height");
+    if (!font_loaded) return;
+    ForgeUiGlyphBitmap bmp;
+    bool result = forge_ui_rasterize_glyph(&test_font, 0, 0.0f, NULL, &bmp);
+    ASSERT_TRUE(!result);
+}
+
+static void test_rasterize_negative_height(void)
+{
+    TEST("forge_ui_rasterize_glyph rejects negative pixel_height");
+    if (!font_loaded) return;
+    ForgeUiGlyphBitmap bmp;
+    bool result = forge_ui_rasterize_glyph(&test_font, 0, -10.0f, NULL, &bmp);
+    ASSERT_TRUE(!result);
+}
+
+static void test_rasterize_nan_height(void)
+{
+    TEST("forge_ui_rasterize_glyph rejects NaN pixel_height");
+    if (!font_loaded) return;
+    ForgeUiGlyphBitmap bmp;
+    float nan_val = 0.0f / 0.0f;
+    bool result = forge_ui_rasterize_glyph(&test_font, 0, nan_val, NULL, &bmp);
+    ASSERT_TRUE(!result);
+}
+
+static void test_advance_width_null_font(void)
+{
+    TEST("forge_ui_ttf_advance_width returns 0 for NULL font");
+    Uint16 w = forge_ui_ttf_advance_width(NULL, 0);
+    ASSERT_EQ_U16(w, 0);
+}
+
+static void test_atlas_build_null_font(void)
+{
+    TEST("forge_ui_atlas_build rejects NULL font");
+    ForgeUiFontAtlas atlas;
+    Uint32 cp = 'A';
+    bool result = forge_ui_atlas_build(NULL, 32.0f, &cp, 1, 1, &atlas);
+    ASSERT_TRUE(!result);
+}
+
+static void test_atlas_build_null_atlas(void)
+{
+    TEST("forge_ui_atlas_build rejects NULL out_atlas");
+    if (!font_loaded) return;
+    Uint32 cp = 'A';
+    bool result = forge_ui_atlas_build(&test_font, 32.0f, &cp, 1, 1, NULL);
+    ASSERT_TRUE(!result);
+}
+
+static void test_atlas_build_null_codepoints(void)
+{
+    TEST("forge_ui_atlas_build rejects NULL codepoints");
+    if (!font_loaded) return;
+    ForgeUiFontAtlas atlas;
+    bool result = forge_ui_atlas_build(&test_font, 32.0f, NULL, 1, 1, &atlas);
+    ASSERT_TRUE(!result);
+}
+
+static void test_atlas_build_zero_count(void)
+{
+    TEST("forge_ui_atlas_build rejects zero codepoint_count");
+    if (!font_loaded) return;
+    ForgeUiFontAtlas atlas;
+    Uint32 cp = 'A';
+    bool result = forge_ui_atlas_build(&test_font, 32.0f, &cp, 0, 1, &atlas);
+    ASSERT_TRUE(!result);
+}
+
+static void test_atlas_build_zero_height(void)
+{
+    TEST("forge_ui_atlas_build rejects zero pixel_height");
+    if (!font_loaded) return;
+    ForgeUiFontAtlas atlas;
+    Uint32 cp = 'A';
+    bool result = forge_ui_atlas_build(&test_font, 0.0f, &cp, 1, 1, &atlas);
+    ASSERT_TRUE(!result);
+}
+
+static void test_atlas_build_negative_height(void)
+{
+    TEST("forge_ui_atlas_build rejects negative pixel_height");
+    if (!font_loaded) return;
+    ForgeUiFontAtlas atlas;
+    Uint32 cp = 'A';
+    bool result = forge_ui_atlas_build(&test_font, -5.0f, &cp, 1, 1, &atlas);
+    ASSERT_TRUE(!result);
+}
+
+static void test_atlas_lookup_null_atlas(void)
+{
+    TEST("forge_ui_atlas_lookup returns NULL for NULL atlas");
+    const ForgeUiPackedGlyph *g = forge_ui_atlas_lookup(NULL, 'A');
+    ASSERT_TRUE(g == NULL);
+}
+
+static void test_atlas_lookup_null_glyphs(void)
+{
+    TEST("forge_ui_atlas_lookup returns NULL when atlas->glyphs is NULL");
+    ForgeUiFontAtlas empty;
+    SDL_memset(&empty, 0, sizeof(empty));
+    empty.glyph_count = 5;  /* non-zero count but NULL glyphs pointer */
+    const ForgeUiPackedGlyph *g = forge_ui_atlas_lookup(&empty, 'A');
+    ASSERT_TRUE(g == NULL);
+}
+
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -1754,6 +1919,27 @@ int main(int argc, char *argv[])
     test_measure_null_params();
     test_measure_multiline();
     test_measure_wrapping();
+
+    /* Parameter validation (audit fixes) */
+    test_load_null_out_font();
+    test_load_null_path();
+    test_glyph_index_null_font();
+    test_load_glyph_null_font();
+    test_load_glyph_null_out();
+    test_rasterize_null_font();
+    test_rasterize_null_out();
+    test_rasterize_zero_height();
+    test_rasterize_negative_height();
+    test_rasterize_nan_height();
+    test_advance_width_null_font();
+    test_atlas_build_null_font();
+    test_atlas_build_null_atlas();
+    test_atlas_build_null_codepoints();
+    test_atlas_build_zero_count();
+    test_atlas_build_zero_height();
+    test_atlas_build_negative_height();
+    test_atlas_lookup_null_atlas();
+    test_atlas_lookup_null_glyphs();
 
     /* Print summary before tearing down SDL (SDL_Log needs SDL alive) */
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",

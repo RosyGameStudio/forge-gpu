@@ -1096,6 +1096,7 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
     if (state->capacity <= 0) return false;
     if (state->length < 0 || state->length >= state->capacity) return false;
     if (state->cursor < 0 || state->cursor > state->length) return false;
+    if (state->buffer[state->length] != '\0') return false;
 
     bool content_changed = false;
     bool is_focused = (ctx->focused == id);
