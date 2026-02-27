@@ -387,8 +387,9 @@ static void test_bmp_write(void)
      * header (14) + info (40) + pixel data (4 * 4 * 4 = 64) = 118 */
     FILE *fp = fopen(path, "rb");
     ASSERT_TRUE(fp != NULL);
-    fseek(fp, 0, SEEK_END);
+    ASSERT_TRUE(fseek(fp, 0, SEEK_END) == 0);
     long file_size = ftell(fp);
+    ASSERT_TRUE(file_size != -1L);
     fclose(fp);
     ASSERT_EQ_INT((int)file_size, 118);
 
@@ -396,8 +397,9 @@ static void test_bmp_write(void)
     fp = fopen(path, "rb");
     ASSERT_TRUE(fp != NULL);
     Uint8 magic[2];
-    fread(magic, 1, 2, fp);
+    size_t nread = fread(magic, 1, 2, fp);
     fclose(fp);
+    ASSERT_EQ_INT((int)nread, 2);
     ASSERT_EQ_BYTE(magic[0], 'B');
     ASSERT_EQ_BYTE(magic[1], 'M');
 
