@@ -47,12 +47,19 @@
 #define FORGE_RASTER_H
 
 #include <SDL3/SDL.h>
+#include <stdint.h>  /* UINT32_MAX for BMP size validation */
 #include <stdio.h>   /* FILE, fopen, fwrite, fclose for BMP writing */
 
 /* ── Public Constants ────────────────────────────────────────────────────── */
 
 /* Bytes per pixel in the framebuffer (RGBA8888) */
 #define FORGE_RASTER_BPP 4
+
+/* Maximum framebuffer or texture dimension (width or height).
+ * Keeps all intermediate integer arithmetic within safe bounds:
+ * width * BPP fits in int, and stride * height fits in size_t.
+ * 16384 is 4x a typical 4K display -- generous for a learning library. */
+#define FORGE_RASTER_MAX_DIM 16384
 
 /* ── Public Types ────────────────────────────────────────────────────────── */
 
@@ -113,9 +120,10 @@ static void forge_raster_triangle(ForgeRasterBuffer *buf,
 /* Draw triangles from vertex and index arrays (batch draw call).
  *
  * Every three consecutive indices form one triangle.  index_count must
- * be a multiple of 3. */
+ * be a multiple of 3.  Each index is validated against vertex_count. */
 static void forge_raster_triangles_indexed(ForgeRasterBuffer *buf,
                                            const ForgeRasterVertex *vertices,
+                                           int vertex_count,
                                            const Uint32 *indices,
                                            int index_count,
                                            const ForgeRasterTexture *texture);
@@ -200,27 +208,49 @@ static inline float forge_raster__orient2d(float ax, float ay,
     return (bx - ax) * (py - ay) - (by - ay) * (px - ax);
 }
 
+/* Absolute value of a float (avoids <math.h> dependency) */
+static inline float forge_raster__fabsf(float x)
+{
+    return x < 0.0f ? -x : x;
+}
+
+/* Returns false for NaN, Infinity, and extremely large magnitudes.
+ * NaN fails both comparisons (IEEE 754), so this catches all non-finite
+ * values without requiring <math.h>. */
+static inline bool forge_raster__is_safe_coord(float x)
+{
+    return x >= -1e7f && x <= 1e7f;
+}
+
 /* ── Buffer Operations ───────────────────────────────────────────────────── */
 
 static ForgeRasterBuffer forge_raster_buffer_create(int width, int height)
 {
     ForgeRasterBuffer buf;
-    buf.width  = width;
-    buf.height = height;
-    buf.stride = width * FORGE_RASTER_BPP;
     buf.pixels = NULL;
+    buf.width  = 0;
+    buf.height = 0;
+    buf.stride = 0;
 
-    if (width <= 0 || height <= 0) {
-        SDL_Log("forge_raster_buffer_create: invalid dimensions %dx%d",
-                width, height);
+    if (width <= 0 || height <= 0 ||
+        width > FORGE_RASTER_MAX_DIM || height > FORGE_RASTER_MAX_DIM) {
+        SDL_Log("forge_raster_buffer_create: invalid dimensions %dx%d "
+                "(max %d)", width, height, FORGE_RASTER_MAX_DIM);
         return buf;
     }
+
+    buf.width  = width;
+    buf.height = height;
+    buf.stride = width * FORGE_RASTER_BPP;  /* safe: max 16384*4 = 65536 */
 
     size_t size = (size_t)buf.stride * (size_t)height;
     buf.pixels = (Uint8 *)SDL_calloc(size, 1);
     if (!buf.pixels) {
         SDL_Log("forge_raster_buffer_create: allocation failed (%zu bytes)",
                 size);
+        buf.width  = 0;
+        buf.height = 0;
+        buf.stride = 0;
     }
     return buf;
 }
@@ -247,7 +277,7 @@ static void forge_raster_clear(ForgeRasterBuffer *buf,
     Uint8 ab = forge_raster__to_byte(a);
 
     for (int y = 0; y < buf->height; y++) {
-        Uint8 *row = buf->pixels + y * buf->stride;
+        Uint8 *row = buf->pixels + (size_t)y * (size_t)buf->stride;
         for (int x = 0; x < buf->width; x++) {
             row[x * FORGE_RASTER_BPP + 0] = rb;
             row[x * FORGE_RASTER_BPP + 1] = gb;
@@ -265,7 +295,18 @@ static void forge_raster_triangle(ForgeRasterBuffer *buf,
                                   const ForgeRasterVertex *v2,
                                   const ForgeRasterTexture *texture)
 {
-    if (!buf || !buf->pixels) return;
+    if (!buf || !buf->pixels || !v0 || !v1 || !v2) return;
+
+    /* Reject vertices with non-finite coordinates (NaN, Infinity).
+     * Casting such values to int is undefined behavior in C99. */
+    if (!forge_raster__is_safe_coord(v0->x) ||
+        !forge_raster__is_safe_coord(v0->y) ||
+        !forge_raster__is_safe_coord(v1->x) ||
+        !forge_raster__is_safe_coord(v1->y) ||
+        !forge_raster__is_safe_coord(v2->x) ||
+        !forge_raster__is_safe_coord(v2->y)) {
+        return;
+    }
 
     /* Compute the signed area of the triangle (twice the signed area).
      * Positive for CCW winding, negative for CW, zero for degenerate. */
@@ -273,8 +314,11 @@ static void forge_raster_triangle(ForgeRasterBuffer *buf,
                                         v1->x, v1->y,
                                         v2->x, v2->y);
 
-    /* Skip degenerate triangles (collinear vertices, zero area) */
-    if (area == 0.0f) return;
+    /* Skip degenerate or near-degenerate triangles.  An exact == 0 test
+     * misses nearly-collinear vertices where 1/area produces extreme
+     * barycentric values.  The negated form handles NaN (NaN >= x is
+     * always false, so the check triggers). */
+    if (!(forge_raster__fabsf(area) >= 1e-6f)) return;
 
     /* Compute bounding box of the triangle in pixel coordinates */
     float fmin_x = forge_raster__min3f(v0->x, v1->x, v2->x);
@@ -341,7 +385,8 @@ static void forge_raster_triangle(ForgeRasterBuffer *buf,
              * channels — this is the Dear ImGui rendering model where the
              * font atlas provides alpha coverage and the vertex color
              * provides the RGB tint. */
-            if (texture && texture->pixels) {
+            if (texture && texture->pixels &&
+                texture->width > 0 && texture->height > 0) {
                 float tu = b0 * v0->u + b1 * v1->u + b2 * v2->u;
                 float tv = b0 * v0->v + b1 * v1->v + b2 * v2->v;
 
@@ -355,8 +400,10 @@ static void forge_raster_triangle(ForgeRasterBuffer *buf,
                 tx = forge_raster__clamp_int(tx, 0, texture->width  - 1);
                 ty = forge_raster__clamp_int(ty, 0, texture->height - 1);
 
+                size_t texel_idx = (size_t)ty * (size_t)texture->width +
+                                   (size_t)tx;
                 float texel = forge_raster__to_float(
-                    texture->pixels[ty * texture->width + tx]);
+                    texture->pixels[texel_idx]);
 
                 /* Multiply all channels by the texel value */
                 src_r *= texel;
@@ -375,8 +422,9 @@ static void forge_raster_triangle(ForgeRasterBuffer *buf,
              * When src_a = 1.0 (fully opaque), the source completely
              * replaces the destination.  When src_a = 0.0 (fully
              * transparent), the destination is unchanged. */
-            Uint8 *pixel = buf->pixels + y * buf->stride +
-                           x * FORGE_RASTER_BPP;
+            Uint8 *pixel = buf->pixels +
+                           (size_t)y * (size_t)buf->stride +
+                           (size_t)x * FORGE_RASTER_BPP;
 
             float dst_r = forge_raster__to_float(pixel[0]);
             float dst_g = forge_raster__to_float(pixel[1]);
@@ -396,18 +444,32 @@ static void forge_raster_triangle(ForgeRasterBuffer *buf,
 
 static void forge_raster_triangles_indexed(ForgeRasterBuffer *buf,
                                            const ForgeRasterVertex *vertices,
+                                           int vertex_count,
                                            const Uint32 *indices,
                                            int index_count,
                                            const ForgeRasterTexture *texture)
 {
-    if (!buf || !vertices || !indices) return;
+    if (!buf || !buf->pixels || !vertices || !indices) return;
+    if (vertex_count <= 0 || index_count <= 0) return;
 
     /* Every three indices form one triangle */
     for (int i = 0; i + 2 < index_count; i += 3) {
+        Uint32 i0 = indices[i + 0];
+        Uint32 i1 = indices[i + 1];
+        Uint32 i2 = indices[i + 2];
+
+        /* Validate each index against the vertex array bounds */
+        if (i0 >= (Uint32)vertex_count ||
+            i1 >= (Uint32)vertex_count ||
+            i2 >= (Uint32)vertex_count) {
+            SDL_Log("forge_raster_triangles_indexed: index out of bounds "
+                    "(%u, %u, %u) with vertex_count=%d",
+                    (unsigned)i0, (unsigned)i1, (unsigned)i2, vertex_count);
+            continue;
+        }
+
         forge_raster_triangle(buf,
-                              &vertices[indices[i + 0]],
-                              &vertices[indices[i + 1]],
-                              &vertices[indices[i + 2]],
+                              &vertices[i0], &vertices[i1], &vertices[i2],
                               texture);
     }
 }
@@ -429,18 +491,26 @@ static bool forge_raster_write_bmp(const ForgeRasterBuffer *buf,
     int width  = buf->width;
     int height = buf->height;
 
-    /* Row stride in BMP: 32-bit pixels are always naturally 4-byte aligned,
-     * so no padding is needed. */
-    Uint32 bmp_row_bytes   = (Uint32)(width * FORGE_RASTER_BPP);
-    Uint32 pixel_data_size = bmp_row_bytes * (Uint32)height;
+    /* Compute sizes using size_t to avoid integer overflow.  BMP headers
+     * use 32-bit fields, so we validate the total fits in Uint32. */
+    size_t bmp_row_bytes   = (size_t)width * FORGE_RASTER_BPP;
+    size_t pixel_data_size = bmp_row_bytes * (size_t)height;
     Uint32 data_offset     = FORGE_RASTER__BMP_FILE_HEADER +
                              FORGE_RASTER__BMP_INFO_HEADER;
-    Uint32 file_size       = data_offset + pixel_data_size;
+    size_t file_size_st    = (size_t)data_offset + pixel_data_size;
 
-    Uint8 *file_buf = (Uint8 *)SDL_calloc(file_size, 1);
+    if (file_size_st > (size_t)UINT32_MAX) {
+        SDL_Log("forge_raster_write_bmp: image too large for BMP format");
+        return false;
+    }
+
+    Uint32 file_size = (Uint32)file_size_st;
+    Uint32 pix_size  = (Uint32)pixel_data_size;
+
+    Uint8 *file_buf = (Uint8 *)SDL_calloc(file_size_st, 1);
     if (!file_buf) {
-        SDL_Log("forge_raster_write_bmp: allocation failed (%u bytes)",
-                file_size);
+        SDL_Log("forge_raster_write_bmp: allocation failed (%zu bytes)",
+                file_size_st);
         return false;
     }
 
@@ -460,21 +530,29 @@ static bool forge_raster_write_bmp(const ForgeRasterBuffer *buf,
     /* ── BITMAPINFOHEADER (40 bytes) ─────────────────────────────────── */
     Uint8 *info = file_buf + FORGE_RASTER__BMP_FILE_HEADER;
     info[0] = FORGE_RASTER__BMP_INFO_HEADER; /* header size */
-    /* Width (little-endian int32) */
-    info[4]  = (Uint8)(width);
-    info[5]  = (Uint8)(width >> 8);
-    info[6]  = (Uint8)(width >> 16);
-    info[7]  = (Uint8)(width >> 24);
+    /* Width (little-endian int32) -- cast to Uint32 for portable shifting */
+    Uint32 w = (Uint32)width;
+    info[4]  = (Uint8)(w);
+    info[5]  = (Uint8)(w >> 8);
+    info[6]  = (Uint8)(w >> 16);
+    info[7]  = (Uint8)(w >> 24);
     /* Height (positive = bottom-up row order in the file) */
-    info[8]  = (Uint8)(height);
-    info[9]  = (Uint8)(height >> 8);
-    info[10] = (Uint8)(height >> 16);
-    info[11] = (Uint8)(height >> 24);
+    Uint32 h = (Uint32)height;
+    info[8]  = (Uint8)(h);
+    info[9]  = (Uint8)(h >> 8);
+    info[10] = (Uint8)(h >> 16);
+    info[11] = (Uint8)(h >> 24);
     /* Planes (always 1) */
     info[12] = 1;
     /* Bits per pixel (32 for BGRA) */
     info[14] = 32;
-    /* Compression, image size, resolution, colors: all 0 (from calloc) */
+    /* Compression: BI_RGB = 0 (from calloc) */
+    /* Image size (set explicitly for maximum BMP reader compatibility) */
+    info[20] = (Uint8)(pix_size);
+    info[21] = (Uint8)(pix_size >> 8);
+    info[22] = (Uint8)(pix_size >> 16);
+    info[23] = (Uint8)(pix_size >> 24);
+    /* Resolution, colors: all 0 (from calloc) */
 
     /* ── Pixel data ──────────────────────────────────────────────────── */
     /* BMP stores rows bottom-up: file row 0 is the bottom of the image.
@@ -483,12 +561,14 @@ static bool forge_raster_write_bmp(const ForgeRasterBuffer *buf,
     Uint8 *pixel_dst = file_buf + data_offset;
     for (int y = 0; y < height; y++) {
         int bmp_row = height - 1 - y;
-        const Uint8 *src_row = buf->pixels + y * buf->stride;
-        Uint8 *dst_row = pixel_dst + bmp_row * bmp_row_bytes;
+        const Uint8 *src_row = buf->pixels +
+                               (size_t)y * (size_t)buf->stride;
+        Uint8 *dst_row = pixel_dst +
+                         (size_t)bmp_row * bmp_row_bytes;
 
         for (int x = 0; x < width; x++) {
-            const Uint8 *src = src_row + x * FORGE_RASTER_BPP;
-            Uint8 *dst       = dst_row + x * FORGE_RASTER_BPP;
+            const Uint8 *src = src_row + (size_t)x * FORGE_RASTER_BPP;
+            Uint8 *dst       = dst_row + (size_t)x * FORGE_RASTER_BPP;
             dst[0] = src[2];  /* B <- our offset 2 (blue) */
             dst[1] = src[1];  /* G <- our offset 1 (green) */
             dst[2] = src[0];  /* R <- our offset 0 (red) */
@@ -504,13 +584,13 @@ static bool forge_raster_write_bmp(const ForgeRasterBuffer *buf,
         return false;
     }
 
-    size_t written = fwrite(file_buf, 1, file_size, fp);
+    size_t written = fwrite(file_buf, 1, file_size_st, fp);
     fclose(fp);
     SDL_free(file_buf);
 
-    if (written != file_size) {
-        SDL_Log("forge_raster_write_bmp: incomplete write (%zu / %u bytes)",
-                written, file_size);
+    if (written != file_size_st) {
+        SDL_Log("forge_raster_write_bmp: incomplete write (%zu / %zu bytes)",
+                written, file_size_st);
         return false;
     }
 

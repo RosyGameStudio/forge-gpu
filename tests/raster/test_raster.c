@@ -223,7 +223,7 @@ static void test_indexed_drawing(void)
     /* Two CCW triangles: (0,1,2) and (0,2,3) */
     Uint32 indices[6] = { 0, 1, 2,  0, 2, 3 };
 
-    forge_raster_triangles_indexed(&buf, verts, indices, 6, NULL);
+    forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, NULL);
 
     /* Center of the quad should be white */
     Uint8 r, g, b, a;
@@ -260,7 +260,7 @@ static void test_texture_sampling(void)
         { 0.0f,  16.0f, 0.0f, 1.0f,  1, 1, 1, 1 },  /* BL, uv(0,1) */
     };
     Uint32 indices[6] = { 0, 1, 2,  0, 2, 3 };
-    forge_raster_triangles_indexed(&buf, verts, indices, 6, &tex);
+    forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, &tex);
 
     /* Top-left quadrant should sample texel (0,0) = white */
     Uint8 r, g, b, a;

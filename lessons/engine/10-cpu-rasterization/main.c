@@ -135,7 +135,7 @@ static void demo_indexed_quad(void)
     /* Two CCW triangles forming the quad */
     Uint32 indices[6] = { 0, 1, 2,  0, 2, 3 };
 
-    forge_raster_triangles_indexed(&buf, verts, indices, 6, NULL);
+    forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, NULL);
 
     forge_raster_write_bmp(&buf, "indexed_quad.bmp");
     SDL_Log("Wrote indexed_quad.bmp");
@@ -166,7 +166,7 @@ static void demo_textured_quad(void)
     };
     Uint32 indices[6] = { 0, 1, 2,  0, 2, 3 };
 
-    forge_raster_triangles_indexed(&buf, verts, indices, 6, &tex);
+    forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, &tex);
 
     forge_raster_write_bmp(&buf, "textured_quad.bmp");
     SDL_Log("Wrote textured_quad.bmp");
@@ -206,7 +206,7 @@ static void demo_alpha_blend(void)
               0, 0, 0, 0,
               0.25f, 0.35f, 0.95f, 0.65f);
 
-    forge_raster_triangles_indexed(&buf, verts, indices, 18, NULL);
+    forge_raster_triangles_indexed(&buf, verts, 12, indices, 18, NULL);
 
     forge_raster_write_bmp(&buf, "alpha_blend.bmp");
     SDL_Log("Wrote alpha_blend.bmp");
@@ -235,7 +235,7 @@ static void demo_scene(void)
                   20.0f, 280.0f, 492.0f, 492.0f,
                   0.0f, 0.0f, 1.0f, 1.0f,
                   0.30f, 0.30f, 0.35f, 1.0f);
-        forge_raster_triangles_indexed(&buf, verts, indices, 6, &tex);
+        forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, &tex);
     }
 
     /* ── Solid colored triangles ─────────────────────────────────────── */
@@ -282,7 +282,7 @@ static void demo_scene(void)
                   0, 0, 0, 0,
                   0.22f, 0.15f, 0.12f, 0.75f);
 
-        forge_raster_triangles_indexed(&buf, verts, indices, 12, NULL);
+        forge_raster_triangles_indexed(&buf, verts, 8, indices, 12, NULL);
     }
 
     /* ── Accent: small bright quad ───────────────────────────────────── */
@@ -293,7 +293,7 @@ static void demo_scene(void)
                   60.0f, 340.0f, 130.0f, 370.0f,
                   0, 0, 0, 0,
                   0.95f, 0.65f, 0.15f, 0.90f);
-        forge_raster_triangles_indexed(&buf, verts, indices, 6, NULL);
+        forge_raster_triangles_indexed(&buf, verts, 4, indices, 6, NULL);
     }
 
     forge_raster_write_bmp(&buf, "scene.bmp");
