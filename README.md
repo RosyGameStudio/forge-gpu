@@ -278,8 +278,8 @@ if (forge_gltf_load("scene.gltf", &scene)) {
 
 ### UI Library (`common/ui/`)
 
-Parse TrueType font files, rasterize glyphs into bitmaps, and pack them into
-a single-channel texture atlas with per-glyph UV coordinates and metadata.
+Parse TrueType font files, rasterize glyphs into bitmaps, pack them into a
+single-channel texture atlas, lay out text, and build immediate-mode UI controls.
 See [`common/ui/README.md`](common/ui/README.md) for details.
 
 ```c
@@ -297,6 +297,26 @@ if (forge_ui_ttf_load("font.ttf", &font)) {
     }
     forge_ui_ttf_free(&font);
 }
+```
+
+The immediate-mode context (`forge_ui_ctx.h`) builds on the atlas and text
+layout to provide labels, buttons, and hit testing — generating vertices and
+indices ready for a single GPU draw call:
+
+```c
+#include "ui/forge_ui_ctx.h"
+
+ForgeUiContext ctx;
+forge_ui_ctx_init(&ctx, &atlas);
+forge_ui_ctx_begin(&ctx, mouse_x, mouse_y, mouse_down);
+
+if (forge_ui_ctx_button(&ctx, BTN_ID, "Save", save_rect)) {
+    save_file();  // runs exactly once per click
+}
+
+forge_ui_ctx_end(&ctx);
+// Render ctx.vertices / ctx.indices with the atlas texture
+forge_ui_ctx_free(&ctx);
 ```
 
 ### Raster Library (`common/raster/`)
@@ -388,7 +408,7 @@ build\lessons\gpu\01-hello-window\Debug\01-hello-window.exe
 ## Testing
 
 The shared libraries have automated tests covering math operations, OBJ parsing,
-glTF parsing, and CPU rasterization.
+glTF parsing, CPU rasterization, and UI systems.
 
 **Run all tests:**
 
@@ -404,6 +424,8 @@ cmake --build build --config Debug --target test_math
 cmake --build build --config Debug --target test_obj
 cmake --build build --config Debug --target test_gltf
 cmake --build build --config Debug --target test_raster
+cmake --build build --config Debug --target test_ui
+cmake --build build --config Debug --target test_ui_ctx
 ```
 
 All tests use epsilon comparison for floating-point accuracy and return proper
@@ -475,8 +497,9 @@ forge-gpu/
 │   ├── gltf/              glTF parser (glTF 2.0 scenes)
 │   │   ├── forge_gltf.h   Parser implementation (header-only)
 │   │   └── README.md      Usage guide, scene hierarchy, materials
-│   ├── ui/                UI library (font parsing, rasterization, atlas)
+│   ├── ui/                UI library (font parsing, atlas, immediate-mode controls)
 │   │   ├── forge_ui.h     TTF parser, rasterizer, atlas packer (header-only)
+│   │   ├── forge_ui_ctx.h Immediate-mode context: labels, buttons, hit testing
 │   │   └── README.md      Usage guide and supported features
 │   ├── raster/            CPU triangle rasterizer (edge function method)
 │   │   └── forge_raster.h Rasterizer implementation (header-only)
@@ -487,7 +510,8 @@ forge-gpu/
 │   ├── math/              Math library tests
 │   ├── obj/               OBJ parser tests
 │   ├── gltf/              glTF parser tests
-│   └── raster/            CPU rasterizer tests
+│   ├── raster/            CPU rasterizer tests
+│   └── ui/                UI library tests (TTF parser, immediate-mode context)
 ├── .claude/skills/        Claude Code skills (AI-invokable patterns)
 │   ├── math-lesson/       Add math concept + lesson + update library
 │   ├── ui-lesson/         Add UI lesson (fonts, text, controls)
