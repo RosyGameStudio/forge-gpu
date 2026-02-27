@@ -3848,6 +3848,200 @@ static void test_layout_item_count(void)
     forge_ui_ctx_free(&ctx);
 }
 
+/* ── Direction validation ─────────────────────────────────────────────────── */
+
+static void test_layout_push_invalid_direction_rejected(void)
+{
+    TEST("layout_push rejects invalid direction value");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    ForgeUiRect area = { 0, 0, 200, 200 };
+
+    /* A direction value outside the enum range should be rejected */
+    bool ok = forge_ui_ctx_layout_push(&ctx, area,
+                                        (ForgeUiLayoutDirection)99,
+                                        5.0f, 5.0f);
+    ASSERT_TRUE(!ok);
+    ASSERT_EQ_INT(ctx.layout_depth, 0);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_layout_push_negative_direction_rejected(void)
+{
+    TEST("layout_push rejects negative direction value");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    ForgeUiRect area = { 0, 0, 200, 200 };
+
+    /* Negative direction value should be rejected */
+    bool ok = forge_ui_ctx_layout_push(&ctx, area,
+                                        (ForgeUiLayoutDirection)(-1),
+                                        0.0f, 0.0f);
+    ASSERT_TRUE(!ok);
+    ASSERT_EQ_INT(ctx.layout_depth, 0);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_layout_push_valid_directions_accepted(void)
+{
+    TEST("layout_push accepts both valid direction values");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    ForgeUiRect area = { 0, 0, 200, 200 };
+
+    /* FORGE_UI_LAYOUT_VERTICAL should be accepted */
+    bool ok = forge_ui_ctx_layout_push(&ctx, area,
+                                        FORGE_UI_LAYOUT_VERTICAL,
+                                        0.0f, 0.0f);
+    ASSERT_TRUE(ok);
+    ASSERT_EQ_INT(ctx.layout_depth, 1);
+    forge_ui_ctx_layout_pop(&ctx);
+
+    /* FORGE_UI_LAYOUT_HORIZONTAL should be accepted */
+    ok = forge_ui_ctx_layout_push(&ctx, area,
+                                   FORGE_UI_LAYOUT_HORIZONTAL,
+                                   0.0f, 0.0f);
+    ASSERT_TRUE(ok);
+    ASSERT_EQ_INT(ctx.layout_depth, 1);
+    forge_ui_ctx_layout_pop(&ctx);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ── Layout wrappers: no-op without active layout ────────────────────────── */
+
+static void test_label_layout_noop_without_layout(void)
+{
+    TEST("label_layout is a no-op when no layout is active");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    /* No layout pushed — label_layout should silently return */
+    int v_before = ctx.vertex_count;
+    forge_ui_ctx_label_layout(&ctx, "Hi", 30.0f, 1, 1, 1, 1);
+    ASSERT_EQ_INT(ctx.vertex_count, v_before);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_button_layout_noop_without_layout(void)
+{
+    TEST("button_layout returns false when no layout is active");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    /* No layout pushed */
+    bool clicked = forge_ui_ctx_button_layout(&ctx, 1, "OK", 30.0f);
+    ASSERT_TRUE(!clicked);
+    ASSERT_EQ_INT(ctx.vertex_count, 0);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_checkbox_layout_noop_without_layout(void)
+{
+    TEST("checkbox_layout returns false when no layout is active");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    bool val = true;
+    bool toggled = forge_ui_ctx_checkbox_layout(&ctx, 1, "CB", &val, 30.0f);
+    ASSERT_TRUE(!toggled);
+    ASSERT_EQ_INT(ctx.vertex_count, 0);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_slider_layout_noop_without_layout(void)
+{
+    TEST("slider_layout returns false when no layout is active");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    float val = 50.0f;
+    bool changed = forge_ui_ctx_slider_layout(&ctx, 1, &val,
+                                               0.0f, 100.0f, 30.0f);
+    ASSERT_TRUE(!changed);
+    ASSERT_EQ_INT(ctx.vertex_count, 0);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ── Layout wrappers: no cursor advance on null atlas ────────────────────── */
+
+static void test_button_layout_null_atlas_no_advance(void)
+{
+    TEST("button_layout with null atlas returns false, no cursor advance");
+
+    /* Build a context without atlas */
+    ForgeUiContext ctx;
+    SDL_memset(&ctx, 0, sizeof(ctx));
+    ctx.vertices = (ForgeUiVertex *)SDL_malloc(
+        FORGE_UI_CTX_INITIAL_VERTEX_CAPACITY * sizeof(ForgeUiVertex));
+    ctx.indices = (Uint32 *)SDL_malloc(
+        FORGE_UI_CTX_INITIAL_INDEX_CAPACITY * sizeof(Uint32));
+    ctx.vertex_capacity = FORGE_UI_CTX_INITIAL_VERTEX_CAPACITY;
+    ctx.index_capacity = FORGE_UI_CTX_INITIAL_INDEX_CAPACITY;
+    ctx.atlas = NULL;
+    ctx.hot = FORGE_UI_ID_NONE;
+    ctx.active = FORGE_UI_ID_NONE;
+    ctx.next_hot = FORGE_UI_ID_NONE;
+    ctx.focused = FORGE_UI_ID_NONE;
+
+    ForgeUiRect area = { 0, 0, 200, 200 };
+    /* Push layout manually — direction validation will pass */
+    ctx.layout_stack[0].rect = area;
+    ctx.layout_stack[0].direction = FORGE_UI_LAYOUT_VERTICAL;
+    ctx.layout_stack[0].padding = 0;
+    ctx.layout_stack[0].spacing = 0;
+    ctx.layout_stack[0].cursor_x = 0;
+    ctx.layout_stack[0].cursor_y = 0;
+    ctx.layout_stack[0].remaining_w = 200;
+    ctx.layout_stack[0].remaining_h = 200;
+    ctx.layout_stack[0].item_count = 0;
+    ctx.layout_depth = 1;
+
+    bool clicked = forge_ui_ctx_button_layout(&ctx, 1, "OK", 30.0f);
+    ASSERT_TRUE(!clicked);
+    ASSERT_EQ_INT(ctx.layout_stack[0].item_count, 0);
+
+    SDL_free(ctx.vertices);
+    SDL_free(ctx.indices);
+}
+
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -4089,6 +4283,20 @@ int main(int argc, char *argv[])
     test_layout_spacing_between_widgets();
     test_layout_horizontal_spacing();
     test_layout_item_count();
+
+    /* Layout -- direction validation */
+    test_layout_push_invalid_direction_rejected();
+    test_layout_push_negative_direction_rejected();
+    test_layout_push_valid_directions_accepted();
+
+    /* Layout -- wrappers no-op without active layout */
+    test_label_layout_noop_without_layout();
+    test_button_layout_noop_without_layout();
+    test_checkbox_layout_noop_without_layout();
+    test_slider_layout_noop_without_layout();
+
+    /* Layout -- wrappers no cursor advance on null atlas */
+    test_button_layout_null_atlas_no_advance();
 
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
             test_count, pass_count, fail_count);
