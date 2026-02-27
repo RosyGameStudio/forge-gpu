@@ -1832,13 +1832,29 @@ static void test_bmp_write_overflow_dimensions_rejected(void)
 
     Uint8 dummy[4] = {0};
 
+    /* Build a portable temp path using SDL_GetBasePath() so the test works
+     * on all platforms (the old "/dev/null" was POSIX-only).  The overflow
+     * check fires before any file I/O, but we still use a real path in case
+     * the guard thresholds ever change. */
+    const char *base = SDL_GetBasePath();
+    ASSERT_TRUE(base != NULL);
+    const char *name = "overflow_test.bmp";
+    size_t path_len = SDL_strlen(base) + SDL_strlen(name) + 1;
+    char *path = (char *)SDL_malloc(path_len);
+    ASSERT_TRUE(path != NULL);
+    SDL_snprintf(path, (int)path_len, "%s%s", base, name);
+
     /* row_stride = 65536 (already 4-aligned).
      * pixel_data_size_64 = 65536 * 65536 = 4294967296 > UINT32_MAX.
      * Before the fix, 32-bit row_stride * height wrapped to 0 → zero-byte
      * allocation → pixel copy overwrites heap. */
-    bool result = forge_ui__write_grayscale_bmp("/dev/null", dummy,
+    bool result = forge_ui__write_grayscale_bmp(path, dummy,
                                                  65536, 65536);
     ASSERT_TRUE(!result);
+
+    /* Clean up in case the file was somehow created */
+    SDL_RemovePath(path);
+    SDL_free(path);
 }
 
 static void test_build_edges_oob_contour_endpoint_skipped(void)

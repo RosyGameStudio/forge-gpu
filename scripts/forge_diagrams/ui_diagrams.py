@@ -4604,7 +4604,7 @@ def diagram_text_input_anatomy():
             ax.text(
                 5.5,
                 4.3,
-                "dark background\nno border",
+                "dark background\nsubtle border",
                 color=STYLE["text_dim"],
                 fontsize=7.5,
                 ha="center",
