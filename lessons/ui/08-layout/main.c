@@ -437,9 +437,13 @@ int main(int argc, char *argv[])
         }
     }
 
+    /* Save Phase 1 layout counts now — later phases overwrite ctx counts */
+    int layout_verts = ctx.vertex_count;
+    int layout_idxs  = ctx.index_count;
+
     /* Verify vertex/index counts match */
-    bool counts_match = (ctx.vertex_count == manual_verts
-                         && ctx.index_count == manual_idxs);
+    bool counts_match = (layout_verts == manual_verts
+                         && layout_idxs == manual_idxs);
     if (counts_match) {
         SDL_Log("%s", "");
         SDL_Log("  [OK] Draw data counts match: %d vertices, %d indices",
@@ -447,7 +451,7 @@ int main(int argc, char *argv[])
     } else {
         SDL_Log("  [!] MISMATCH: manual=%d/%d  layout=%d/%d",
                 manual_verts, manual_idxs,
-                ctx.vertex_count, ctx.index_count);
+                layout_verts, layout_idxs);
     }
 
     /* ══════════════════════════════════════════════════════════════════════ */
@@ -630,7 +634,7 @@ int main(int argc, char *argv[])
     } else {
         SDL_Log("  Comparison: MISMATCH — manual=%d/%d  layout=%d/%d",
                 manual_verts, manual_idxs,
-                ctx.vertex_count, ctx.index_count);
+                layout_verts, layout_idxs);
     }
     SDL_Log("%s", SEPARATOR);
     SDL_Log("Done. Output files written to the current directory.");

@@ -1458,6 +1458,16 @@ static inline bool forge_ui_ctx_layout_push(ForgeUiContext *ctx,
         return false;
     }
 
+    /* Validate direction — must be one of the defined enum values.
+     * Reject unknown values rather than silently treating them as horizontal. */
+    if (direction != FORGE_UI_LAYOUT_VERTICAL
+        && direction != FORGE_UI_LAYOUT_HORIZONTAL) {
+        SDL_Log("forge_ui_ctx_layout_push: invalid direction %d"
+                " (expected FORGE_UI_LAYOUT_VERTICAL or FORGE_UI_LAYOUT_HORIZONTAL)",
+                (int)direction);
+        return false;
+    }
+
     /* Reject NaN/Inf in padding and spacing; clamp negatives to 0 */
     if (isnan(padding) || isinf(padding)) padding = 0.0f;
     if (isnan(spacing) || isinf(spacing)) spacing = 0.0f;
