@@ -278,28 +278,28 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
  * the slider (anywhere on the track or thumb), the slider becomes active
  * and the value snaps to the click position.  While active, the value
  * tracks the mouse x position even if the cursor moves outside the
- * widget bounds.  The value is always clamped to [min, max].
+ * widget bounds.  The value is always clamped to [min_val, max_val].
  *
  * Value mapping (pixel position to user value):
  *   t = clamp((mouse_x - track_x) / track_w, 0, 1)
- *   *value = min + t * (max - min)
+ *   *value = min_val + t * (max_val - min_val)
  *
  * Inverse mapping (user value to thumb position):
- *   t = (*value - min) / (max - min)
+ *   t = (*value - min_val) / (max_val - min_val)
  *   thumb_x = track_x + t * track_w
  *
  * Draw elements: a thin horizontal track rect (white_uv), a thumb rect
  * that slides along the track (white_uv, color varies by state).
  *
- * id:    unique non-zero identifier for this widget
- * value: pointer to the float value (updated during drag)
- * min:   minimum value (left edge of track)
- * max:   maximum value (right edge of track), must be > min
- * rect:  bounding rectangle for the slider track/thumb area */
+ * id:      unique non-zero identifier for this widget
+ * value:   pointer to the float value (updated during drag)
+ * min_val: minimum value (left edge of track)
+ * max_val: maximum value (right edge of track), must be > min_val
+ * rect:    bounding rectangle for the slider track/thumb area */
 static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
                                         Uint32 id,
                                         float *value,
-                                        float min, float max,
+                                        float min_val, float max_val,
                                         ForgeUiRect rect);
 
 /* ── Internal Helpers ───────────────────────────────────────────────────── */
@@ -562,7 +562,7 @@ static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
                                        const char *text,
                                        ForgeUiRect rect)
 {
-    if (!ctx || !text || id == FORGE_UI_ID_NONE) return false;
+    if (!ctx || !ctx->atlas || !text || id == FORGE_UI_ID_NONE) return false;
 
     bool clicked = false;
 
@@ -654,7 +654,7 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
                                           bool *value,
                                           ForgeUiRect rect)
 {
-    if (!ctx || !label || !value || id == FORGE_UI_ID_NONE) return false;
+    if (!ctx || !ctx->atlas || !label || !value || id == FORGE_UI_ID_NONE) return false;
 
     bool toggled = false;
 
@@ -742,11 +742,11 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
 static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
                                         Uint32 id,
                                         float *value,
-                                        float min, float max,
+                                        float min_val, float max_val,
                                         ForgeUiRect rect)
 {
-    if (!ctx || !value || id == FORGE_UI_ID_NONE) return false;
-    if (max <= min) return false;
+    if (!ctx || !ctx->atlas || !value || id == FORGE_UI_ID_NONE) return false;
+    if (!(max_val > min_val)) return false;  /* also rejects NaN */
 
     bool changed = false;
 
@@ -769,16 +769,19 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
     /* ── Effective track geometry ─────────────────────────────────────── */
     /* The thumb center can travel from half a thumb width inside the left
      * edge to half a thumb width inside the right edge.  This keeps the
-     * thumb fully within the widget rect at both extremes. */
+     * thumb fully within the widget rect at both extremes.  Clamp to
+     * zero so a rect narrower than the thumb does not produce a negative
+     * range. */
     float track_x = rect.x + FORGE_UI_SL_THUMB_WIDTH * 0.5f;
     float track_w = rect.w - FORGE_UI_SL_THUMB_WIDTH;
+    if (track_w < 0.0f) track_w = 0.0f;
 
     /* ── Value update while active (drag interaction) ─────────────────── */
     /* While the mouse button is held and this slider is active, map the
      * mouse x position to a normalized t in [0, 1], then to the user
      * value.  This update happens regardless of whether the cursor is
      * inside the widget bounds -- that is the key property of drag
-     * interaction.  The value is always clamped to [min, max]. */
+     * interaction.  The value is always clamped to [min_val, max_val]. */
     if (ctx->active == id && ctx->mouse_down) {
         float t = 0.0f;
         if (track_w > 0.0f) {
@@ -786,7 +789,7 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
         }
         if (t < 0.0f) t = 0.0f;
         if (t > 1.0f) t = 1.0f;
-        float new_val = min + t * (max - min);
+        float new_val = min_val + t * (max_val - min_val);
         if (new_val != *value) {
             *value = new_val;
             changed = true;
@@ -802,7 +805,7 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
     }
 
     /* ── Compute normalized t from current value for thumb positioning ── */
-    float t = (*value - min) / (max - min);
+    float t = (*value - min_val) / (max_val - min_val);
     if (t < 0.0f) t = 0.0f;
     if (t > 1.0f) t = 1.0f;
 
