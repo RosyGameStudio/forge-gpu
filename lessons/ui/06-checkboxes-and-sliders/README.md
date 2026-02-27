@@ -130,7 +130,7 @@ Both functions return `true` on frames where the value changed, so the
 application can respond to changes if needed:
 
 ```c
-if (forge_ui_ctx_slider(&ctx, SL_ID, &volume, 0, 100, rect)) {
+if (forge_ui_ctx_slider(&ctx, SL_ID, &volume, 0.0f, 100.0f, rect)) {
     apply_volume(volume);  /* runs each frame the slider moves */
 }
 ```
@@ -229,7 +229,7 @@ if (ctx->active == id && ctx->mouse_down) {
     float t = (ctx->mouse_x - track_x) / track_w;
     if (t < 0.0f) t = 0.0f;
     if (t > 1.0f) t = 1.0f;
-    float new_val = min + t * (max - min);
+    float new_val = min_val + t * (max_val - min_val);
     if (new_val != *value) {
         *value = new_val;
         changed = true;
@@ -263,17 +263,17 @@ occupy. It is inset by half the thumb width on each side so the thumb
 never overhangs the widget rect:
 
 $$
-\text{track\_x} = \text{rect.x} + \frac{\text{thumb\_w}}{2}
+\text{track}\_\text{x} = \text{rect}.x + \frac{\text{thumb}\_\text{w}}{2}
 $$
 
 $$
-\text{track\_w} = \text{rect.w} - \text{thumb\_w}
+\text{track}\_\text{w} = \text{rect}.w - \text{thumb}\_\text{w}
 $$
 
 The normalized parameter t maps the mouse position to [0, 1]:
 
 $$
-t = \text{clamp}\left(\frac{\text{mouse\_x} - \text{track\_x}}{\text{track\_w}},\; 0,\; 1\right)
+t = \text{clamp}\left(\frac{\text{mouse}\_\text{x} - \text{track}\_\text{x}}{\text{track}\_\text{w}},\; 0,\; 1\right)
 $$
 
 Then t maps linearly to the user value:
@@ -292,7 +292,7 @@ t = \frac{\text{value} - \text{min}}{\text{max} - \text{min}}
 $$
 
 $$
-\text{thumb\_x} = \text{track\_x} + t \times \text{track\_w}
+\text{thumb}\_\text{x} = \text{track}\_\text{x} + t \times \text{track}\_\text{w}
 $$
 
 These are inverse operations: forward mapping converts mouse position to

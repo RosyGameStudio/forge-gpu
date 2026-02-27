@@ -3423,10 +3423,10 @@ def diagram_checkbox_anatomy():
     )
 
     states = [
-        ("Normal", False, STYLE["text_dim"], "#4d4d59"),
-        ("Hot (hovered)", False, STYLE["accent1"], "#66668a"),
-        ("Active (pressed)", False, STYLE["accent2"], "#38383f"),
-        ("Checked", True, STYLE["text_dim"], "#4d4d59"),
+        ("Normal", False, STYLE["text_dim"], STYLE["surface"]),
+        ("Hot (hovered)", False, STYLE["accent1"], STYLE["grid"]),
+        ("Active (pressed)", False, STYLE["accent2"], STYLE["bg"]),
+        ("Checked", True, STYLE["text_dim"], STYLE["surface"]),
     ]
 
     for ax, (title, checked, border_color, box_fill) in zip(axes, states):
@@ -3588,7 +3588,7 @@ def diagram_checkbox_vs_button():
         )
 
     # Highlight the difference
-    for ax_idx, (ax_ref, color, text) in enumerate(zip(axes, [STYLE["accent2"], STYLE["accent1"]],
+    for _ax_idx, (ax_ref, color, text) in enumerate(zip(axes, [STYLE["accent2"], STYLE["accent1"]],
                                                         ["Returns bool", "Modifies *value"])):
         ax_ref.text(
             3.0, 0.0, text,
@@ -3715,6 +3715,7 @@ def diagram_slider_anatomy():
         color=STYLE["accent3"], fontsize=8.5, ha="center", va="top", fontweight="bold",
     )
 
+    fig.tight_layout()
     save(fig, "ui/06-checkboxes-and-sliders", "slider_anatomy.png")
 
 
@@ -3738,7 +3739,7 @@ def diagram_slider_value_mapping():
 
     labels = [
         ("Pixel Position (mouse_x)", "track_x", "track_x + track_w",
-         f"mouse_x", STYLE["accent2"]),
+         "mouse_x", STYLE["accent2"]),
         ("Normalized t  [0, 1]", "0.0", "1.0",
          f"t = {mark_t:.1f}", STYLE["accent1"]),
         ("User Value  [min, max]", "min (0)", "max (100)",
@@ -3771,7 +3772,6 @@ def diagram_slider_value_mapping():
                 fontweight="bold", ha="center", va="bottom")
 
     # Formulas between the rows
-    formula_x = 9.8
     fig.text(0.82, 0.68, "t = (mouse_x - track_x) / track_w",
              color=STYLE["warn"], fontsize=8, family="monospace",
              transform=fig.transFigure)
@@ -3809,7 +3809,7 @@ def diagram_drag_outside_bounds():
         ("3. Release outside", 1.3, False, False, STYLE["text_dim"]),
     ]
 
-    for ax, (title, cursor_t, mouse_down, cursor_inside, title_color) in zip(axes, panels):
+    for ax, (title, cursor_t, mouse_down, _cursor_inside, title_color) in zip(axes, panels):
         setup_axes(ax, xlim=(-1, 8), ylim=(-1.5, 4), grid=False, aspect=None)
         ax.axis("off")
         ax.set_title(title, color=title_color, fontsize=10, fontweight="bold", pad=8)
@@ -3901,8 +3901,8 @@ def diagram_slider_state_colors():
     )
 
     states = [
-        ("Normal", 0.3, STYLE["text_dim"], "#808093"),
-        ("Hot (hovered)", 0.3, STYLE["accent1"], "#9999b8"),
+        ("Normal", 0.3, STYLE["text_dim"], STYLE["text_dim"]),
+        ("Hot (hovered)", 0.3, STYLE["accent1"], STYLE["axis"]),
         ("Active (dragging)", 0.6, STYLE["accent1"], STYLE["accent1"]),
         ("Disabled", 0.3, STYLE["text_dim"], STYLE["grid"]),
     ]
@@ -4032,7 +4032,7 @@ def diagram_widget_interaction_comparison():
     }
 
     for ry, entries in data.items():
-        for i, (entry, (_, cx, color)) in enumerate(zip(entries, cols)):
+        for _i, (entry, (_, cx, color)) in enumerate(zip(entries, cols)):
             bg = mpatches.FancyBboxPatch(
                 (cx - 1.5, ry - 0.55), 3.0, 1.1,
                 boxstyle="round,pad=0.05",
@@ -4044,4 +4044,5 @@ def diagram_widget_interaction_comparison():
             ax.text(cx, ry, entry, color=STYLE["text"], fontsize=7.5,
                     ha="center", va="center")
 
+    fig.tight_layout()
     save(fig, "ui/06-checkboxes-and-sliders", "widget_interaction_comparison.png")

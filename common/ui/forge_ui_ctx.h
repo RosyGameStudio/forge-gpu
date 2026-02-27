@@ -668,7 +668,9 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
     }
 
     /* ── State transitions ────────────────────────────────────────────── */
-    /* Identical to button: edge-triggered activation, click on release. */
+    /* Edge-triggered: activation fires once on the press edge (up→down).
+     * This prevents a held mouse dragged onto the checkbox from toggling
+     * it, and lets the user cancel by dragging off before releasing. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
     if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed && ctx->hot == id) {
         ctx->active = id;
@@ -684,7 +686,7 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
         ctx->active = FORGE_UI_ID_NONE;
     }
 
-    /* ── Choose box color based on state ──────────────────────────────── */
+    /* ── Box color reflects interaction state ─────────────────────────── */
     float box_r, box_g, box_b, box_a;
     if (ctx->active == id) {
         box_r = FORGE_UI_CB_ACTIVE_R;  box_g = FORGE_UI_CB_ACTIVE_G;
@@ -703,10 +705,11 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
     ForgeUiRect box_rect = { box_x, box_y,
                              FORGE_UI_CB_BOX_SIZE, FORGE_UI_CB_BOX_SIZE };
 
-    /* ── Emit outer box rectangle ─────────────────────────────────────── */
+    /* ── Outer box — border with hover feedback via box color ────────── */
     forge_ui__emit_rect(ctx, box_rect, box_r, box_g, box_b, box_a);
 
-    /* ── Emit inner fill when checked ─────────────────────────────────── */
+    /* ── Inner fill — solid rect rather than a glyph keeps the renderer
+     *    purely quad-based with no dedicated checkmark in the atlas ──── */
     if (*value) {
         ForgeUiRect inner = {
             box_x + FORGE_UI_CB_INNER_PAD,
@@ -719,7 +722,9 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
                             FORGE_UI_CB_CHECK_B, FORGE_UI_CB_CHECK_A);
     }
 
-    /* ── Emit label text to the right of the box ──────────────────────── */
+    /* ── Label baseline alignment ────────────────────────────────────── */
+    /* The font origin is at the baseline, not the top of the em square.
+     * Offset by the ascender so text sits visually centered in the rect. */
     float scale = 0.0f;
     float ascender_px = 0.0f;
     if (ctx->atlas->units_per_em > 0) {
@@ -760,7 +765,9 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
     }
 
     /* ── State transitions ────────────────────────────────────────────── */
-    /* Same edge-triggered activation as button and checkbox. */
+    /* Edge-triggered: activation fires once on the press edge (up→down).
+     * Subsequent frames update the value via the drag path below, without
+     * re-entering the activation branch. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
     if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed && ctx->hot == id) {
         ctx->active = id;
@@ -804,12 +811,14 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
         ctx->active = FORGE_UI_ID_NONE;
     }
 
-    /* ── Compute normalized t from current value for thumb positioning ── */
+    /* ── Re-derive t from *value for thumb positioning ──────────────── */
+    /* Use the canonical *value (not the drag t) so the thumb reflects any
+     * clamping or quantization the caller may apply between frames. */
     float t = (*value - min_val) / (max_val - min_val);
     if (t < 0.0f) t = 0.0f;
     if (t > 1.0f) t = 1.0f;
 
-    /* ── Emit track rectangle ─────────────────────────────────────────── */
+    /* ── Track — thin bar so the thumb visually protrudes above/below ── */
     float track_draw_y = rect.y + (rect.h - FORGE_UI_SL_TRACK_HEIGHT) * 0.5f;
     ForgeUiRect track_rect = { rect.x, track_draw_y,
                                rect.w, FORGE_UI_SL_TRACK_HEIGHT };
