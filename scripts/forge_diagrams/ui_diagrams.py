@@ -4272,9 +4272,9 @@ def diagram_widget_interaction_comparison():
 
 
 def diagram_focus_state_machine():
-    """Three-state focus machine: Unfocused -> Focused -> Typing, with labeled
-    transitions for click-to-focus, click-outside/Escape-to-unfocus, and
-    key-events-while-focused."""
+    """Two-state focus machine (Unfocused / Focused) with a transient key-event
+    processing phase shown as a dashed node, reflecting the single focused-ID
+    model in forge_ui_ctx.h."""
 
     fig, ax = plt.subplots(figsize=(10, 5.5))
     fig.patch.set_facecolor(STYLE["bg"])
@@ -4289,14 +4289,13 @@ def diagram_focus_state_machine():
         pad=12,
     )
 
-    # State positions and colors
+    # Persistent state positions and colors
     states = {
         "UNFOCUSED": (1.5, 3.0, STYLE["text_dim"]),
         "FOCUSED": (5.5, 3.0, STYLE["accent1"]),
-        "TYPING": (9.5, 3.0, STYLE["accent2"]),
     }
 
-    # Draw state circles
+    # Draw persistent state circles (solid border)
     for name, (x, y, color) in states.items():
         circle = mpatches.Circle(
             (x, y),
@@ -4320,11 +4319,46 @@ def diagram_focus_state_machine():
             path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
 
-    # Descriptions below each state
+    # Transient key-event node (dashed border to signal non-persistent)
+    ke_x, ke_y, ke_color = 9.5, 3.0, STYLE["accent2"]
+    ke_circle = mpatches.Circle(
+        (ke_x, ke_y),
+        1.0,
+        facecolor=ke_color + "15",
+        edgecolor=ke_color,
+        linewidth=1.5,
+        linestyle="--",
+        zorder=3,
+    )
+    ax.add_patch(ke_circle)
+    ax.text(
+        ke_x,
+        ke_y + 0.15,
+        "KEY EVENT",
+        color=STYLE["text"],
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        zorder=4,
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+    ax.text(
+        ke_x,
+        ke_y - 0.25,
+        "(transient)",
+        color=STYLE["text_dim"],
+        fontsize=7,
+        ha="center",
+        va="center",
+        zorder=4,
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
+    )
+
+    # Descriptions below each node
     descs = {
         "UNFOCUSED": "focused = NONE\nno keyboard input",
         "FOCUSED": "focused = id\ncursor visible",
-        "TYPING": "text_input != NULL\nor key pressed",
     }
     for name, (x, y, _) in states.items():
         ax.text(
@@ -4337,6 +4371,16 @@ def diagram_focus_state_machine():
             va="top",
             style="italic",
         )
+    ax.text(
+        ke_x,
+        ke_y - 1.5,
+        "momentary key processing\nwhile focused (same frame)",
+        color=STYLE["text_dim"],
+        fontsize=7.5,
+        ha="center",
+        va="top",
+        style="italic",
+    )
 
     arrow_style = dict(
         arrowstyle="->,head_width=0.25,head_length=0.15",
@@ -4382,7 +4426,7 @@ def diagram_focus_state_machine():
         path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
-    # FOCUSED -> TYPING: key event
+    # FOCUSED -> KEY EVENT: key arrives while focused
     ax.annotate(
         "",
         xy=(8.5, 3.2),
@@ -4402,7 +4446,7 @@ def diagram_focus_state_machine():
         path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
-    # TYPING -> FOCUSED: processed (returns to waiting)
+    # KEY EVENT -> FOCUSED: processed, returns to focused
     ax.annotate(
         "",
         xy=(6.5, 2.8),
@@ -4413,7 +4457,7 @@ def diagram_focus_state_machine():
     ax.text(
         7.5,
         2.25,
-        "input processed\n(same frame)",
+        "input processed\n(returns immediately)",
         color=STYLE["accent3"],
         fontsize=8,
         ha="center",
@@ -4421,7 +4465,7 @@ def diagram_focus_state_machine():
         path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
-    # TYPING -> UNFOCUSED: Escape while typing
+    # KEY EVENT -> UNFOCUSED: Escape key
     ax.annotate(
         "",
         xy=(2.2, 4.0),

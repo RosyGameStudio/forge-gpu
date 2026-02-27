@@ -106,9 +106,10 @@ The **focused ID** is a third persistence slot that lives longer than both:
   keyboard input. This is the initial state.
 - **Focused** — `focused = id`. The widget with this ID receives keyboard
   input. The cursor bar is visible and the border changes to accent color.
-- **Typing** — keyboard events are processed by the focused widget within
-  the same frame. After processing, the widget returns to the focused
-  (waiting) state.
+- **Key event (transient)** — keyboard events are processed by the focused
+  widget within the same frame. This is not a separate state in the code
+  (`focused` stays set to `id`); it is momentary processing that returns
+  immediately to the focused (waiting) state.
 
 **Transitions:**
 
