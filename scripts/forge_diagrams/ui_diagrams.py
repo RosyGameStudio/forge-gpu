@@ -3639,7 +3639,7 @@ def diagram_slider_anatomy():
 
     fig, ax = plt.subplots(figsize=(10, 5))
     fig.patch.set_facecolor(STYLE["bg"])
-    setup_axes(ax, xlim=(-0.5, 12), ylim=(-1.5, 5), grid=False, aspect=None)
+    setup_axes(ax, xlim=(-0.5, 13.5), ylim=(-1.5, 5), grid=False, aspect=None)
     ax.axis("off")
 
     ax.set_title(
@@ -3710,15 +3710,16 @@ def diagram_slider_anatomy():
     ax.add_patch(thumb)
 
     # Labels
-    # Track label
+    # Track label — placed to the right of the track to avoid overlapping
+    # the effective-track annotation below
     ax.annotate(
         "track\n(thin rect, white_uv)",
-        xy=(rx + rw * 0.7, track_y + track_h / 2),
-        xytext=(rx + rw * 0.7, track_y - 1.2),
+        xy=(rx + rw, track_y + track_h / 2),
+        xytext=(rx + rw + 0.3, track_y - 0.9),
         arrowprops=dict(arrowstyle="->", color=STYLE["text_dim"], lw=1.0),
         color=STYLE["text_dim"],
         fontsize=8.5,
-        ha="center",
+        ha="left",
         va="top",
         fontweight="bold",
     )
