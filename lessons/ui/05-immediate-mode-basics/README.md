@@ -417,5 +417,3 @@ repository root so it can find the font file at
   pattern and white pixel technique
 - [rxi — microui](https://github.com/rxi/microui) — a minimal
   immediate-mode UI in ~1000 lines of C
-- [UI Lesson 06 — Buttons and Checkboxes](../06-buttons-and-checkboxes/)
-  — extends this lesson with more interactive controls
