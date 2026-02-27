@@ -77,14 +77,21 @@ static ForgeUiFont     test_font;
 static ForgeUiFontAtlas test_atlas;
 static bool font_loaded  = false;
 static bool atlas_built  = false;
+static bool setup_failed = false;  /* cache failure so we only attempt once */
 
 static bool setup_atlas(void)
 {
     if (atlas_built) return true;
+    if (setup_failed) {
+        fail_count++;
+        return false;
+    }
 
     if (!font_loaded) {
         if (!forge_ui_ttf_load(DEFAULT_FONT_PATH, &test_font)) {
-            SDL_Log("  [SKIP] Cannot load font: %s", DEFAULT_FONT_PATH);
+            SDL_Log("    FAIL: Cannot load font: %s", DEFAULT_FONT_PATH);
+            setup_failed = true;
+            fail_count++;
             return false;
         }
         font_loaded = true;
@@ -97,7 +104,9 @@ static bool setup_atlas(void)
 
     if (!forge_ui_atlas_build(&test_font, PIXEL_HEIGHT, codepoints,
                                ASCII_COUNT, ATLAS_PADDING, &test_atlas)) {
-        SDL_Log("  [SKIP] Cannot build atlas");
+        SDL_Log("    FAIL: Cannot build atlas");
+        setup_failed = true;
+        fail_count++;
         return false;
     }
     atlas_built = true;

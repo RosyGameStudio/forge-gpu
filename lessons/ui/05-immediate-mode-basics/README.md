@@ -323,7 +323,7 @@ opaque white). When a rectangle's vertices use the UV coordinates of this
 white region, every texel they sample returns 1.0. The final pixel color is:
 
 $$
-\text{color} = \text{vertex\_color} \times \text{texel}
+\text{color} = \text{vertex}\_\text{color} \times \text{texel}
 $$
 
 For text glyphs, the texel is the glyph's alpha coverage (0.0 to 1.0), so

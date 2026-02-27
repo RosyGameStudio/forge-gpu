@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
           btn_rects[1].y + btn_rects[1].h * 0.5f,
           false, "Mouse moves to Options -- Options becomes hot" },
 
-        /* Frame 5: Mouse pressed on Options, then dragged off and released */
+        /* Frame 5: Mouse pressed on Options -- Options becomes active */
         { btn_rects[1].x + btn_rects[1].w * 0.5f,
           btn_rects[1].y + btn_rects[1].h * 0.5f,
           true, "Mouse pressed on Options -- Options becomes active" },
