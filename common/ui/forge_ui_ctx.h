@@ -153,9 +153,9 @@
 /* ── Text input style ─────────────────────────────────────────────────── */
 
 /* Text input layout dimensions */
-#define FORGE_UI_TI_PADDING       6.0f   /* horizontal padding (left/right) */
+#define FORGE_UI_TI_PADDING       6.0f   /* left padding in pixels before text starts */
 #define FORGE_UI_TI_CURSOR_WIDTH  2.0f   /* cursor bar width in pixels */
-#define FORGE_UI_TI_BORDER_WIDTH  1.0f   /* border width when focused */
+#define FORGE_UI_TI_BORDER_WIDTH  1.0f   /* focused border edge width in pixels */
 
 /* Background colors by state (RGBA floats in [0, 1]) */
 #define FORGE_UI_TI_NORMAL_R   0.15f   /* unfocused: dark */
@@ -209,14 +209,15 @@ typedef struct ForgeUiRect {
  * based on keyboard input.
  *
  * buffer:   character array (owned by the application, not freed by the library)
- * capacity: total size of buffer in bytes (including space for '\0')
- * length:   current text length in bytes (not counting '\0')
- * cursor:   byte index into buffer where the next character will be inserted */
+ * capacity: total size of buffer in bytes (including space for '\0'); must be > 0
+ * length:   current text length in bytes (not counting '\0'); 0 <= length < capacity
+ * cursor:   byte index into buffer where the next character will be inserted;
+ *           0 <= cursor <= length */
 typedef struct ForgeUiTextInputState {
     char *buffer;    /* text buffer (owned by application, null-terminated) */
-    int   capacity;  /* total buffer size in bytes (including '\0') */
-    int   length;    /* current text length in bytes */
-    int   cursor;    /* cursor position (byte index, 0 = before first char) */
+    int   capacity;  /* total buffer size in bytes (including '\0'); must be > 0 */
+    int   length;    /* current text length in bytes; 0 <= length < capacity */
+    int   cursor;    /* byte index for insertion point; 0 <= cursor <= length */
 } ForgeUiTextInputState;
 
 /* Immediate-mode UI context.
@@ -589,20 +590,21 @@ static inline void forge_ui__emit_border(ForgeUiContext *ctx,
     if (border_w <= 0.0f) return;
     if (border_w > rect.w * 0.5f || border_w > rect.h * 0.5f) return;
 
-    /* Top edge */
+    /* Top edge — full width so corners are covered by the horizontal edges */
     forge_ui__emit_rect(ctx,
         (ForgeUiRect){ rect.x, rect.y, rect.w, border_w },
         r, g, b, a);
-    /* Bottom edge */
+    /* Bottom edge — full width, same reason */
     forge_ui__emit_rect(ctx,
         (ForgeUiRect){ rect.x, rect.y + rect.h - border_w, rect.w, border_w },
         r, g, b, a);
-    /* Left edge (between top and bottom) */
+    /* Left edge — shortened to avoid double-drawing corner pixels where
+     * it would overlap the top and bottom edges */
     forge_ui__emit_rect(ctx,
         (ForgeUiRect){ rect.x, rect.y + border_w,
                        border_w, rect.h - 2.0f * border_w },
         r, g, b, a);
-    /* Right edge (between top and bottom) */
+    /* Right edge — shortened for the same corner overlap reason */
     forge_ui__emit_rect(ctx,
         (ForgeUiRect){ rect.x + rect.w - border_w, rect.y + border_w,
                        border_w, rect.h - 2.0f * border_w },
@@ -1233,6 +1235,9 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
     }
     (void)scale;  /* only ascender_px needed for baseline placement */
 
+    /* Vertically center the text within the rect: offset to the top of
+     * the em square, then add the ascender to reach the baseline where
+     * forge_ui_ctx_label expects the y coordinate. */
     float text_top_y = rect.y + (rect.h - ctx->atlas->pixel_height) * 0.5f;
     float baseline_y = text_top_y + ascender_px;
 
@@ -1252,7 +1257,8 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
     if (is_focused && cursor_visible) {
         float cursor_x = rect.x + FORGE_UI_TI_PADDING;
         if (state->cursor > 0 && state->length > 0) {
-            /* Temporarily null-terminate at cursor for measurement */
+            /* Temporarily null-terminate at cursor so forge_ui_text_measure
+             * measures only the substring before the insertion point */
             char saved = state->buffer[state->cursor];
             state->buffer[state->cursor] = '\0';
             ForgeUiTextMetrics m = forge_ui_text_measure(

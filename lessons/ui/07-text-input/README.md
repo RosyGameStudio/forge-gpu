@@ -75,10 +75,15 @@ unfocused to show the visual contrast.
 - **ForgeUiTextInputState** — application-owned struct with `buffer`,
   `capacity`, `length`, and `cursor` fields; the widget modifies these when
   it has focus
-- **Splice insertion** — `memmove` trailing bytes right, then `memcpy` new
-  characters at the cursor position
-- **Shift deletion** — `memmove` trailing bytes left to overwrite the
+- **Splice insertion** — `SDL_memmove` trailing bytes right, then
+  `SDL_memcpy` new characters at the cursor position
+- **Shift deletion** — `SDL_memmove` trailing bytes left to overwrite the
   removed byte(s)
+- **Mutual exclusion** — editing operations (backspace, delete, insert) and
+  cursor movement are mutually exclusive within a single frame via a
+  `did_edit` flag; deletion takes priority over insertion
+- **State validation** — the widget rejects invalid state at entry
+  (`capacity > 0`, `0 <= length < capacity`, `0 <= cursor <= length`)
 - **Cursor bar positioning** — run `forge_ui_text_measure` on the substring
   `buffer[0..cursor]` and use the resulting width as the cursor's x offset
 
@@ -113,8 +118,9 @@ The **focused ID** is a third persistence slot that lives longer than both:
 - **Click outside** — when a mouse press edge occurs and no text input
   widget is under the cursor, `focused` is cleared to `FORGE_UI_ID_NONE`.
   This is tracked with an internal `_ti_press_claimed` flag.
-- **Escape** — `key_escape` in the keyboard input clears `focused`
-  regardless of mouse state.
+- **Escape** — `key_escape` in the keyboard input clears both `focused`
+  and `active` regardless of mouse state. Clearing `active` prevents a
+  pending click from re-acquiring focus on the same frame.
 
 ### Keyboard input routing
 
@@ -141,14 +147,16 @@ The text input widget operates on an **application-owned** struct:
 ```c
 typedef struct ForgeUiTextInputState {
     char *buffer;    /* text buffer (null-terminated) */
-    int   capacity;  /* total size including '\0' */
-    int   length;    /* current text length in bytes */
-    int   cursor;    /* byte index for insertion point */
+    int   capacity;  /* total size including '\0'; must be > 0 */
+    int   length;    /* current text length in bytes; 0 <= length < capacity */
+    int   cursor;    /* byte index for insertion point; 0 <= cursor <= length */
 } ForgeUiTextInputState;
 ```
 
 The application allocates the buffer and sets the capacity. The widget
-modifies `buffer`, `length`, and `cursor` when it has focus. This follows
+validates the invariants at entry (`capacity > 0`, `0 <= length < capacity`,
+`0 <= cursor <= length`) and modifies `buffer`, `length`, and `cursor` when
+it has focus. This follows
 the same external-mutable-state pattern as checkboxes (`bool*`) and sliders
 (`float*`) from [Lesson 06](../06-checkboxes-and-sliders/) — the library
 writes back into your data.
@@ -205,58 +213,72 @@ for those characters.
 ### Character insertion
 
 When the user types characters, they are **spliced** into the buffer at
-the cursor position:
+the cursor position. Insertion only runs if no deletion (backspace/delete)
+already occurred this frame — the `did_edit` flag enforces mutual exclusion:
 
 ![Character insertion](assets/character_insertion.png)
 
-1. Check that there is room: `length + insert_len < capacity`
-2. **Shift trailing bytes right** — `memmove(buffer + cursor + insert_len,
-   buffer + cursor, length - cursor)` makes room at the cursor
-3. **Write new characters** — `memcpy(buffer + cursor, text_input,
-   insert_len)` copies the typed characters into the gap
+1. Check that there is room: `insert_len < capacity - length` (subtraction
+   form avoids signed overflow)
+2. **Shift trailing bytes right** — `SDL_memmove(buffer + cursor + insert_len,
+   buffer + cursor, (size_t)(length - cursor))` makes room at the cursor
+3. **Write new characters** — `SDL_memcpy(buffer + cursor, text_input,
+   (size_t)insert_len)` copies the typed characters into the gap
 4. **Advance cursor** — `cursor += insert_len` so the cursor sits after
    the newly inserted text
 5. **Update length** — `length += insert_len` and null-terminate
 
-The `memmove` is essential because the source and destination regions can
-overlap (they share the same buffer). Using `memcpy` for the shift would
-produce undefined behavior.
+The `SDL_memmove` is essential because the source and destination regions
+can overlap (they share the same buffer). Using `SDL_memcpy` for the shift
+would produce undefined behavior.
 
 ### Character deletion
 
 Deletion is the reverse of insertion — remove a byte and shift trailing
-bytes left to close the gap:
+bytes left to close the gap. Editing operations are **mutually exclusive**
+within a single frame: if SDL delivers both a text input event and a key
+event together, applying both would operate on inconsistent state (e.g.,
+backspace would delete the just-inserted character). A `did_edit` flag
+ensures deletion takes priority over insertion, and any edit blocks cursor
+movement:
 
 ![Character deletion](assets/character_deletion.png)
 
 **Backspace** (removes byte *before* cursor):
 
 ```c
-if (cursor > 0) {
-    memmove(buffer + cursor - 1, buffer + cursor, length - cursor);
+if (!did_edit && key_backspace && cursor > 0) {
+    SDL_memmove(buffer + cursor - 1, buffer + cursor,
+                (size_t)(length - cursor));
     cursor--;
     length--;
     buffer[length] = '\0';
+    did_edit = true;
 }
 ```
 
 **Delete** (removes byte *at* cursor):
 
 ```c
-if (cursor < length) {
-    memmove(buffer + cursor, buffer + cursor + 1, length - cursor - 1);
+if (!did_edit && key_delete && cursor < length) {
+    SDL_memmove(buffer + cursor, buffer + cursor + 1,
+                (size_t)(length - cursor - 1));
     length--;
     buffer[length] = '\0';
+    did_edit = true;
 }
 ```
 
 The key difference: Backspace moves the cursor left by one after removing,
-while Delete keeps the cursor at the same index. In both cases, the
-`memmove` shifts the remaining bytes left to fill the gap.
+while Delete keeps the cursor at the same index. In both cases,
+`SDL_memmove` shifts the remaining bytes left to fill the gap. The
+`!did_edit` guard ensures only one editing operation runs per frame.
 
 ### Cursor movement
 
-Cursor movement is straightforward:
+Cursor movement only runs when no editing operation (backspace, delete,
+insert) occurred this frame — the `did_edit` flag prevents
+double-shifting the cursor after an edit that already moved it:
 
 - **Left** — `if (cursor > 0) cursor--`
 - **Right** — `if (cursor < length) cursor++`

@@ -4317,6 +4317,7 @@ def diagram_focus_state_machine():
             ha="center",
             va="center",
             zorder=4,
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
 
     # Descriptions below each state
@@ -4359,6 +4360,7 @@ def diagram_focus_state_machine():
         ha="center",
         va="bottom",
         fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # FOCUSED -> UNFOCUSED: click outside / Escape
@@ -4377,6 +4379,7 @@ def diagram_focus_state_machine():
         fontsize=8,
         ha="center",
         va="top",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # FOCUSED -> TYPING: key event
@@ -4396,6 +4399,7 @@ def diagram_focus_state_machine():
         ha="center",
         va="bottom",
         fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # TYPING -> FOCUSED: processed (returns to waiting)
@@ -4414,6 +4418,7 @@ def diagram_focus_state_machine():
         fontsize=8,
         ha="center",
         va="top",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # TYPING -> UNFOCUSED: Escape while typing
@@ -4437,6 +4442,7 @@ def diagram_focus_state_machine():
         ha="center",
         va="bottom",
         fontweight="bold",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     fig.tight_layout()
@@ -4459,7 +4465,7 @@ def diagram_text_input_anatomy():
 
     titles = ["Unfocused", "Focused"]
     border_colors = [STYLE["text_dim"] + "40", STYLE["accent1"]]
-    bg_colors = ["#26263a", "#2e2e46"]
+    bg_colors = [STYLE["surface"], STYLE["surface"]]
     show_cursor = [False, True]
 
     for idx, ax in enumerate(axes):
@@ -4470,6 +4476,7 @@ def diagram_text_input_anatomy():
             color=STYLE["text"],
             fontsize=11,
             fontweight="bold",
+            pad=8,
         )
 
         # Background rect
@@ -4502,6 +4509,7 @@ def diagram_text_input_anatomy():
                 ha="left",
                 va="baseline",
                 zorder=3,
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             )
             pen_x += widths[li]
 
@@ -4525,6 +4533,7 @@ def diagram_text_input_anatomy():
             fontsize=7,
             ha="center",
             va="top",
+            path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
         )
 
         # Baseline indicator
@@ -4544,6 +4553,7 @@ def diagram_text_input_anatomy():
             fontsize=7,
             ha="left",
             va="center",
+            path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
         )
 
         # Cursor bar (focused only)
@@ -4570,6 +4580,7 @@ def diagram_text_input_anatomy():
                     color=STYLE["accent1"],
                     lw=1.2,
                 ),
+                path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
             )
 
         # Border annotation (focused only)
@@ -4587,6 +4598,7 @@ def diagram_text_input_anatomy():
                     color=STYLE["accent1"],
                     lw=1.0,
                 ),
+                path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
             )
         else:
             ax.text(
@@ -4597,6 +4609,7 @@ def diagram_text_input_anatomy():
                 fontsize=7.5,
                 ha="center",
                 va="bottom",
+                path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
             )
 
     fig.tight_layout()
@@ -4626,7 +4639,7 @@ def diagram_cursor_positioning():
         12,
         2.8,
         boxstyle="round,pad=0.08",
-        facecolor="#2e2e46",
+        facecolor=STYLE["surface"],
         edgecolor=STYLE["accent1"],
         linewidth=1.5,
         zorder=2,
@@ -4652,6 +4665,7 @@ def diagram_cursor_positioning():
             ha="left",
             va="baseline",
             zorder=4,
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
 
         # Glyph advance box
@@ -4711,6 +4725,7 @@ def diagram_cursor_positioning():
         fontweight="bold",
         ha="center",
         va="top",
+        path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
     )
 
     # Formula annotation
@@ -4829,6 +4844,7 @@ def diagram_character_insertion():
                 va="center",
                 fontfamily="monospace",
                 zorder=4,
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             )
 
             # Index label below
@@ -4861,6 +4877,7 @@ def diagram_character_insertion():
                 fontweight="bold",
                 ha="center",
                 va="bottom",
+                path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
             )
         else:
             cx = start_x + 4 * cell_w - 0.1
@@ -4882,6 +4899,7 @@ def diagram_character_insertion():
         fontweight="bold",
         ha="center",
         va="center",
+        path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
     )
 
     fig.tight_layout()
@@ -4923,6 +4941,7 @@ def diagram_character_deletion():
             color=STYLE["text"],
             fontsize=10,
             fontweight="bold",
+            pad=8,
         )
 
         cell_w = 1.3
@@ -4968,6 +4987,7 @@ def diagram_character_deletion():
                 va="center",
                 fontfamily="monospace",
                 zorder=4,
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             )
 
         # Cursor line (before)
@@ -5019,6 +5039,7 @@ def diagram_character_deletion():
                 va="center",
                 fontfamily="monospace",
                 zorder=4,
+                path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
             )
 
         # Cursor line (after)
@@ -5052,6 +5073,7 @@ def diagram_character_deletion():
             fontweight="bold",
             ha="center",
             va="top",
+            path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
         )
 
         # Description
@@ -5152,6 +5174,7 @@ def diagram_keyboard_input_flow():
             ha="center",
             va="center",
             zorder=4,
+            path_effects=[pe.withStroke(linewidth=3, foreground=STYLE["bg"])],
         )
         ax.text(
             cx,
@@ -5163,6 +5186,7 @@ def diagram_keyboard_input_flow():
             va="center",
             style="italic",
             zorder=4,
+            path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
         )
 
     # Arrows between boxes
@@ -5202,6 +5226,7 @@ def diagram_keyboard_input_flow():
             color=STYLE["accent2"],
             lw=1.0,
         ),
+        path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
     )
 
     fig.tight_layout()
