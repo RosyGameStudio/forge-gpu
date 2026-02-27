@@ -578,10 +578,11 @@ static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
     /* Active transition: on the frame the mouse button transitions from up
      * to down (press edge), if this widget is hot, it becomes active.
      * Using edge detection prevents a held mouse dragged onto a button
-     * from falsely activating it. */
+     * from falsely activating it.  When overlapping widgets share a click
+     * point, each hovered widget overwrites ctx->active in draw order so
+     * the last-drawn (topmost) widget wins. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
-    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed
-            && ctx->next_hot == id) {
+    if (mouse_pressed && ctx->next_hot == id) {
         ctx->active = id;
     }
 
@@ -670,10 +671,11 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
     /* ── State transitions ────────────────────────────────────────────── */
     /* Edge-triggered: activation fires once on the press edge (up→down).
      * This prevents a held mouse dragged onto the checkbox from toggling
-     * it, and lets the user cancel by dragging off before releasing. */
+     * it, and lets the user cancel by dragging off before releasing.
+     * Overlapping widgets overwrite ctx->active in draw order so the
+     * last-drawn (topmost) widget wins. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
-    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed
-            && ctx->next_hot == id) {
+    if (mouse_pressed && ctx->next_hot == id) {
         ctx->active = id;
     }
 
@@ -768,10 +770,10 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
     /* ── State transitions ────────────────────────────────────────────── */
     /* Edge-triggered: activation fires once on the press edge (up→down).
      * Subsequent frames update the value via the drag path below, without
-     * re-entering the activation branch. */
+     * re-entering the activation branch.  Overlapping widgets overwrite
+     * ctx->active in draw order so the last-drawn (topmost) widget wins. */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
-    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed
-            && ctx->next_hot == id) {
+    if (mouse_pressed && ctx->next_hot == id) {
         ctx->active = id;
     }
 

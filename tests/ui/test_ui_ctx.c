@@ -762,6 +762,47 @@ static void test_multiple_buttons_independent(void)
     forge_ui_ctx_free(&ctx);
 }
 
+static void test_overlap_press_last_drawn_wins(void)
+{
+    TEST("multiple buttons: overlapping press activates last-drawn (topmost)");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+
+    /* Two overlapping buttons -- B is drawn after A so B is on top */
+    ForgeUiRect rect_a = { 10.0f, 10.0f, 100.0f, 40.0f };
+    ForgeUiRect rect_b = { 50.0f, 10.0f, 100.0f, 40.0f };
+    float cx = 80.0f, cy = 30.0f;  /* in overlap region */
+
+    /* Frame 0: hover -- establish hot (last-drawn wins) */
+    forge_ui_ctx_begin(&ctx, cx, cy, false);
+    forge_ui_ctx_button(&ctx, 1, "A", rect_a);
+    forge_ui_ctx_button(&ctx, 2, "B", rect_b);
+    forge_ui_ctx_end(&ctx);
+    ASSERT_EQ_U32(ctx.hot, 2);
+
+    /* Frame 1: press -- last-drawn button must become active */
+    forge_ui_ctx_begin(&ctx, cx, cy, true);
+    bool clicked_a = forge_ui_ctx_button(&ctx, 1, "A", rect_a);
+    bool clicked_b = forge_ui_ctx_button(&ctx, 2, "B", rect_b);
+    forge_ui_ctx_end(&ctx);
+    ASSERT_EQ_U32(ctx.active, 2);
+    ASSERT_TRUE(!clicked_a);
+    ASSERT_TRUE(!clicked_b);
+
+    /* Frame 2: release -- only button B registers a click */
+    forge_ui_ctx_begin(&ctx, cx, cy, false);
+    clicked_a = forge_ui_ctx_button(&ctx, 1, "A", rect_a);
+    clicked_b = forge_ui_ctx_button(&ctx, 2, "B", rect_b);
+    forge_ui_ctx_end(&ctx);
+    ASSERT_TRUE(!clicked_a);
+    ASSERT_TRUE(clicked_b);
+    ASSERT_EQ_U32(ctx.active, FORGE_UI_ID_NONE);
+
+    forge_ui_ctx_free(&ctx);
+}
+
 /* ── Draw data verification tests ───────────────────────────────────────── */
 
 static void test_button_rect_uses_white_uv(void)
@@ -2017,6 +2058,7 @@ int main(int argc, char *argv[])
     /* Multiple buttons */
     test_multiple_buttons_last_hot_wins();
     test_multiple_buttons_independent();
+    test_overlap_press_last_drawn_wins();
 
     /* Draw data verification */
     test_button_rect_uses_white_uv();
