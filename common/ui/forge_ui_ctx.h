@@ -116,6 +116,7 @@ typedef struct ForgeUiContext {
     float mouse_x;        /* cursor x in screen pixels */
     float mouse_y;        /* cursor y in screen pixels */
     bool  mouse_down;     /* true while the primary button is held */
+    bool  mouse_down_prev; /* mouse_down from the previous frame (for edge detection) */
 
     /* Persistent widget state (survives across frames) */
     Uint32 hot;           /* widget under the cursor (or FORGE_UI_ID_NONE) */
@@ -185,11 +186,27 @@ static inline bool forge_ui__rect_contains(ForgeUiRect rect,
 /* Ensure vertex buffer has room for `count` more vertices. */
 static inline bool forge_ui__grow_vertices(ForgeUiContext *ctx, int count)
 {
+    if (count <= 0) return count == 0;
+
+    /* Guard against signed integer overflow in the addition */
+    if (ctx->vertex_count > INT_MAX - count) {
+        SDL_Log("forge_ui__grow_vertices: count overflow");
+        return false;
+    }
     int needed = ctx->vertex_count + count;
     if (needed <= ctx->vertex_capacity) return true;
 
+    /* Start from at least the initial capacity (handles zero after free) */
     int new_cap = ctx->vertex_capacity;
-    while (new_cap < needed) new_cap *= 2;
+    if (new_cap == 0) new_cap = FORGE_UI_CTX_INITIAL_VERTEX_CAPACITY;
+
+    while (new_cap < needed) {
+        if (new_cap > INT_MAX / 2) {
+            SDL_Log("forge_ui__grow_vertices: capacity overflow");
+            return false;
+        }
+        new_cap *= 2;
+    }
 
     ForgeUiVertex *new_buf = (ForgeUiVertex *)SDL_realloc(
         ctx->vertices, (size_t)new_cap * sizeof(ForgeUiVertex));
@@ -206,11 +223,27 @@ static inline bool forge_ui__grow_vertices(ForgeUiContext *ctx, int count)
 /* Ensure index buffer has room for `count` more indices. */
 static inline bool forge_ui__grow_indices(ForgeUiContext *ctx, int count)
 {
+    if (count <= 0) return count == 0;
+
+    /* Guard against signed integer overflow in the addition */
+    if (ctx->index_count > INT_MAX - count) {
+        SDL_Log("forge_ui__grow_indices: count overflow");
+        return false;
+    }
     int needed = ctx->index_count + count;
     if (needed <= ctx->index_capacity) return true;
 
+    /* Start from at least the initial capacity (handles zero after free) */
     int new_cap = ctx->index_capacity;
-    while (new_cap < needed) new_cap *= 2;
+    if (new_cap == 0) new_cap = FORGE_UI_CTX_INITIAL_INDEX_CAPACITY;
+
+    while (new_cap < needed) {
+        if (new_cap > INT_MAX / 2) {
+            SDL_Log("forge_ui__grow_indices: capacity overflow");
+            return false;
+        }
+        new_cap *= 2;
+    }
 
     Uint32 *new_buf = (Uint32 *)SDL_realloc(
         ctx->indices, (size_t)new_cap * sizeof(Uint32));
@@ -231,6 +264,7 @@ static inline void forge_ui__emit_rect(ForgeUiContext *ctx,
                                        ForgeUiRect rect,
                                        float r, float g, float b, float a)
 {
+    if (!ctx->atlas) return;
     if (!forge_ui__grow_vertices(ctx, 4)) return;
     if (!forge_ui__grow_indices(ctx, 6)) return;
 
@@ -262,7 +296,7 @@ static inline void forge_ui__emit_rect(ForgeUiContext *ctx,
 static inline void forge_ui__emit_text_layout(ForgeUiContext *ctx,
                                               const ForgeUiTextLayout *layout)
 {
-    if (!layout || layout->vertex_count == 0) return;
+    if (!layout || layout->vertex_count == 0 || !layout->vertices || !layout->indices) return;
     if (!forge_ui__grow_vertices(ctx, layout->vertex_count)) return;
     if (!forge_ui__grow_indices(ctx, layout->index_count)) return;
 
@@ -325,10 +359,14 @@ static inline void forge_ui_ctx_free(ForgeUiContext *ctx)
     SDL_free(ctx->indices);
     ctx->vertices = NULL;
     ctx->indices = NULL;
+    ctx->atlas = NULL;
     ctx->vertex_count = 0;
     ctx->index_count = 0;
     ctx->vertex_capacity = 0;
     ctx->index_capacity = 0;
+    ctx->hot = FORGE_UI_ID_NONE;
+    ctx->active = FORGE_UI_ID_NONE;
+    ctx->next_hot = FORGE_UI_ID_NONE;
 }
 
 static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
@@ -336,6 +374,9 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
                                       bool mouse_down)
 {
     if (!ctx) return;
+
+    /* Track the previous frame's mouse state for edge detection */
+    ctx->mouse_down_prev = ctx->mouse_down;
 
     /* Update input state */
     ctx->mouse_x = mouse_x;
@@ -353,6 +394,14 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
 static inline void forge_ui_ctx_end(ForgeUiContext *ctx)
 {
     if (!ctx) return;
+
+    /* Safety valve: if a widget was active but the mouse is no longer held,
+     * clear active.  This handles the case where an active widget disappears
+     * (is not declared) on a subsequent frame -- without this, active would
+     * remain stuck forever, blocking all other widgets. */
+    if (ctx->active != FORGE_UI_ID_NONE && !ctx->mouse_down) {
+        ctx->active = FORGE_UI_ID_NONE;
+    }
 
     /* Finalize hot state: adopt whatever widget claimed hot this frame.
      * If no widget claimed hot and nothing is active, hot stays NONE.
@@ -398,9 +447,12 @@ static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
     }
 
     /* ── State transitions ────────────────────────────────────────────── */
-    /* Active transition: when the mouse button is pressed while this widget
-     * is hot (the cursor is over it), the widget becomes active. */
-    if (ctx->active == FORGE_UI_ID_NONE && ctx->mouse_down && ctx->hot == id) {
+    /* Active transition: on the frame the mouse button transitions from up
+     * to down (press edge), if this widget is hot, it becomes active.
+     * Using edge detection prevents a held mouse dragged onto a button
+     * from falsely activating it. */
+    bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
+    if (ctx->active == FORGE_UI_ID_NONE && mouse_pressed && ctx->hot == id) {
         ctx->active = id;
     }
 
