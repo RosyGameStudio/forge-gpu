@@ -1597,7 +1597,7 @@ static inline bool forge_ui_ctx_button_layout(ForgeUiContext *ctx,
 {
     /* Validate all params before calling layout_next so we don't
      * advance the cursor for a widget that will fail to draw. */
-    if (!ctx || !text || id == FORGE_UI_ID_NONE) return false;
+    if (!ctx || !ctx->atlas || !text || id == FORGE_UI_ID_NONE) return false;
     if (ctx->layout_depth <= 0) return false;  /* no active layout — no-op */
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_button(ctx, id, text, rect);
@@ -1609,7 +1609,7 @@ static inline bool forge_ui_ctx_checkbox_layout(ForgeUiContext *ctx,
                                                  bool *value,
                                                  float size)
 {
-    if (!ctx || !label || !value || id == FORGE_UI_ID_NONE) return false;
+    if (!ctx || !ctx->atlas || !label || !value || id == FORGE_UI_ID_NONE) return false;
     if (ctx->layout_depth <= 0) return false;  /* no active layout — no-op */
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_checkbox(ctx, id, label, value, rect);
@@ -1621,7 +1621,7 @@ static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
                                                float min_val, float max_val,
                                                float size)
 {
-    if (!ctx || !value || id == FORGE_UI_ID_NONE) return false;
+    if (!ctx || !ctx->atlas || !value || id == FORGE_UI_ID_NONE) return false;
     if (ctx->layout_depth <= 0) return false;  /* no active layout — no-op */
     if (!(max_val > min_val)) return false;  /* also rejects NaN */
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
