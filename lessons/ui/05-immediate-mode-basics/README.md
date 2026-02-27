@@ -404,6 +404,13 @@ The program writes BMP files to the current directory. Run from the
 repository root so it can find the font file at
 `assets/fonts/liberation_mono/LiberationMono-Regular.ttf`.
 
+## AI skill
+
+This lesson has a matching Claude Code skill:
+[`ui-lesson`](../../../.claude/skills/ui-lesson/SKILL.md) — invoke it to
+scaffold new UI lessons covering font parsing, rasterization, atlas packing,
+text layout, and interactive controls.
+
 ## What's next
 
 The next UI lesson adds checkboxes, sliders, and a layout system that
