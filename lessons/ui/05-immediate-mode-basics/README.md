@@ -404,6 +404,12 @@ The program writes BMP files to the current directory. Run from the
 repository root so it can find the font file at
 `assets/fonts/liberation_mono/LiberationMono-Regular.ttf`.
 
+## What's next
+
+The next UI lesson adds checkboxes, sliders, and a layout system that
+automatically positions widgets in rows and columns — building on the
+hot/active state machine and draw data generation from this lesson.
+
 ## Exercises
 
 1. **Add a third state color**: modify the button to show a distinct

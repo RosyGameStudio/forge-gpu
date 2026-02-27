@@ -56,15 +56,45 @@
 /* Number of buttons in the demo */
 #define BUTTON_COUNT     3
 
+/* Vertical gap between the title label baseline and the first button */
+#define TITLE_BTN_GAP   20.0f
+/* Horizontal gap between the button column and the status label */
+#define STATUS_GAP      20.0f
+
+/* ── Background clear color (dark slate) ────────────────────────────────── */
+#define BG_CLEAR_R      0.08f
+#define BG_CLEAR_G      0.08f
+#define BG_CLEAR_B      0.12f
+#define BG_CLEAR_A      1.00f
+
+/* ── Title label color (soft blue-gray) ─────────────────────────────────── */
+#define TITLE_R         0.70f
+#define TITLE_G         0.80f
+#define TITLE_B         0.90f
+#define TITLE_A         1.00f
+
+/* ── Status label color (warm gold) ─────────────────────────────────────── */
+#define STATUS_R        0.90f
+#define STATUS_G        0.90f
+#define STATUS_B        0.60f
+#define STATUS_A        1.00f
+
+/* ── Mouse cursor dot ───────────────────────────────────────────────────── */
+#define CURSOR_DOT_RADIUS_SQ  5   /* squared pixel radius for circular shape */
+#define CURSOR_DOT_R    255       /* red channel (uint8) */
+#define CURSOR_DOT_G    220       /* green channel (uint8) */
+#define CURSOR_DOT_B     50       /* blue channel (uint8) */
+#define CURSOR_DOT_A    255       /* alpha channel (uint8) */
+
 /* ── Simulated frame input ───────────────────────────────────────────────── */
 
 /* Each frame specifies a mouse position and button state.  These simulate
  * a user moving the mouse over buttons, hovering, pressing, and releasing. */
 typedef struct FrameInput {
-    float mouse_x;
-    float mouse_y;
-    bool  mouse_down;
-    const char *description;  /* what this frame demonstrates */
+    float mouse_x;            /* simulated cursor x in screen pixels */
+    float mouse_y;            /* simulated cursor y in screen pixels */
+    bool  mouse_down;         /* true if the primary button is held this frame */
+    const char *description;  /* what this frame demonstrates (for logging) */
 } FrameInput;
 
 /* ── Helper: state name for logging ──────────────────────────────────────── */
@@ -91,7 +121,7 @@ static bool render_frame_bmp(const char *path,
     }
 
     /* Clear to dark background */
-    forge_raster_clear(&fb, 0.08f, 0.08f, 0.12f, 1.0f);
+    forge_raster_clear(&fb, BG_CLEAR_R, BG_CLEAR_G, BG_CLEAR_B, BG_CLEAR_A);
 
     /* Set up the atlas as a raster texture.  ForgeRasterVertex matches
      * ForgeUiVertex in memory layout, so we can cast the vertex pointer
@@ -119,16 +149,16 @@ static bool render_frame_bmp(const char *path,
     for (int dy = -2; dy <= 2; dy++) {
         for (int dx = -2; dx <= 2; dx++) {
             /* Circular shape: skip corners */
-            if (dx * dx + dy * dy > 5) continue;
+            if (dx * dx + dy * dy > CURSOR_DOT_RADIUS_SQ) continue;
             int px = mx + dx;
             int py = my + dy;
             if (px < 0 || px >= FB_WIDTH || py < 0 || py >= FB_HEIGHT) continue;
             Uint8 *pixel = fb.pixels + (size_t)py * (size_t)fb.stride
                          + (size_t)px * FORGE_RASTER_BPP;
-            pixel[0] = 255;  /* R */
-            pixel[1] = 220;  /* G */
-            pixel[2] = 50;   /* B */
-            pixel[3] = 255;  /* A */
+            pixel[0] = CURSOR_DOT_R;
+            pixel[1] = CURSOR_DOT_G;
+            pixel[2] = CURSOR_DOT_B;
+            pixel[3] = CURSOR_DOT_A;
         }
     }
 
@@ -215,7 +245,7 @@ int main(int argc, char *argv[])
     const char *btn_labels[BUTTON_COUNT] = { "Start", "Options", "Quit" };
 
     float btn_x = MARGIN;
-    float btn_start_y = MARGIN + LABEL_OFFSET_Y + 20.0f;
+    float btn_start_y = MARGIN + LABEL_OFFSET_Y + TITLE_BTN_GAP;
 
     ForgeUiRect btn_rects[BUTTON_COUNT];
     for (int i = 0; i < BUTTON_COUNT; i++) {
@@ -287,7 +317,7 @@ int main(int argc, char *argv[])
         /* Title label */
         forge_ui_ctx_label(&ctx, "Immediate-Mode UI Demo",
                            MARGIN, MARGIN + ascender_px,
-                           0.7f, 0.8f, 0.9f, 1.0f);
+                           TITLE_R, TITLE_G, TITLE_B, TITLE_A);
 
         /* Buttons */
         bool clicked[BUTTON_COUNT];
@@ -311,9 +341,9 @@ int main(int argc, char *argv[])
 
         /* Right-side status area */
         forge_ui_ctx_label(&ctx, status,
-                           MARGIN + BUTTON_WIDTH + 20.0f,
+                           MARGIN + BUTTON_WIDTH + STATUS_GAP,
                            btn_rects[0].y + ascender_px,
-                           0.9f, 0.9f, 0.6f, 1.0f);
+                           STATUS_R, STATUS_G, STATUS_B, STATUS_A);
 
         /* End frame: finalize hot/active transitions */
         forge_ui_ctx_end(&ctx);
