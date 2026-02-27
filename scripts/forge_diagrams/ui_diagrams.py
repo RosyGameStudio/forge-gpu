@@ -6001,12 +6001,6 @@ def diagram_padding_and_spacing():
     r0 = rects[0]
     r1 = rects[1]
     gap_mid_x = inner_x + inner_w + 0.3
-    ax.annotate(
-        "",
-        xy=(gap_mid_x, r0[1]),
-        xytext=(gap_mid_x, r0[1] + r0[3]),
-        arrowprops=dict(arrowstyle="<->", color=STYLE["accent4"], lw=2),
-    )
 
     # Spacing between widget A bottom and widget B top
     ax.annotate(
@@ -6122,9 +6116,12 @@ def diagram_layout_next_sequence():
             cy = wy - sp
 
         # Cursor indicator — show position AFTER this step's widget
+        # First widget has no leading spacing; subsequent widgets have sp before them
         cursor_after_y = ly + lh - pad
         for i in range(step + 1):
-            cursor_after_y -= widget_heights[i] + sp
+            if i > 0:
+                cursor_after_y -= sp
+            cursor_after_y -= widget_heights[i]
 
         ax.plot(
             [lx - 0.15, lx + 0.05],

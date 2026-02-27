@@ -39,7 +39,6 @@
 #ifndef FORGE_UI_CTX_H
 #define FORGE_UI_CTX_H
 
-#include <assert.h>
 #include <math.h>
 #include <SDL3/SDL.h>
 #include "forge_ui.h"
@@ -201,7 +200,8 @@
 
 /* Maximum nesting depth for layout regions.  8 levels is enough for most
  * UI hierarchies (e.g. panel > row > column > widget).  The layout stack
- * lives inside ForgeUiContext and is bounds-checked with assert(). */
+ * lives inside ForgeUiContext and is bounds-checked with runtime guards
+ * that log via SDL_Log and return safely on overflow/underflow. */
 #define FORGE_UI_LAYOUT_MAX_DEPTH  8
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -1573,6 +1573,7 @@ static inline void forge_ui_ctx_label_layout(ForgeUiContext *ctx,
                                               float r, float g, float b, float a)
 {
     if (!ctx || !text || !ctx->atlas) return;
+    if (ctx->layout_depth <= 0) return;  /* no active layout — no-op */
 
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
 
@@ -1597,6 +1598,7 @@ static inline bool forge_ui_ctx_button_layout(ForgeUiContext *ctx,
     /* Validate all params before calling layout_next so we don't
      * advance the cursor for a widget that will fail to draw. */
     if (!ctx || !text || id == FORGE_UI_ID_NONE) return false;
+    if (ctx->layout_depth <= 0) return false;  /* no active layout — no-op */
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_button(ctx, id, text, rect);
 }
@@ -1608,6 +1610,7 @@ static inline bool forge_ui_ctx_checkbox_layout(ForgeUiContext *ctx,
                                                  float size)
 {
     if (!ctx || !label || !value || id == FORGE_UI_ID_NONE) return false;
+    if (ctx->layout_depth <= 0) return false;  /* no active layout — no-op */
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_checkbox(ctx, id, label, value, rect);
 }
@@ -1619,6 +1622,7 @@ static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
                                                float size)
 {
     if (!ctx || !value || id == FORGE_UI_ID_NONE) return false;
+    if (ctx->layout_depth <= 0) return false;  /* no active layout — no-op */
     if (!(max_val > min_val)) return false;  /* also rejects NaN */
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_slider(ctx, id, value, min_val, max_val, rect);

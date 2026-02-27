@@ -436,7 +436,6 @@ LESSON_NAMES = {
     "math/13": "math/13-gradient-noise",
     "math/14": "math/14-blue-noise-sequences",
     "math/15": "math/15-bezier-curves",
-    "ui/08": "ui/08-layout",
     "gpu/03": "gpu/03-uniforms-and-motion",
     "gpu/04": "gpu/04-textures-and-samplers",
     "gpu/10": "gpu/10-basic-lighting",
@@ -459,6 +458,7 @@ LESSON_NAMES = {
     "ui/05": "ui/05-immediate-mode-basics",
     "ui/06": "ui/06-checkboxes-and-sliders",
     "ui/07": "ui/07-text-input",
+    "ui/08": "ui/08-layout",
 }
 
 

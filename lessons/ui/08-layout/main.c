@@ -102,7 +102,8 @@
 
 /* ── Mouse cursor dot ────────────────────────────────────────────────────── */
 #define CURSOR_DOT_RADIUS     2   /* pixel radius for the circular dot */
-#define CURSOR_DOT_RADIUS_SQ  5   /* squared pixel radius for circular shape */
+#define CURSOR_DOT_RADIUS_SQ  5   /* slightly > RADIUS*RADIUS (4) to include
+                                   * diagonal pixels and produce a rounder dot */
 #define CURSOR_DOT_R    255       /* red channel (uint8) */
 #define CURSOR_DOT_G    220       /* green channel (uint8) */
 #define CURSOR_DOT_B     50       /* blue channel (uint8) */

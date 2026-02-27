@@ -60,7 +60,7 @@ dkms.conf
 
 # Generated BMP files from running UI lessons (committed copies live in assets/)
 /glyph_*.bmp
-layout_*.bmp
+/layout_*.bmp
 
 # CMake build directories
 build/
