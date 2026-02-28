@@ -438,7 +438,9 @@ int main(int argc, char *argv[])
     }
 
     /* Verify vertex/index counts match */
-    if (ctx.vertex_count == manual_verts && ctx.index_count == manual_idxs) {
+    bool counts_match = (ctx.vertex_count == manual_verts
+                         && ctx.index_count == manual_idxs);
+    if (counts_match) {
         SDL_Log("%s", "");
         SDL_Log("  [OK] Draw data counts match: %d vertices, %d indices",
                 manual_verts, manual_idxs);
@@ -446,6 +448,7 @@ int main(int argc, char *argv[])
         SDL_Log("  [!] MISMATCH: manual=%d/%d  layout=%d/%d",
                 manual_verts, manual_idxs,
                 ctx.vertex_count, ctx.index_count);
+        had_render_error = true;
     }
 
     /* ══════════════════════════════════════════════════════════════════════ */
@@ -622,8 +625,14 @@ int main(int argc, char *argv[])
     SDL_Log("      slider_layout()");
     SDL_Log("    pop()");
     SDL_Log("%s", "");
-    SDL_Log("  Comparison: manual vs layout produced identical draw data");
-    SDL_Log("    (%d vertices, %d indices)", manual_verts, manual_idxs);
+    if (counts_match) {
+        SDL_Log("  Comparison: manual vs layout produced identical draw data");
+        SDL_Log("    (%d vertices, %d indices)", manual_verts, manual_idxs);
+    } else {
+        SDL_Log("  Comparison: MISMATCH — manual=%d/%d  layout=%d/%d",
+                manual_verts, manual_idxs,
+                ctx.vertex_count, ctx.index_count);
+    }
     SDL_Log("%s", SEPARATOR);
     SDL_Log("Done. Output files written to the current directory.");
 
