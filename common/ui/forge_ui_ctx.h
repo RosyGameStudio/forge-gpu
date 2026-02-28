@@ -409,6 +409,16 @@ typedef struct ForgeUiContext {
      * outside" for focus loss. */
     bool _ti_press_claimed;
 
+    /* Internal: set by the window system when a window cannot receive
+     * input (i.e. another window is on top).  While true, text input
+     * widgets skip keyboard processing — the buffer is not modified and
+     * the cursor does not move.  Visual state (focused background,
+     * cursor caret) is intentionally preserved so the window still
+     * *looks* focused even when input is suppressed.  This lets games
+     * disable window input for game controls (e.g. FPS camera) without
+     * the window appearing unfocused. */
+    bool _keyboard_input_suppressed;
+
     /* Mouse wheel scroll delta for the current frame.  Positive values
      * scroll downward.  Set by the caller after forge_ui_ctx_begin(). */
     float scroll_delta;
@@ -1102,6 +1112,7 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
     ctx->key_end = false;
     ctx->key_escape = false;
     ctx->_ti_press_claimed = false;
+    ctx->_keyboard_input_suppressed = false;
 
     /* Reset scroll and panel state for this frame.  The caller sets
      * scroll_delta after begin if mouse wheel input is available. */
@@ -1565,7 +1576,13 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
      * invisible widget would silently mutate the buffer with no visual
      * feedback, so we suppress editing until the widget scrolls back
      * into view.  Focus is intentionally preserved so the cursor
-     * reappears when the user scrolls back. */
+     * reappears when the user scrolls back.
+     *
+     * Similarly, when the containing window is covered by another window
+     * (_keyboard_input_suppressed), keyboard input is silenced.  The
+     * visual focused state is kept so the window still looks focused --
+     * important for games that suppress window input for game controls
+     * (e.g. FPS camera) without wanting a visual change. */
     bool visible = true;
     if (ctx->has_clip) {
         float cx1 = ctx->clip_rect.x + ctx->clip_rect.w;
@@ -1575,7 +1592,7 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
         visible = !(rx1 <= ctx->clip_rect.x || rect.x >= cx1 ||
                      ry1 <= ctx->clip_rect.y || rect.y >= cy1);
     }
-    if (is_focused && visible) {
+    if (is_focused && visible && !ctx->_keyboard_input_suppressed) {
         /* Editing operations are mutually exclusive within a single frame.
          * When SDL delivers both a text input event and a key event in the
          * same frame, applying both would operate on inconsistent state

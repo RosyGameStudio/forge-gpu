@@ -649,6 +649,14 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
     bool can_receive_input = (wctx->hovered_window_id == FORGE_UI_ID_NONE ||
                               wctx->hovered_window_id == id);
 
+    /* Suppress keyboard input for widgets in windows that are covered
+     * by another window.  This prevents a focused text input in a
+     * background window from silently accepting keystrokes.  The flag
+     * is cleared by window_end so widgets declared after the window
+     * (or in a subsequent window) are unaffected.  Visual focus state
+     * is intentionally preserved — the window still looks focused. */
+    ctx->_keyboard_input_suppressed = !can_receive_input;
+
     /* ── Find the maximum z_order across all registered windows ────────── */
     int max_z = state->z_order;
     for (int i = 0; i < wctx->prev_window_count; i++) {
@@ -817,6 +825,7 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
 
     /* ── If collapsed, we're done: restore buffers and return false ─────── */
     if (state->collapsed) {
+        ctx->_keyboard_input_suppressed = false;
         forge_ui_win__restore_from_window(wctx);
         return false;
     }
@@ -864,6 +873,7 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
         ctx->_panel_active = false;
         ctx->_panel.id = FORGE_UI_ID_NONE;
         ctx->_panel.scroll_y = NULL;
+        ctx->_keyboard_input_suppressed = false;
         forge_ui_win__restore_from_window(wctx);
         /* Undo registration: discard partial draw data so wctx_end
          * does not render a half-constructed window. */
@@ -902,6 +912,7 @@ static inline void forge_ui_wctx_window_end(ForgeUiWindowContext *wctx)
         SDL_Log("forge_ui_wctx_window_end: panel not active "
                 "(missing window_begin?)");
         ctx->has_clip = false;
+        ctx->_keyboard_input_suppressed = false;
         int widx = wctx->active_window_idx;
         wctx->window_entries[widx].vertex_count = 0;
         wctx->window_entries[widx].index_count = 0;
@@ -921,6 +932,10 @@ static inline void forge_ui_wctx_window_end(ForgeUiWindowContext *wctx)
         wctx->active_window_idx = -1;
         return;
     }
+
+    /* Clear keyboard suppression so widgets after this window (or in
+     * a subsequent window) are not affected by this window's state. */
+    ctx->_keyboard_input_suppressed = false;
 
     /* Reuse panel_end logic to compute content height, draw scrollbar,
      * clear clip rect, and pop layout. */

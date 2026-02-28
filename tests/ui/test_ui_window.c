@@ -21,6 +21,7 @@
  *   - State cleanup (ctx_free panel zeroing, panel_end scroll_y NULL,
  *     window_end guard path, wctx_free saved fields)
  *   - Shared state isolation (window_begin rejects during active panel)
+ *   - Keyboard focus leak (covered window suppresses keyboard input)
  *
  * Uses the bundled Liberation Mono Regular font for all tests.
  *
@@ -178,6 +179,16 @@ static int fail_count = 0;
 #define TEST_PANEL_W      200.0f
 #define TEST_PANEL_H      200.0f
 #define TEST_PANEL_ID     400u
+
+/* Text input keyboard focus leak test */
+#define TEST_TI_ID        500u             /* text input widget ID */
+#define TEST_TI_BUF_CAP   32               /* text input buffer capacity */
+#define TEST_TI_RECT_X    20.0f            /* text input rect (inside window) */
+#define TEST_TI_RECT_Y    60.0f
+#define TEST_TI_RECT_W    160.0f
+#define TEST_TI_RECT_H    28.0f
+#define TEST_TI_CLICK_X   100.0f           /* center of text input for clicking */
+#define TEST_TI_CLICK_Y   74.0f
 
 static ForgeUiFont      test_font;
 static ForgeUiFontAtlas  test_atlas;
@@ -1699,6 +1710,146 @@ static void test_window_begin_rejects_during_panel(void)
     forge_ui_ctx_free(&ctx);
 }
 
+/* ── Keyboard focus leak: covered window must not accept keyboard input ──── */
+
+static void test_covered_window_blocks_keyboard(void)
+{
+    TEST("covered window: text input does not accept keyboard input");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+
+    /* Two fully overlapping windows: A has a text input, B will cover it.
+     * Window A starts on top (z=1) so we can click its text input.
+     * Window B starts behind (z=0) and will be brought to front later. */
+    ForgeUiWindowState winA = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H },
+        .z_order = 1
+    };
+    ForgeUiWindowState winB = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H },
+        .z_order = 0
+    };
+
+    char ti_buf[TEST_TI_BUF_CAP] = "";
+    ForgeUiTextInputState ti_state = {
+        ti_buf, TEST_TI_BUF_CAP, 0, 0
+    };
+    ForgeUiRect ti_rect = {
+        TEST_TI_RECT_X, TEST_TI_RECT_Y, TEST_TI_RECT_W, TEST_TI_RECT_H
+    };
+
+    /* Helper macro: declare both windows for a frame, with text input in A */
+#define DECLARE_BOTH_WINDOWS()                                             \
+    do {                                                                   \
+        if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1,              \
+                                       "WinA", &winA)) {                  \
+            forge_ui_ctx_text_input(&ctx, TEST_TI_ID, &ti_state,          \
+                                   ti_rect, true);                        \
+            forge_ui_wctx_window_end(&wctx);                              \
+        }                                                                  \
+        if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2,              \
+                                       "WinB", &winB)) {                  \
+            forge_ui_wctx_window_end(&wctx);                              \
+        }                                                                  \
+    } while (0)
+
+    /* ── Frame 0: warm up (populates prev_window data) ───────────────── */
+    forge_ui_ctx_begin(&ctx, TEST_MOUSE_FAR, TEST_MOUSE_FAR, false);
+    forge_ui_wctx_begin(&wctx);
+    DECLARE_BOTH_WINDOWS();
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* ── Frame 1: hover over text input in window A ──────────────────── */
+    /* prev data now has both windows.  A (z=1) > B (z=0), so mouse over
+     * the overlap area → hovered = A.  This frame establishes hot. */
+    forge_ui_ctx_begin(&ctx, TEST_TI_CLICK_X, TEST_TI_CLICK_Y, false);
+    forge_ui_wctx_begin(&wctx);
+    DECLARE_BOTH_WINDOWS();
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* ── Frame 2: press on text input ────────────────────────────────── */
+    forge_ui_ctx_begin(&ctx, TEST_TI_CLICK_X, TEST_TI_CLICK_Y, true);
+    forge_ui_wctx_begin(&wctx);
+    DECLARE_BOTH_WINDOWS();
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+    ASSERT_EQ_U32(ctx.active, TEST_TI_ID);
+
+    /* ── Frame 3: release → focus acquired ───────────────────────────── */
+    forge_ui_ctx_begin(&ctx, TEST_TI_CLICK_X, TEST_TI_CLICK_Y, false);
+    forge_ui_wctx_begin(&wctx);
+    DECLARE_BOTH_WINDOWS();
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+    ASSERT_EQ_U32(ctx.focused, TEST_TI_ID);
+
+    /* ── Frame 4: bring Window B to front ────────────────────────────── */
+    /* Set B's z_order above A's.  This frame's wctx_begin still uses
+     * prev data where A was on top, but it saves the new z_orders for
+     * the next frame's hovered determination.  Mouse stays inside the
+     * window area so hovered_window_id is computed for the overlap. */
+    winB.z_order = 2;
+    forge_ui_ctx_begin(&ctx, TEST_TI_CLICK_X, TEST_TI_CLICK_Y, false);
+    forge_ui_wctx_begin(&wctx);
+    DECLARE_BOTH_WINDOWS();
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* ── Frame 5: type "X" — Window B now hovered (z=2 > z=1) ────────── */
+    /* prev data now reflects z_orders [A:1, B:2].  Mouse is inside both
+     * windows, so hovered_window_id = B (highest z).  Window A's
+     * can_receive_input = false → _keyboard_input_suppressed = true.
+     * The focused text input in A should NOT accept keyboard input. */
+    forge_ui_ctx_begin(&ctx, TEST_TI_CLICK_X, TEST_TI_CLICK_Y, false);
+    forge_ui_ctx_set_keyboard(&ctx, "X", false, false, false, false,
+                              false, false, false);
+    forge_ui_wctx_begin(&wctx);
+    DECLARE_BOTH_WINDOWS();
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Buffer must be untouched */
+    ASSERT_EQ_INT(ti_state.length, 0);
+    ASSERT_TRUE(ti_buf[0] == '\0');
+
+    /* Focus is intentionally preserved (visual state unchanged) */
+    ASSERT_EQ_U32(ctx.focused, TEST_TI_ID);
+
+    /* ── Frame 6: bring A back on top, verify typing works ───────────── */
+    winA.z_order = 3;
+
+    /* Propagation frame: prev data updates to [A:3, B:2] */
+    forge_ui_ctx_begin(&ctx, TEST_TI_CLICK_X, TEST_TI_CLICK_Y, false);
+    forge_ui_wctx_begin(&wctx);
+    DECLARE_BOTH_WINDOWS();
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* ── Frame 7: type "Y" — A on top, keyboard should work ──────────── */
+    forge_ui_ctx_begin(&ctx, TEST_TI_CLICK_X, TEST_TI_CLICK_Y, false);
+    forge_ui_ctx_set_keyboard(&ctx, "Y", false, false, false, false,
+                              false, false, false);
+    forge_ui_wctx_begin(&wctx);
+    DECLARE_BOTH_WINDOWS();
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Now Window A is on top — keyboard input should go through */
+    ASSERT_EQ_INT(ti_state.length, 1);
+    ASSERT_TRUE(ti_buf[0] == 'Y');
+
+#undef DECLARE_BOTH_WINDOWS
+
+    forge_ui_wctx_free(&wctx);
+    forge_ui_ctx_free(&ctx);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -1807,6 +1958,10 @@ int main(int argc, char *argv[])
     /* Task 7: Shared state isolation */
     SDL_Log("--- Shared State Isolation ---");
     test_window_begin_rejects_during_panel();
+
+    /* Keyboard focus leak fix */
+    SDL_Log("--- Keyboard Focus Leak ---");
+    test_covered_window_blocks_keyboard();
 
     SDL_Log("");
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
