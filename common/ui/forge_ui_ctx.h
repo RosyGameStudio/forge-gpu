@@ -2088,8 +2088,9 @@ static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx)
     if (!(*scroll_y <= max_scroll)) *scroll_y = max_scroll;  /* catches NaN too */
     if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;  /* catches NaN too */
 
-    /* ── Draw scrollbar (only if content overflows) ───────────────────── */
+    /* ── Draw scrollbar (only if content overflows AND track is usable) ── */
     if (content_h <= visible_h) return;
+    if (visible_h < 1.0f) return;  /* track too small to be useful */
 
     ForgeUiRect cr = ctx->_panel.content_rect;
     float track_x = ctx->_panel.rect.x + ctx->_panel.rect.w

@@ -4677,6 +4677,30 @@ static void test_panel_end_scrollbar_on_overflow(void)
     panel_test_teardown(&ctx);
 }
 
+static void test_panel_end_no_scrollbar_zero_track(void)
+{
+    TEST("panel_end: no scrollbar when track height is too small");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    /* Panel barely has room for the title bar — content_rect.h ≈ 0.
+     * title=30 + 2*pad=20 = 50, so a 51px panel gives ~1px content.
+     * A 50px panel gives 0px content. */
+    float panel_h = FORGE_UI_PANEL_TITLE_HEIGHT + 2.0f * FORGE_UI_PANEL_PADDING;
+    forge_ui_ctx_panel_begin(&ctx, 1, "T",
+                (ForgeUiRect){ 0, 0, 100, panel_h }, &scroll_y);
+    /* Place a widget to force overflow */
+    forge_ui_ctx_layout_next(&ctx, 100.0f);
+    int v_before_end = ctx.vertex_count;
+    forge_ui_ctx_panel_end(&ctx);
+    /* Track is 0px tall — scrollbar should be skipped entirely */
+    ASSERT_EQ_INT(ctx.vertex_count, v_before_end);
+
+    panel_test_teardown(&ctx);
+}
+
 static void test_panel_end_no_scrollbar_when_fits(void)
 {
     TEST("panel_end: no scrollbar when content fits");
@@ -5305,6 +5329,7 @@ int main(int argc, char *argv[])
     test_panel_end_thumb_clamped_to_track();
     test_panel_end_scrollbar_on_overflow();
     test_panel_end_no_scrollbar_when_fits();
+    test_panel_end_no_scrollbar_zero_track();
 
     /* Panels -- draw data and features */
     test_panel_begin_emits_draw_data();
