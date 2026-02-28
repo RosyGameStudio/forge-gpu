@@ -1742,19 +1742,20 @@ static void test_covered_window_blocks_keyboard(void)
         TEST_TI_RECT_X, TEST_TI_RECT_Y, TEST_TI_RECT_W, TEST_TI_RECT_H
     };
 
-    /* Helper macro: declare both windows for a frame, with text input in A */
+    /* Helper macro: declare both windows for a frame, with text input in A.
+     * Neither window is ever collapsed in this test, so window_begin must
+     * always succeed — assert it.  text_input returns "content_changed"
+     * (not success/failure), so it is not wrapped with ASSERT_TRUE. */
 #define DECLARE_BOTH_WINDOWS()                                             \
     do {                                                                   \
-        if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1,              \
-                                       "WinA", &winA)) {                  \
-            forge_ui_ctx_text_input(&ctx, TEST_TI_ID, &ti_state,          \
-                                   ti_rect, true);                        \
-            forge_ui_wctx_window_end(&wctx);                              \
-        }                                                                  \
-        if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2,              \
-                                       "WinB", &winB)) {                  \
-            forge_ui_wctx_window_end(&wctx);                              \
-        }                                                                  \
+        ASSERT_TRUE(forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1,      \
+                                               "WinA", &winA));           \
+        forge_ui_ctx_text_input(&ctx, TEST_TI_ID, &ti_state,              \
+                                ti_rect, true);                            \
+        forge_ui_wctx_window_end(&wctx);                                  \
+        ASSERT_TRUE(forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2,      \
+                                               "WinB", &winB));           \
+        forge_ui_wctx_window_end(&wctx);                                  \
     } while (0)
 
     /* ── Frame 0: warm up (populates prev_window data) ───────────────── */
