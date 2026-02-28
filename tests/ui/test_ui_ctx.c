@@ -4628,6 +4628,10 @@ static void test_panel_begin_layout_stack_full(void)
     /* State should be rolled back: no clip, no active panel */
     ASSERT_TRUE(!ctx.has_clip);
     ASSERT_TRUE(!ctx._panel_active);
+    /* Identity fields must be cleared so the pre-clamp check on the next
+     * frame does not match against a panel that never completed. */
+    ASSERT_EQ_U32(ctx._panel.id, FORGE_UI_ID_NONE);
+    ASSERT_TRUE(ctx._panel.scroll_y == NULL);
 
     /* Clean up the stacked layouts */
     for (int i = 0; i < FORGE_UI_LAYOUT_MAX_DEPTH; i++) {
@@ -4815,6 +4819,77 @@ static void test_panel_mouse_wheel_scroll(void)
                 (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
     /* scroll_y should be updated by delta * speed */
     ASSERT_NEAR(scroll_y, 2.0f * FORGE_UI_SCROLL_SPEED, 0.01f);
+
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_panel_mouse_wheel_nan_ignored(void)
+{
+    TEST("panel_begin: NaN scroll_delta does not modify scroll_y");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 50.0f;
+    if (!forge_ui_ctx_init(&ctx, &test_atlas)) return;
+
+    /* Position mouse inside the content area */
+    float content_x = 10.0f + FORGE_UI_PANEL_PADDING + 5.0f;
+    float content_y = 20.0f + FORGE_UI_PANEL_TITLE_HEIGHT + FORGE_UI_PANEL_PADDING + 5.0f;
+    forge_ui_ctx_begin(&ctx, content_x, content_y, false);
+    ctx.scroll_delta = NAN;
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
+    /* NaN delta should be rejected; scroll_y stays at 50 */
+    ASSERT_NEAR(scroll_y, 50.0f, 0.01f);
+
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_panel_mouse_wheel_inf_ignored(void)
+{
+    TEST("panel_begin: +Inf scroll_delta does not modify scroll_y");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 50.0f;
+    if (!forge_ui_ctx_init(&ctx, &test_atlas)) return;
+
+    /* Position mouse inside the content area */
+    float content_x = 10.0f + FORGE_UI_PANEL_PADDING + 5.0f;
+    float content_y = 20.0f + FORGE_UI_PANEL_TITLE_HEIGHT + FORGE_UI_PANEL_PADDING + 5.0f;
+    forge_ui_ctx_begin(&ctx, content_x, content_y, false);
+    ctx.scroll_delta = INFINITY;
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
+    /* +Inf delta should be rejected; scroll_y stays at 50 */
+    ASSERT_NEAR(scroll_y, 50.0f, 0.01f);
+
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_panel_mouse_wheel_neg_inf_ignored(void)
+{
+    TEST("panel_begin: -Inf scroll_delta does not modify scroll_y");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 50.0f;
+    if (!forge_ui_ctx_init(&ctx, &test_atlas)) return;
+
+    float content_x = 10.0f + FORGE_UI_PANEL_PADDING + 5.0f;
+    float content_y = 20.0f + FORGE_UI_PANEL_TITLE_HEIGHT + FORGE_UI_PANEL_PADDING + 5.0f;
+    forge_ui_ctx_begin(&ctx, content_x, content_y, false);
+    ctx.scroll_delta = -INFINITY;
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
+    /* -Inf delta should be rejected; scroll_y stays at 50 */
+    ASSERT_NEAR(scroll_y, 50.0f, 0.01f);
 
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
@@ -5460,6 +5535,9 @@ int main(int argc, char *argv[])
     test_panel_begin_emits_draw_data();
     test_panel_begin_null_title_ok();
     test_panel_mouse_wheel_scroll();
+    test_panel_mouse_wheel_nan_ignored();
+    test_panel_mouse_wheel_inf_ignored();
+    test_panel_mouse_wheel_neg_inf_ignored();
 
     /* Panels -- scroll pre-clamp */
     test_panel_scroll_preclamp_on_panel_resize();

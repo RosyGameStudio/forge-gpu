@@ -2038,7 +2038,10 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
      * overwrite it with this frame's measured height. */
 
     /* ── Apply mouse wheel scrolling ──────────────────────────────────── */
-    if (ctx->scroll_delta != 0.0f &&
+    /* Validate scroll_delta: a NaN or ±Inf delta (from a corrupt input
+     * event or driver bug) would make *scroll_y non-finite, poisoning
+     * every subsequent layout position.  Treat non-finite as zero. */
+    if (ctx->scroll_delta != 0.0f && isfinite(ctx->scroll_delta) &&
         forge_ui__rect_contains(content, ctx->mouse_x, ctx->mouse_y)) {
         *scroll_y += ctx->scroll_delta * FORGE_UI_SCROLL_SPEED;
         if (*scroll_y < 0.0f) *scroll_y = 0.0f;
@@ -2062,6 +2065,10 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
         SDL_Log("forge_ui_ctx_panel_begin: layout_push failed (stack full?)");
         ctx->has_clip = false;
         ctx->_panel_active = false;
+        /* Clear identity/state written above so the pre-clamp check on the
+         * next frame does not match against a panel that never completed. */
+        ctx->_panel.id = FORGE_UI_ID_NONE;
+        ctx->_panel.scroll_y = NULL;
         return false;
     }
 
