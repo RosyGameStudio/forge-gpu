@@ -3134,7 +3134,7 @@ static void test_text_input_bad_null_termination(void)
     if (!atlas_built) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
 
     char buf[16];
     SDL_memset(buf, 'A', sizeof(buf));  /* fill with non-zero, no '\0' at length */
@@ -3161,7 +3161,7 @@ static void test_layout_push_returns_true(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect r = { 10, 10, 200, 300 };
@@ -3181,7 +3181,7 @@ static void test_layout_pop_returns_true(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect r = { 0, 0, 100, 100 };
@@ -3215,7 +3215,7 @@ static void test_layout_pop_empty_stack(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     /* Stack is empty — pop should fail gracefully */
@@ -3233,7 +3233,7 @@ static void test_layout_push_overflow(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect r = { 0, 0, 100, 100 };
@@ -3263,7 +3263,7 @@ static void test_layout_nested_push_pop(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect r = { 0, 0, 200, 200 };
@@ -3301,7 +3301,7 @@ static void test_layout_next_no_active_layout(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     /* No push — layout_next should return zero rect */
@@ -3319,7 +3319,7 @@ static void test_layout_vertical_positions(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 10.0f, 20.0f, 200.0f, 300.0f };
@@ -3356,7 +3356,7 @@ static void test_layout_horizontal_positions(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 10.0f, 20.0f, 300.0f, 50.0f };
@@ -3389,7 +3389,7 @@ static void test_layout_remaining_after_last_widget(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     /* 100px tall area, 0 padding, 10px spacing */
@@ -3423,7 +3423,7 @@ static void test_layout_push_negative_padding_clamped(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 10, 20, 200, 100 };
@@ -3447,7 +3447,7 @@ static void test_layout_push_negative_spacing_clamped(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 100, 100 };
@@ -3468,7 +3468,7 @@ static void test_layout_next_negative_size_clamped(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 100, 100 };
@@ -3489,7 +3489,7 @@ static void test_layout_push_tiny_rect_no_negative_remaining(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     /* Rect smaller than 2*padding → inner space is 0, not negative */
@@ -3513,7 +3513,7 @@ static void test_layout_begin_resets_depth(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
 
     /* First frame: push without pop (intentional mismatch) */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
@@ -3536,7 +3536,7 @@ static void test_layout_free_resets_depth(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect r = { 0, 0, 100, 100 };
@@ -3555,7 +3555,7 @@ static void test_button_layout_null_text(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3580,7 +3580,7 @@ static void test_button_layout_id_zero(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3603,7 +3603,7 @@ static void test_checkbox_layout_null_value(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3626,7 +3626,7 @@ static void test_checkbox_layout_null_label(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3647,7 +3647,7 @@ static void test_slider_layout_null_value(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3671,7 +3671,7 @@ static void test_slider_layout_invalid_range(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3701,7 +3701,7 @@ static void test_label_layout_emits_draw_data(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 10, 20, 200, 100 };
@@ -3722,7 +3722,7 @@ static void test_button_layout_correct_rect(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 200, 200, false);  /* mouse far away */
 
     ForgeUiRect area = { 10, 20, 200, 200 };
@@ -3749,7 +3749,7 @@ static void test_layout_no_spacing_before_first_widget(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     /* Large spacing to make a gap obvious if misapplied */
@@ -3771,7 +3771,7 @@ static void test_layout_spacing_between_widgets(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 100, 200 };
@@ -3802,7 +3802,7 @@ static void test_layout_horizontal_spacing(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 300, 50 };
@@ -3831,7 +3831,7 @@ static void test_layout_item_count(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3856,7 +3856,7 @@ static void test_layout_push_invalid_direction_rejected(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3878,7 +3878,7 @@ static void test_layout_push_negative_direction_rejected(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3900,7 +3900,7 @@ static void test_layout_push_valid_directions_accepted(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
@@ -3933,7 +3933,7 @@ static void test_label_layout_noop_without_layout(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     /* No layout pushed — label_layout should silently return */
@@ -3951,7 +3951,7 @@ static void test_button_layout_noop_without_layout(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     /* No layout pushed */
@@ -3969,7 +3969,7 @@ static void test_checkbox_layout_noop_without_layout(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     bool val = true;
@@ -3987,7 +3987,7 @@ static void test_slider_layout_noop_without_layout(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     float val = 50.0f;
