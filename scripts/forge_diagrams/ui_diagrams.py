@@ -6508,9 +6508,9 @@ def diagram_scroll_offset_model():
             logical_y = logical_y_start - i * (widget_h + spacing)
             rendered_y = logical_y + scroll_y * 0.03  # scale scroll for diagram
 
-            # Check if inside clip
+            # Check if fully inside clip rect
             inside = rendered_y >= clip_y and (rendered_y + widget_h) <= (
-                clip_y + clip_h + widget_h
+                clip_y + clip_h
             )
             alpha = 0.6 if inside else 0.15
             color = STYLE["accent1"] if inside else STYLE["text_dim"]

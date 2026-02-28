@@ -677,8 +677,10 @@ static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
  * rect:      outer bounds of the panel in screen pixels
  * scroll_y:  pointer to the caller's scroll offset (persists across frames)
  *
- * Always returns true (the caller should always declare children and call
- * panel_end). */
+ * Returns false without drawing if validation fails: NULL ctx/atlas/scroll_y,
+ * nested panel (one already active), id == FORGE_UI_ID_NONE or UINT32_MAX,
+ * or non-positive rect dimensions.  On false the caller must still call
+ * panel_end (which is a safe no-op when no panel is active). */
 static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
                                              Uint32 id,
                                              const char *title,
@@ -1990,6 +1992,11 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
      * (e.g. panel resize): prev_max shrinks and the stale scroll_y
      * that was valid last frame now exceeds the new max.
      *
+     * Only apply the pre-clamp when _panel.id matches this panel.
+     * With multiple panels per frame, _panel retains the state of
+     * whichever panel called panel_end last; using that stale height
+     * for a different panel would silently corrupt its scroll_y.
+     *
      * Limitation: when content *shrinks* between frames (e.g. items
      * removed from a list), prev_max is based on the old (large)
      * content height, so it won't clamp aggressively enough.  The
@@ -1999,10 +2006,14 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
      * known until all widgets have been placed.
      *
      * On the very first frame content_height is 0, so prev_max is 0
-     * and any stale scroll_y is clamped to 0 — correct behavior. */
-    float prev_max = ctx->_panel.content_height - content.h;
-    if (prev_max < 0.0f) prev_max = 0.0f;
-    if (*scroll_y > prev_max) *scroll_y = prev_max;
+     * and any stale scroll_y is clamped to 0 — correct behavior.
+     * When the id doesn't match (first frame or different panel),
+     * the pre-clamp is skipped and panel_end handles clamping. */
+    if (ctx->_panel.id == id) {
+        float prev_max = ctx->_panel.content_height - content.h;
+        if (prev_max < 0.0f) prev_max = 0.0f;
+        if (*scroll_y > prev_max) *scroll_y = prev_max;
+    }
 
     /* ── Store panel state ────────────────────────────────────────────── */
     ctx->_panel.rect = rect;
