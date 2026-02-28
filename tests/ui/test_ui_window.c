@@ -158,10 +158,10 @@ static int fail_count = 0;
 #define TEST_NEAR_EPS     0.01f
 
 /* NaN/Inf mouse validation (task 3) */
-#define TEST_NAN_MOUSE_X  (0.0f / 0.0f)  /* produces NaN */
-#define TEST_NAN_MOUSE_Y  (0.0f / 0.0f)
-#define TEST_INF_MOUSE_X  (1.0f / 0.0f)  /* produces +Inf */
-#define TEST_INF_MOUSE_Y  (1.0f / 0.0f)
+#define TEST_NAN_MOUSE_X  ((float)NAN)
+#define TEST_NAN_MOUSE_Y  ((float)NAN)
+#define TEST_INF_MOUSE_X  ((float)INFINITY)
+#define TEST_INF_MOUSE_Y  ((float)INFINITY)
 
 /* Slider test geometry */
 #define TEST_SLIDER_X     20.0f
@@ -834,6 +834,8 @@ static void test_multiple_windows_all_rendered(void)
     forge_ui_wctx_free(&wctx);
     forge_ui_ctx_free(&ctx);
 }
+#undef TEST_MULTI_WIN_COUNT
+#undef TEST_MULTI_WIN_STEP
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  DRAG MECHANICS

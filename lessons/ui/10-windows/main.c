@@ -98,6 +98,10 @@
 /* ── Checkbox click nudge ──────────────────────────────────────────────── */
 #define CB_CLICK_NUDGE   10.0f    /* horizontal offset into checkbox hit area */
 
+/* ── Drag displacement (how far Settings is dragged in the demo) ─────── */
+#define DRAG_OFFSET_X  150.0f    /* horizontal drag displacement (pixels) */
+#define DRAG_OFFSET_Y   80.0f    /* vertical drag displacement (pixels) */
+
 /* ── Widget IDs ──────────────────────────────────────────────────────────── */
 /* Settings window: ID 100, scrollbar 101, collapse toggle 102 */
 #define ID_SETTINGS_WIN     100
@@ -437,12 +441,12 @@ int main(int argc, char *argv[])
           "Press Settings title bar (bring to front, start drag)" },
 
         /* Frame 2: Drag Settings window to new position */
-        { settings_title_cx + 150.0f, settings_title_cy + 80.0f, true, 0.0f,
-          "Drag Settings to new position" },
+        { settings_title_cx + DRAG_OFFSET_X, settings_title_cy + DRAG_OFFSET_Y,
+          true, 0.0f, "Drag Settings to new position" },
 
         /* Frame 3: Release drag */
-        { settings_title_cx + 150.0f, settings_title_cy + 80.0f, false, 0.0f,
-          "Release drag -- Settings at new position" },
+        { settings_title_cx + DRAG_OFFSET_X, settings_title_cy + DRAG_OFFSET_Y,
+          false, 0.0f, "Release drag -- Settings at new position" },
 
         /* Frame 4: Click Info collapse toggle to collapse */
         { info_toggle_cx, info_toggle_cy, true, 0.0f,
@@ -469,11 +473,11 @@ int main(int argc, char *argv[])
           "Continue scrolling Info content" },
 
         /* Frame 10: Click checkbox in Settings (overlapping Status) */
-        { cb_click_x + 150.0f, cb_click_y + 80.0f, true, 0.0f,
+        { cb_click_x + DRAG_OFFSET_X, cb_click_y + DRAG_OFFSET_Y, true, 0.0f,
           "Press checkbox in Settings (overlaps Status, tests z-routing)" },
 
         /* Frame 11: Release checkbox */
-        { cb_click_x + 150.0f, cb_click_y + 80.0f, false, 0.0f,
+        { cb_click_x + DRAG_OFFSET_X, cb_click_y + DRAG_OFFSET_Y, false, 0.0f,
           "Release checkbox -- verify toggle, z-order input routing" },
     };
     int frame_count = (int)(sizeof(frames) / sizeof(frames[0]));

@@ -352,9 +352,9 @@ each glyph is rasterized once and cached.
 **The anti-aliasing comparison** in the example program produces two BMP files
 for the letter 'A':
 
-- `glyph_A_noaa.png` — Binary rasterization: only values 0 and 255, jagged
+- `glyph_A_noaa.bmp` — Binary rasterization: only values 0 and 255, jagged
   edges visible
-- `glyph_A_aa.png` — 4x4 supersampling: 17 distinct coverage levels, smooth
+- `glyph_A_aa.bmp` — 4x4 supersampling: 17 distinct coverage levels, smooth
   edges
 
 More sophisticated approaches exist (analytical area coverage computes the

@@ -259,8 +259,8 @@ cmake --build build --target 09-panels-and-scrolling
 ./build/lessons/ui/09-panels-and-scrolling/09-panels-and-scrolling
 ```
 
-The program writes `panels_frame_0.png` through `panels_frame_9.png` to the
-current directory. Pre-generated frames are in the `assets/` directory.
+The program writes `panels_frame_0.bmp` through `panels_frame_9.bmp` to the
+current directory. Pre-generated PNG versions are in `assets/`.
 
 ## AI skill
 

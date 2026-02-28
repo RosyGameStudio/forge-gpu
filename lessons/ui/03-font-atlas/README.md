@@ -407,11 +407,11 @@ two verification steps:
    Check for overlapping glyphs (glyphs drawn on top of each other),
    cut-off glyphs (bitmaps extending past the atlas boundary), and
    correct padding (visible gaps between adjacent glyphs). The debug
-   BMP `atlas_debug.png` draws outlines around each glyph rectangle
+   BMP `atlas_debug.bmp` draws outlines around each glyph rectangle
    to make the shelf structure visible.
 
 2. **UV round-trip**: extract glyph 'A' from the atlas using its UV
-   coordinates and write it as a separate BMP (`glyph_A_from_atlas.png`).
+   coordinates and write it as a separate BMP (`glyph_A_from_atlas.bmp`).
    If the extracted image matches the original rasterized 'A', the UV
    coordinates are correct. This proves the full pipeline works:
    rasterize → pack → compute UVs → extract via UVs.

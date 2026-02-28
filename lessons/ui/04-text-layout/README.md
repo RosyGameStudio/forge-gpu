@@ -482,10 +482,12 @@ build\lessons\ui\04-text-layout\Debug\ui-04-text-layout.exe
 
 The program writes BMP files to the current directory:
 
-- `layout_hello.png` — "Hello, World!" on a single line
-- `layout_multiline.png` — four lines with explicit `\n` breaks
-- `layout_wrapped.png` — long text wrapped at 300 px
-- `layout_alignment.png` — left, center, and right alignment side by side
+- `layout_hello.bmp` — "Hello, World!" on a single line
+- `layout_multiline.bmp` — four lines with explicit `\n` breaks
+- `layout_wrapped.bmp` — long text wrapped at 300 px
+- `layout_alignment.bmp` — left, center, and right alignment side by side
+
+Pre-generated PNG versions are in `assets/`.
 
 ## AI skill
 

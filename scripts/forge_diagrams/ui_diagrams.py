@@ -7221,11 +7221,11 @@ def diagram_window_anatomy():
     )
     ax.add_patch(title_rect)
 
-    # Collapse toggle triangle
+    # Collapse toggle triangle (down-pointing = expanded state)
     tri_x = wx + 0.4
     tri_cy = wy + wh - th / 2
     tri = plt.Polygon(
-        [[tri_x, tri_cy + 0.25], [tri_x, tri_cy - 0.25], [tri_x + 0.35, tri_cy]],
+        [[tri_x, tri_cy + 0.2], [tri_x + 0.4, tri_cy + 0.2], [tri_x + 0.2, tri_cy - 0.2]],
         closed=True,
         facecolor=STYLE["accent3"],
         edgecolor=STYLE["accent3"],
