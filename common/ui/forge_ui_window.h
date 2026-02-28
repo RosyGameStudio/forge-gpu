@@ -347,9 +347,47 @@ static inline bool forge_ui_wctx_init(ForgeUiWindowContext *wctx,
     return true;
 }
 
+/* Restore the context's vertex/index buffers from saved state */
+static inline void forge_ui_win__restore_from_window(
+    ForgeUiWindowContext *wctx)
+{
+    ForgeUiContext *ctx = wctx->ctx;
+    int idx = wctx->active_window_idx;
+    if (idx < 0 || idx >= wctx->window_count) return;
+
+    ForgeUiWindowEntry *entry = &wctx->window_entries[idx];
+
+    /* Save back the window's updated buffer state (may have grown) */
+    entry->vertices = ctx->vertices;
+    entry->vertex_count = ctx->vertex_count;
+    entry->vertex_capacity = ctx->vertex_capacity;
+    entry->indices = ctx->indices;
+    entry->index_count = ctx->index_count;
+    entry->index_capacity = ctx->index_capacity;
+
+    /* Restore main context's buffers */
+    ctx->vertices = wctx->saved_vertices;
+    ctx->vertex_count = wctx->saved_vertex_count;
+    ctx->vertex_capacity = wctx->saved_vertex_capacity;
+    ctx->indices = wctx->saved_indices;
+    ctx->index_count = wctx->saved_index_count;
+    ctx->index_capacity = wctx->saved_index_capacity;
+
+    wctx->active_window_idx = -1;
+}
+
 static inline void forge_ui_wctx_free(ForgeUiWindowContext *wctx)
 {
     if (!wctx) return;
+
+    /* If the context is currently redirected to a per-window draw list,
+     * restore the main context's buffer pointers before freeing.
+     * Otherwise ctx->vertices/indices would become dangling pointers
+     * (use-after-free) and a subsequent forge_ui_ctx_free would
+     * double-free the same allocation. */
+    if (wctx->active_window_idx >= 0 && wctx->ctx) {
+        forge_ui_win__restore_from_window(wctx);
+    }
 
     /* Free any allocated per-window draw list buffers */
     for (int i = 0; i < FORGE_UI_WINDOW_MAX; i++) {
@@ -370,7 +408,20 @@ static inline void forge_ui_wctx_free(ForgeUiWindowContext *wctx)
 
 static inline void forge_ui_wctx_begin(ForgeUiWindowContext *wctx)
 {
-    if (!wctx || !wctx->ctx) return;
+    if (!wctx || !wctx->ctx) {
+        SDL_Log("forge_ui_wctx_begin: NULL argument");
+        return;
+    }
+
+    /* If a previous window was never closed (missing window_end call),
+     * restore the context's main buffers before proceeding.  Without
+     * this, ctx->vertices/indices would still point at the per-window
+     * draw list, and the reset below would orphan those pointers. */
+    if (wctx->active_window_idx >= 0) {
+        SDL_Log("forge_ui_wctx_begin: previous window not closed "
+                "(missing window_end call), restoring buffers");
+        forge_ui_win__restore_from_window(wctx);
+    }
 
     /* ── Determine hovered window from previous frame's data ──────────── */
     /* Iterate previous frame's windows in descending z-order to find
@@ -402,7 +453,16 @@ static inline void forge_ui_wctx_begin(ForgeUiWindowContext *wctx)
     for (int i = 0; i < wctx->window_count; i++) {
         wctx->prev_window_ids[i] = wctx->window_entries[i].id;
         if (wctx->window_entries[i].state) {
-            wctx->prev_window_rects[i] = wctx->window_entries[i].state->rect;
+            ForgeUiRect r = wctx->window_entries[i].state->rect;
+            /* Collapsed windows only show their title bar, so use the
+             * title-bar rect for hover detection.  Without this,
+             * collapsed windows create an invisible dead zone over
+             * their full (hidden) content area that blocks input to
+             * windows behind them. */
+            if (wctx->window_entries[i].state->collapsed) {
+                r.h = FORGE_UI_WIN_TITLE_HEIGHT;
+            }
+            wctx->prev_window_rects[i] = r;
             wctx->prev_window_z_orders[i] = wctx->window_entries[i].state->z_order;
         }
     }
@@ -437,7 +497,10 @@ static inline void forge_ui_win__sort_entries(ForgeUiWindowEntry *entries,
 
 static inline void forge_ui_wctx_end(ForgeUiWindowContext *wctx)
 {
-    if (!wctx || !wctx->ctx) return;
+    if (!wctx || !wctx->ctx) {
+        SDL_Log("forge_ui_wctx_end: NULL argument");
+        return;
+    }
 
     ForgeUiContext *ctx = wctx->ctx;
 
@@ -452,8 +515,16 @@ static inline void forge_ui_wctx_end(ForgeUiWindowContext *wctx)
         ForgeUiWindowEntry *entry = &wctx->window_entries[w];
         if (entry->vertex_count == 0 || entry->index_count == 0) continue;
 
-        if (!forge_ui__grow_vertices(ctx, entry->vertex_count)) continue;
-        if (!forge_ui__grow_indices(ctx, entry->index_count)) continue;
+        if (!forge_ui__grow_vertices(ctx, entry->vertex_count)) {
+            SDL_Log("forge_ui_wctx_end: vertex buffer grow failed for "
+                    "window %u", (unsigned)entry->id);
+            continue;
+        }
+        if (!forge_ui__grow_indices(ctx, entry->index_count)) {
+            SDL_Log("forge_ui_wctx_end: index buffer grow failed for "
+                    "window %u", (unsigned)entry->id);
+            continue;
+        }
 
         Uint32 base = (Uint32)ctx->vertex_count;
 
@@ -497,41 +568,15 @@ static inline void forge_ui_win__redirect_to_window(
     wctx->active_window_idx = window_idx;
 }
 
-/* Restore the context's vertex/index buffers from saved state */
-static inline void forge_ui_win__restore_from_window(
-    ForgeUiWindowContext *wctx)
-{
-    ForgeUiContext *ctx = wctx->ctx;
-    int idx = wctx->active_window_idx;
-    if (idx < 0 || idx >= wctx->window_count) return;
-
-    ForgeUiWindowEntry *entry = &wctx->window_entries[idx];
-
-    /* Save back the window's updated buffer state (may have grown) */
-    entry->vertices = ctx->vertices;
-    entry->vertex_count = ctx->vertex_count;
-    entry->vertex_capacity = ctx->vertex_capacity;
-    entry->indices = ctx->indices;
-    entry->index_count = ctx->index_count;
-    entry->index_capacity = ctx->index_capacity;
-
-    /* Restore main context's buffers */
-    ctx->vertices = wctx->saved_vertices;
-    ctx->vertex_count = wctx->saved_vertex_count;
-    ctx->vertex_capacity = wctx->saved_vertex_capacity;
-    ctx->indices = wctx->saved_indices;
-    ctx->index_count = wctx->saved_index_count;
-    ctx->index_capacity = wctx->saved_index_capacity;
-
-    wctx->active_window_idx = -1;
-}
-
 static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
                                                 Uint32 id,
                                                 const char *title,
                                                 ForgeUiWindowState *state)
 {
-    if (!wctx || !wctx->ctx || !state || id == FORGE_UI_ID_NONE) return false;
+    if (!wctx || !wctx->ctx || !wctx->ctx->atlas ||
+        !state || id == FORGE_UI_ID_NONE) {
+        return false;
+    }
 
     ForgeUiContext *ctx = wctx->ctx;
 
@@ -554,7 +599,11 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
         return false;
     }
 
-    /* ── Validate rect dimensions ──────────────────────────────────────── */
+    /* ── Validate rect origin and dimensions ──────────────────────────── */
+    if (!isfinite(state->rect.x) || !isfinite(state->rect.y)) {
+        SDL_Log("forge_ui_wctx_window_begin: rect origin must be finite");
+        return false;
+    }
     if (!(state->rect.w > 0.0f) || !isfinite(state->rect.w) ||
         !(state->rect.h > 0.0f) || !isfinite(state->rect.h)) {
         SDL_Log("forge_ui_wctx_window_begin: rect dimensions must be "
@@ -601,14 +650,23 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
                                                ctx->mouse_x, ctx->mouse_y);
 
     /* ── Hit test: entire window (for bring-to-front) ─────────────────── */
+    /* Use title-bar-only rect when collapsed so the invisible content
+     * area does not intercept clicks meant for windows behind. */
+    ForgeUiRect hit_rect = state->rect;
+    if (state->collapsed) {
+        hit_rect.h = FORGE_UI_WIN_TITLE_HEIGHT;
+    }
     bool window_over = can_receive_input &&
-                       forge_ui__rect_contains(state->rect,
+                       forge_ui__rect_contains(hit_rect,
                                                 ctx->mouse_x, ctx->mouse_y);
 
     /* ── Bring to front on click ───────────────────────────────────────── */
     bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
     if (mouse_pressed && window_over) {
-        if (state->z_order < max_z + 1) {
+        /* Guard against signed integer overflow: if max_z has reached
+         * INT_MAX we cannot increment further.  In practice this requires
+         * ~2 billion bring-to-front clicks. */
+        if (max_z < INT_MAX && state->z_order < max_z + 1) {
             state->z_order = max_z + 1;
         }
     }
@@ -785,7 +843,16 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
         SDL_Log("forge_ui_wctx_window_begin: layout_push failed");
         ctx->has_clip = false;
         ctx->_panel_active = false;
+        ctx->_panel.id = FORGE_UI_ID_NONE;
+        ctx->_panel.scroll_y = NULL;
         forge_ui_win__restore_from_window(wctx);
+        /* Undo registration: discard partial draw data so wctx_end
+         * does not render a half-constructed window. */
+        entry->vertex_count = 0;
+        entry->index_count = 0;
+        entry->id = FORGE_UI_ID_NONE;
+        entry->state = NULL;
+        wctx->window_count--;
         return false;
     }
 
@@ -801,9 +868,23 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
 static inline void forge_ui_wctx_window_end(ForgeUiWindowContext *wctx)
 {
     if (!wctx || !wctx->ctx) return;
-    if (wctx->active_window_idx < 0) return;
+    if (wctx->active_window_idx < 0) {
+        SDL_Log("forge_ui_wctx_window_end: no active window "
+                "(missing window_begin or window was collapsed?)");
+        return;
+    }
 
     ForgeUiContext *ctx = wctx->ctx;
+
+    /* Guard: if the panel state was not set up (e.g. misuse with
+     * multiple window contexts), log and restore buffers without
+     * running panel_end, which would operate on stale state. */
+    if (!ctx->_panel_active) {
+        SDL_Log("forge_ui_wctx_window_end: panel not active "
+                "(missing window_begin?)");
+        forge_ui_win__restore_from_window(wctx);
+        return;
+    }
 
     /* Reuse panel_end logic to compute content height, draw scrollbar,
      * clear clip rect, and pop layout. */
