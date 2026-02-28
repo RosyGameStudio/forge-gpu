@@ -2065,7 +2065,7 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
         SDL_Log("forge_ui_ctx_panel_begin: layout_push failed (stack full?)");
         ctx->has_clip = false;
         ctx->_panel_active = false;
-        /* Clear identity/state written above so the pre-clamp check on the
+        /* Clear identity/state set above so the pre-clamp check on the
          * next frame does not match against a panel that never completed. */
         ctx->_panel.id = FORGE_UI_ID_NONE;
         ctx->_panel.scroll_y = NULL;
