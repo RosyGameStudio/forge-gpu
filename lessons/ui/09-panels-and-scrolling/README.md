@@ -254,6 +254,18 @@ cmake --build build --target 09-panels-and-scrolling
 The program writes `panels_frame_0.bmp` through `panels_frame_9.bmp` to the
 current directory. Pre-generated frames are in the `assets/` directory.
 
+## AI skill
+
+This lesson has a matching Claude Code skill:
+[`ui-lesson`](../../../.claude/skills/ui-lesson/SKILL.md) -- invoke it to
+scaffold new UI lessons following the same structure and conventions.
+
+## What's next
+
+- **[UI Lesson 10 -- Windows](../10-windows/)** -- draggable panels with title
+  bars, z-ordering (bring-to-front on click), collapse/expand; builds on
+  panels (this lesson) and layout (Lesson 08)
+
 ## Exercises
 
 1. **Add a horizontal scrollbar** -- extend the panel system to support
@@ -281,9 +293,3 @@ current directory. Pre-generated frames are in the `assets/` directory.
   positioning that panels build on
 - **[common/ui/ README](../../../common/ui/README.md)** -- full API reference
   for the UI library
-
-## What's next
-
-- **[UI Lesson 10 -- Windows](../10-windows/)** -- draggable panels with title
-  bars, z-ordering (bring-to-front on click), collapse/expand; builds on
-  panels (this lesson) and layout (Lesson 08)

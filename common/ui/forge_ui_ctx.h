@@ -255,6 +255,11 @@
 #define FORGE_UI_SB_ACTIVE_B   0.97f
 #define FORGE_UI_SB_ACTIVE_A   1.00f
 
+/* ── Panel content layout ──────────────────────────────────────────────── */
+
+/* Vertical spacing between child widgets inside a panel (pixels) */
+#define FORGE_UI_PANEL_CONTENT_SPACING  8.0f
+
 /* ── Scroll speed ──────────────────────────────────────────────────────── */
 
 /* Pixels scrolled per unit of mouse wheel delta */
@@ -2050,7 +2055,7 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
      *    downward with consistent gaps. ───────────────────────────────── */
     if (!forge_ui_ctx_layout_push(ctx, content,
                                    FORGE_UI_LAYOUT_VERTICAL,
-                                   0.0f, 8.0f)) {
+                                   0.0f, FORGE_UI_PANEL_CONTENT_SPACING)) {
         SDL_Log("forge_ui_ctx_panel_begin: layout_push failed (stack full?)");
         ctx->has_clip = false;
         ctx->_panel_active = false;

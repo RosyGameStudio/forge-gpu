@@ -96,6 +96,13 @@
 #define BG_CLEAR_B      0.12f
 #define BG_CLEAR_A      1.00f
 
+/* ── Status label positioning ────────────────────────────────────────────── */
+#define STATUS_LABEL_GAP   12.0f  /* vertical gap between panel bottom and status text */
+
+/* ── Simulated cursor margins ───────────────────────────────────────────── */
+#define IDLE_CURSOR_MARGIN 20.0f  /* offset from framebuffer edge for idle cursor */
+#define CB_CLICK_X_OFFSET  10.0f  /* horizontal offset into checkbox hit area */
+
 /* ── Mouse cursor dot ────────────────────────────────────────────────────── */
 #define CURSOR_DOT_RADIUS     2
 #define CURSOR_DOT_RADIUS_SQ  5
@@ -303,10 +310,12 @@ int main(int argc, char *argv[])
     bool had_render_error = false;
 
     /* ── Compute approximate scrollbar thumb position for dragging ─────── */
-    /* Content: 10 checkboxes * (28 + 8 spacing) - 8 (no trailing spacing) = 352
-     * Content area: panel_h - title_h - 2*padding = 360 - 30 - 20 = 310
+    /* Content: 10 checkboxes * (28 + 8 spacing) - 8 trailing spacing = 352
+     * Content area: panel_h - title_h - 2 * padding = 360 - 30 - 20 = 310
      * max_scroll = 352 - 310 = 42 */
-    float approx_content_h = CHECKBOX_COUNT * (CHECKBOX_HEIGHT + 8.0f) - 8.0f;
+    float approx_content_h = CHECKBOX_COUNT
+                              * (CHECKBOX_HEIGHT + FORGE_UI_PANEL_CONTENT_SPACING)
+                              - FORGE_UI_PANEL_CONTENT_SPACING;
     float approx_visible_h = LEFT_PANEL_H - FORGE_UI_PANEL_TITLE_HEIGHT
                               - 2.0f * FORGE_UI_PANEL_PADDING;
     float approx_max_scroll = approx_content_h - approx_visible_h;
@@ -324,8 +333,8 @@ int main(int argc, char *argv[])
                          + FORGE_UI_SCROLLBAR_WIDTH * 0.5f;
 
     /* Idle mouse position (outside both panels) */
-    float idle_mx = FB_WIDTH - 20.0f;
-    float idle_my = 20.0f;
+    float idle_mx = FB_WIDTH - IDLE_CURSOR_MARGIN;
+    float idle_my = IDLE_CURSOR_MARGIN;
 
     /* Center of left panel content area (for mouse wheel scrolling) */
     float content_cx = LEFT_PANEL_X + LEFT_PANEL_W * 0.5f;
@@ -333,7 +342,7 @@ int main(int argc, char *argv[])
                        + LEFT_PANEL_H * 0.35f;
 
     /* A checkbox center y for click verification (checkbox 5, ~middle) */
-    float cb5_approx_x = LEFT_PANEL_X + FORGE_UI_PANEL_PADDING + 10.0f;
+    float cb5_approx_x = LEFT_PANEL_X + FORGE_UI_PANEL_PADDING + CB_CLICK_X_OFFSET;
 
     /* ── Simulated frames ─────────────────────────────────────────────── */
 
@@ -416,7 +425,7 @@ int main(int argc, char *argv[])
 
             forge_ui_ctx_label(&ctx, status_buf,
                                LEFT_PANEL_X,
-                               LEFT_PANEL_Y + LEFT_PANEL_H + 12.0f + ascender_px,
+                               LEFT_PANEL_Y + LEFT_PANEL_H + STATUS_LABEL_GAP + ascender_px,
                                STATUS_R, STATUS_G, STATUS_B, STATUS_A);
         }
 
