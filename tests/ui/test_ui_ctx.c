@@ -4327,6 +4327,15 @@ static void test_emit_quad_clipped_degenerate(void)
     forge_ui_ctx_free(&ctx);
 }
 
+/* ── Panel test constants ─────────────────────────────────────────────── */
+
+#define PANEL_X         0.0f   /* default panel origin x */
+#define PANEL_Y         0.0f   /* default panel origin y */
+#define PANEL_W       300.0f   /* standard panel width */
+#define PANEL_H       300.0f   /* standard panel height (content fits) */
+#define SMALL_PANEL_H 200.0f   /* shorter panel height (content overflows) */
+#define ITEM_H         30.0f   /* standard widget / item height */
+
 /* ── panel_begin parameter validation ─────────────────────────────────── */
 
 static void test_panel_begin_null_ctx(void)
@@ -4425,7 +4434,7 @@ static void test_panel_begin_nan_scroll_sanitized(void)
     float scroll_y = NAN;
     if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     ASSERT_NEAR(scroll_y, 0.0f, 0.001f);
     forge_ui_ctx_panel_end(&ctx);
     panel_test_teardown(&ctx);
@@ -4439,7 +4448,7 @@ static void test_panel_begin_negative_scroll_sanitized(void)
     float scroll_y = -10.0f;
     if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     ASSERT_NEAR(scroll_y, 0.0f, 0.001f);
     forge_ui_ctx_panel_end(&ctx);
     panel_test_teardown(&ctx);
@@ -4456,7 +4465,7 @@ static void test_panel_begin_sets_clip(void)
     if (!panel_test_setup(&ctx)) return;
 
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y));
+                (ForgeUiRect){ 10, 20, PANEL_W, 400 }, &scroll_y));
     ASSERT_TRUE(ctx.has_clip);
     ASSERT_TRUE(ctx._panel_active);
     /* Content rect should be inset by padding and title height */
@@ -4464,7 +4473,7 @@ static void test_panel_begin_sets_clip(void)
     ASSERT_NEAR(ctx.clip_rect.y, 20.0f + FORGE_UI_PANEL_TITLE_HEIGHT + FORGE_UI_PANEL_PADDING, 0.01f);
     /* Width = panel.w - 2*padding - scrollbar; height = panel.h - title - 2*padding */
     ASSERT_NEAR(ctx.clip_rect.w,
-                300.0f - 2.0f * FORGE_UI_PANEL_PADDING - FORGE_UI_SCROLLBAR_WIDTH, 0.01f);
+                PANEL_W - 2.0f * FORGE_UI_PANEL_PADDING - FORGE_UI_SCROLLBAR_WIDTH, 0.01f);
     ASSERT_NEAR(ctx.clip_rect.h,
                 400.0f - FORGE_UI_PANEL_TITLE_HEIGHT - 2.0f * FORGE_UI_PANEL_PADDING, 0.01f);
 
@@ -4480,8 +4489,8 @@ static void test_panel_end_clears_clip(void)
     float scroll_y = 0.0f;
     if (!panel_test_setup(&ctx)) return;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     forge_ui_ctx_panel_end(&ctx);
 
     ASSERT_TRUE(!ctx.has_clip);
@@ -4513,8 +4522,8 @@ static void test_panel_end_clamps_scroll(void)
     float scroll_y = 9999.0f;  /* way too large */
     if (!panel_test_setup(&ctx)) return;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     /* No child widgets → content_height = 0 → max_scroll = 0 */
     forge_ui_ctx_panel_end(&ctx);
 
@@ -4531,8 +4540,8 @@ static void test_panel_layout_push_pop_balanced(void)
     if (!panel_test_setup(&ctx)) return;
 
     int depth_before = ctx.layout_depth;
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     ASSERT_EQ_INT(ctx.layout_depth, depth_before + 1);
     forge_ui_ctx_panel_end(&ctx);
     ASSERT_EQ_INT(ctx.layout_depth, depth_before);
@@ -4551,8 +4560,8 @@ static void test_ctx_end_cleans_up_active_panel(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     /* Deliberately skip panel_end */
     forge_ui_ctx_end(&ctx);
 
@@ -4578,11 +4587,11 @@ static void test_panel_scroll_offset_applied(void)
     float scroll_y = 50.0f;
     if (!panel_test_setup(&ctx)) return;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 400 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, 400 }, &scroll_y));
 
     /* Get the first widget rect — should be offset by -scroll_y */
-    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, 30.0f);
+    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, ITEM_H);
     float expected_y = ctx._panel.content_rect.y - scroll_y;
     ASSERT_NEAR(r.y, expected_y, 0.01f);
 
@@ -4598,9 +4607,9 @@ static void test_panel_scroll_zero_no_offset(void)
     float scroll_y = 0.0f;
     if (!panel_test_setup(&ctx)) return;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 400 }, &scroll_y);
-    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, 30.0f);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, 400 }, &scroll_y));
+    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, ITEM_H);
     float expected_y = ctx._panel.content_rect.y;
     ASSERT_NEAR(r.y, expected_y, 0.01f);
 
@@ -4628,7 +4637,7 @@ static void test_panel_begin_layout_stack_full(void)
 
     /* panel_begin should fail because it cannot push another layout */
     bool ok = forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y);
     ASSERT_TRUE(!ok);
     /* State should be rolled back: no clip, no active panel */
     ASSERT_TRUE(!ctx.has_clip);
@@ -4658,8 +4667,8 @@ static void test_panel_end_thumb_clamped_to_track(void)
     /* Panel is just barely tall enough to have a content area
      * but the content area will be shorter than MIN_THUMB (20px) */
     float panel_h = FORGE_UI_PANEL_TITLE_HEIGHT + 2.0f * FORGE_UI_PANEL_PADDING + 15.0f;
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 100, panel_h }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, 100, panel_h }, &scroll_y));
     /* Put a widget taller than visible area to force scrollbar */
     forge_ui_ctx_layout_next(&ctx, 200.0f);
     forge_ui_ctx_panel_end(&ctx);
@@ -4686,8 +4695,8 @@ static void test_free_clears_panel_fields(void)
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
 
     float scroll_y = 0.0f;
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
 
@@ -4711,7 +4720,7 @@ static void test_panel_begin_null_title_ok(void)
     if (!panel_test_setup(&ctx)) return;
 
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, NULL,
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     forge_ui_ctx_panel_end(&ctx);
     panel_test_teardown(&ctx);
 }
@@ -4727,8 +4736,8 @@ static void test_panel_begin_emits_draw_data(void)
     if (!panel_test_setup(&ctx)) return;
 
     int v_before = ctx.vertex_count;
-    forge_ui_ctx_panel_begin(&ctx, 1, "Title",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Title",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     /* Should emit at least bg (4v) + title bar (4v) + title text */
     ASSERT_TRUE(ctx.vertex_count > v_before + 8);
 
@@ -4746,11 +4755,11 @@ static void test_panel_end_scrollbar_on_overflow(void)
     float scroll_y = 0.0f;
     if (!panel_test_setup(&ctx)) return;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, SMALL_PANEL_H }, &scroll_y));
     /* Emit many widgets to overflow the panel */
     for (int i = 0; i < 20; i++) {
-        forge_ui_ctx_layout_next(&ctx, 30.0f);
+        forge_ui_ctx_layout_next(&ctx, ITEM_H);
     }
     int v_before_end = ctx.vertex_count;
     forge_ui_ctx_panel_end(&ctx);
@@ -4772,8 +4781,8 @@ static void test_panel_end_no_scrollbar_zero_track(void)
      * title=30 + 2*pad=20 = 50, so a 51px panel gives ~1px content.
      * A 50px panel gives 0px content. */
     float panel_h = FORGE_UI_PANEL_TITLE_HEIGHT + 2.0f * FORGE_UI_PANEL_PADDING;
-    forge_ui_ctx_panel_begin(&ctx, 1, "T",
-                (ForgeUiRect){ 0, 0, 100, panel_h }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "T",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, 100, panel_h }, &scroll_y));
     /* Place a widget to force overflow */
     forge_ui_ctx_layout_next(&ctx, 100.0f);
     int v_before_end = ctx.vertex_count;
@@ -4792,8 +4801,8 @@ static void test_panel_end_no_scrollbar_when_fits(void)
     float scroll_y = 0.0f;
     if (!panel_test_setup(&ctx)) return;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 500 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, 500 }, &scroll_y));
     /* Single small widget that fits */
     forge_ui_ctx_layout_next(&ctx, 20.0f);
     int v_before_end = ctx.vertex_count;
@@ -4820,8 +4829,8 @@ static void test_panel_mouse_wheel_scroll(void)
     forge_ui_ctx_begin(&ctx, content_x, content_y, false);
     ctx.scroll_delta = 2.0f;  /* scroll down */
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, PANEL_W, 400 }, &scroll_y));
     /* scroll_y should be updated by delta * speed */
     ASSERT_NEAR(scroll_y, 2.0f * FORGE_UI_SCROLL_SPEED, 0.01f);
 
@@ -4844,8 +4853,8 @@ static void test_panel_mouse_wheel_nan_ignored(void)
     forge_ui_ctx_begin(&ctx, content_x, content_y, false);
     ctx.scroll_delta = NAN;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, PANEL_W, 400 }, &scroll_y));
     /* NaN delta should be rejected; scroll_y stays at 50 */
     ASSERT_NEAR(scroll_y, 50.0f, 0.01f);
 
@@ -4868,8 +4877,8 @@ static void test_panel_mouse_wheel_inf_ignored(void)
     forge_ui_ctx_begin(&ctx, content_x, content_y, false);
     ctx.scroll_delta = INFINITY;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, PANEL_W, 400 }, &scroll_y));
     /* +Inf delta should be rejected; scroll_y stays at 50 */
     ASSERT_NEAR(scroll_y, 50.0f, 0.01f);
 
@@ -4891,8 +4900,8 @@ static void test_panel_mouse_wheel_neg_inf_ignored(void)
     forge_ui_ctx_begin(&ctx, content_x, content_y, false);
     ctx.scroll_delta = -INFINITY;
 
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, PANEL_W, 400 }, &scroll_y));
     /* -Inf delta should be rejected; scroll_y stays at 50 */
     ASSERT_NEAR(scroll_y, 50.0f, 0.01f);
 
@@ -4990,12 +4999,12 @@ static void test_panel_scroll_preclamp_on_panel_resize(void)
 
     /* Frame 1: small panel (200px) with enough content to scroll */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_panel_begin(&ctx, 1, "List",
-                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, SMALL_PANEL_H }, &scroll_y));
     /* 10 items × (30+8 spacing) ≈ 370px content in ~150px visible area.
      * max_scroll ≈ 220. */
     for (int i = 0; i < 10; i++) {
-        forge_ui_ctx_layout_next(&ctx, 30.0f);
+        forge_ui_ctx_layout_next(&ctx, ITEM_H);
     }
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
@@ -5009,14 +5018,14 @@ static void test_panel_scroll_preclamp_on_panel_resize(void)
      * (~560): prev_max = 370-560 = negative → 0.  scroll_y (200) > 0,
      * so it clamps to 0 immediately — no blank-space flash. */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_panel_begin(&ctx, 1, "List",
-                (ForgeUiRect){ 0, 0, 300, 600 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, 600 }, &scroll_y));
 
     /* scroll_y should already be 0 thanks to pre-clamp */
     ASSERT_NEAR(scroll_y, 0.0f, 0.01f);
 
     /* First widget should be at content area top, not offset */
-    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, 30.0f);
+    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, ITEM_H);
     ASSERT_NEAR(r.y, ctx._panel.content_rect.y, 0.01f);
 
     forge_ui_ctx_panel_end(&ctx);
@@ -5036,15 +5045,15 @@ static void test_panel_preclamp_skips_different_panel(void)
     /* Frame 1: panel A (tall content → scrollable), then panel B (short). */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
 
-    forge_ui_ctx_panel_begin(&ctx, 10, "A",
-                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_a);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 10, "A",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, SMALL_PANEL_H }, &scroll_a));
     for (int i = 0; i < 15; i++)          /* ~570px content in ~150px view */
-        forge_ui_ctx_layout_next(&ctx, 30.0f);
+        forge_ui_ctx_layout_next(&ctx, ITEM_H);
     forge_ui_ctx_panel_end(&ctx);
 
-    forge_ui_ctx_panel_begin(&ctx, 20, "B",
-                (ForgeUiRect){ 310, 0, 300, 200 }, &scroll_b);
-    forge_ui_ctx_layout_next(&ctx, 30.0f); /* little content — max_scroll ≈ 0 */
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 20, "B",
+                (ForgeUiRect){ 310, PANEL_Y, PANEL_W, SMALL_PANEL_H }, &scroll_b));
+    forge_ui_ctx_layout_next(&ctx, ITEM_H); /* little content — max_scroll ≈ 0 */
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
 
@@ -5057,14 +5066,14 @@ static void test_panel_preclamp_skips_different_panel(void)
      * the last panel_end.  The pre-clamp must detect the id mismatch
      * (20 != 10) and skip, preserving scroll_a = 100. */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_panel_begin(&ctx, 10, "A",
-                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_a);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 10, "A",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, SMALL_PANEL_H }, &scroll_a));
 
     /* scroll_a should remain 100 — NOT clamped by B's tiny content */
     ASSERT_NEAR(scroll_a, 100.0f, 0.01f);
 
     for (int i = 0; i < 15; i++)
-        forge_ui_ctx_layout_next(&ctx, 30.0f);
+        forge_ui_ctx_layout_next(&ctx, ITEM_H);
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -5080,10 +5089,10 @@ static void test_panel_scroll_content_shrink_one_frame_lag(void)
 
     /* Frame 1: lots of content, scroll to 400px */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_panel_begin(&ctx, 1, "List",
-                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, SMALL_PANEL_H }, &scroll_y));
     for (int i = 0; i < 30; i++) {
-        forge_ui_ctx_layout_next(&ctx, 30.0f);
+        forge_ui_ctx_layout_next(&ctx, ITEM_H);
     }
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
@@ -5094,10 +5103,10 @@ static void test_panel_scroll_content_shrink_one_frame_lag(void)
      * here because it uses the previous frame's (large) content_height.
      * But panel_end WILL clamp scroll_y to the new max_scroll. */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_panel_begin(&ctx, 1, "List",
-                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, SMALL_PANEL_H }, &scroll_y));
     for (int i = 0; i < 3; i++) {
-        forge_ui_ctx_layout_next(&ctx, 30.0f);
+        forge_ui_ctx_layout_next(&ctx, ITEM_H);
     }
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
@@ -5108,9 +5117,9 @@ static void test_panel_scroll_content_shrink_one_frame_lag(void)
 
     /* Frame 3: with scroll_y now 0, content is properly visible */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_panel_begin(&ctx, 1, "List",
-                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
-    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, 30.0f);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, SMALL_PANEL_H }, &scroll_y));
+    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, ITEM_H);
     ASSERT_NEAR(r.y, ctx._panel.content_rect.y, 0.01f);  /* visible */
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
@@ -5232,7 +5241,7 @@ static void test_panel_begin_id_max_minus_one_ok(void)
 
     /* UINT32_MAX-1 is valid; scrollbar uses id+1 = UINT32_MAX (non-zero) */
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, UINT32_MAX - 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     ASSERT_TRUE(ctx._panel_active);
     ASSERT_EQ_U32(ctx._panel.id, UINT32_MAX - 1);
 
@@ -5250,8 +5259,8 @@ static void test_ctx_begin_resets_panel_state(void)
 
     /* Frame 1: open and close a panel normally */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
-                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ PANEL_X, PANEL_Y, PANEL_W, PANEL_H }, &scroll_y));
     forge_ui_ctx_panel_end(&ctx);
     forge_ui_ctx_end(&ctx);
 
