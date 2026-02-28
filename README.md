@@ -190,8 +190,8 @@ and a reusable implementation added to the shared math library.
 ### Engine Lessons (lessons/engine/)
 
 The practical engineering. CMake, C fundamentals, pointers and memory,
-header-only libraries, debuggers, RenderDoc, HLSL shared headers, and a CPU
-triangle rasterizer.
+header-only libraries, debuggers, RenderDoc, HLSL shared headers, CPU
+rasterization, and git version control.
 
 | # | Topic | What you'll learn |
 |---|-------|-------------------|
