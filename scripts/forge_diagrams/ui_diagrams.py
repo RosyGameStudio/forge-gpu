@@ -6859,7 +6859,7 @@ def diagram_uv_remap_on_clip():
     ax.text(
         clipped_u1,
         uv_y0 - 0.3,
-        f"u'={t:.1f}",
+        f"u'={clipped_u1:.1f}",
         color=STYLE["accent3"],
         fontsize=8,
         ha="center",
@@ -7057,16 +7057,16 @@ def diagram_mouse_wheel_and_drag():
         path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
     )
 
-    # Scroll direction arrow
+    # Scroll direction arrow (content moves up when scrolling down)
     ax.annotate(
         "",
-        xy=(mouse_x, mouse_y - 1.5),
-        xytext=(mouse_x, mouse_y - 0.3),
+        xy=(mouse_x, mouse_y + 1.5),
+        xytext=(mouse_x, mouse_y + 0.3),
         arrowprops={"arrowstyle": "->", "color": STYLE["accent1"], "lw": 2.5},
     )
     ax.text(
         mouse_x - 1,
-        mouse_y - 1.0,
+        mouse_y + 1.0,
         "content\nmoves up",
         color=STYLE["accent1"],
         fontsize=8,

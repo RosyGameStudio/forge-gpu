@@ -701,6 +701,15 @@ static inline bool forge_ui__rect_contains(ForgeUiRect rect,
            py >= rect.y && py < rect.y + rect.h;
 }
 
+/* Compute the font's pixel-space ascender for baseline positioning.
+ * Returns 0.0f if atlas is NULL or has no em data. */
+static inline float forge_ui__ascender_px(const ForgeUiFontAtlas *atlas)
+{
+    if (!atlas || atlas->units_per_em == 0) return 0.0f;
+    float scale = atlas->pixel_height / (float)atlas->units_per_em;
+    return (float)atlas->ascender * scale;
+}
+
 /* Test whether the mouse is over a widget, respecting the clip rect.
  * When clipping is active, a widget that has been scrolled out of the
  * visible area must not respond to mouse interaction. */
@@ -1245,20 +1254,11 @@ static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
     /* Measure text to compute centering offsets */
     ForgeUiTextMetrics metrics = forge_ui_text_measure(ctx->atlas, text, NULL);
 
-    /* Compute the font's pixel-space ascender for baseline calculation.
-     * The ascender tells us how far above the baseline the tallest glyph
-     * extends -- we need this to convert from "top of text" to baseline. */
-    float scale = 0.0f;
-    float ascender_px = 0.0f;
-    if (ctx->atlas->units_per_em > 0) {
-        scale = ctx->atlas->pixel_height / (float)ctx->atlas->units_per_em;
-        ascender_px = (float)ctx->atlas->ascender * scale;
-    }
-
     /* Center the text within the button rectangle.
      * Horizontal: offset by half the difference between rect width and text width.
      * Vertical: place the baseline so that the text is vertically centered.
      * The baseline y = rect_center_y - text_half_height + ascender. */
+    float ascender_px = forge_ui__ascender_px(ctx->atlas);
     float text_x = rect.x + (rect.w - metrics.width) * 0.5f;
     float text_y = rect.y + (rect.h - metrics.height) * 0.5f + ascender_px;
 
@@ -1348,13 +1348,7 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
     /* ── Label baseline alignment ────────────────────────────────────── */
     /* The font origin is at the baseline, not the top of the em square.
      * Offset by the ascender so text sits visually centered in the rect. */
-    float scale = 0.0f;
-    float ascender_px = 0.0f;
-    if (ctx->atlas->units_per_em > 0) {
-        scale = ctx->atlas->pixel_height / (float)ctx->atlas->units_per_em;
-        ascender_px = (float)ctx->atlas->ascender * scale;
-    }
-    (void)scale;  /* only ascender_px is needed for baseline placement */
+    float ascender_px = forge_ui__ascender_px(ctx->atlas);
 
     float label_x = box_x + FORGE_UI_CB_BOX_SIZE + FORGE_UI_CB_LABEL_GAP;
     float label_y = rect.y + (rect.h - ctx->atlas->pixel_height) * 0.5f
@@ -1660,13 +1654,7 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
     }
 
     /* ── Compute font metrics for baseline positioning ───────────────── */
-    float scale = 0.0f;
-    float ascender_px = 0.0f;
-    if (ctx->atlas->units_per_em > 0) {
-        scale = ctx->atlas->pixel_height / (float)ctx->atlas->units_per_em;
-        ascender_px = (float)ctx->atlas->ascender * scale;
-    }
-    (void)scale;  /* only ascender_px needed for baseline placement */
+    float ascender_px = forge_ui__ascender_px(ctx->atlas);
 
     /* Vertically center the text within the rect: offset to the top of
      * the em square, then add the ascender to reach the baseline where
@@ -1872,11 +1860,7 @@ static inline void forge_ui_ctx_label_layout(ForgeUiContext *ctx,
 
     /* Compute baseline position within the rect: vertically center the
      * em square, then offset by the ascender to reach the baseline. */
-    float ascender_px = 0.0f;
-    if (ctx->atlas->units_per_em > 0) {
-        float scale = ctx->atlas->pixel_height / (float)ctx->atlas->units_per_em;
-        ascender_px = (float)ctx->atlas->ascender * scale;
-    }
+    float ascender_px = forge_ui__ascender_px(ctx->atlas);
     float text_y = rect.y + (rect.h - ctx->atlas->pixel_height) * 0.5f
                    + ascender_px;
 
@@ -1979,11 +1963,7 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
     /* Center the title text in the title bar */
     if (title && title[0] != '\0') {
         ForgeUiTextMetrics m = forge_ui_text_measure(ctx->atlas, title, NULL);
-        float ascender_px = 0.0f;
-        if (ctx->atlas->units_per_em > 0) {
-            float scale = ctx->atlas->pixel_height / (float)ctx->atlas->units_per_em;
-            ascender_px = (float)ctx->atlas->ascender * scale;
-        }
+        float ascender_px = forge_ui__ascender_px(ctx->atlas);
         float tx = rect.x + (rect.w - m.width) * 0.5f;
         float ty = rect.y + (FORGE_UI_PANEL_TITLE_HEIGHT - m.height) * 0.5f
                    + ascender_px;

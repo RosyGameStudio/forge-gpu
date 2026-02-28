@@ -240,6 +240,14 @@ buffers.
   reused for the scrollbar thumb
 - **[UI Lesson 08](../08-layout/)** -- layout system that panels use internally
   (push/pop layout, layout_next)
+- **[Math Lesson 01](../../math/01-vectors/)** -- 2D vectors and positions
+  that underpin `ForgeUiRect` and the clipping math in `panel_begin`/`panel_end`
+- **[Math Lesson 03](../../math/03-bilinear-interpolation/)** -- linear
+  interpolation (lerp) used to remap UVs when clipping quads
+- **[Engine Lesson 04](../../engine/04-pointers-and-memory/)** -- structs and
+  memory layout behind `ForgeUiPanel` and the vertex/index buffers
+- **[Engine Lesson 05](../../engine/05-header-only-libraries/)** -- the
+  header-only library pattern used by `forge_ui_ctx.h`
 - **[common/ui/forge_ui_ctx.h](../../../common/ui/forge_ui_ctx.h)** -- the
   header-only library where `ForgeUiPanel`, `panel_begin`, and `panel_end` live
 

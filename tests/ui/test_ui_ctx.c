@@ -188,6 +188,57 @@ static void test_rect_contains_zero_size(void)
     ASSERT_TRUE(!forge_ui__rect_contains(r, 10.0f, 20.0f));
 }
 
+/* ── forge_ui__ascender_px tests ────────────────────────────────────────── */
+
+static void test_ascender_px_normal(void)
+{
+    TEST("ascender_px: computes correct value from real atlas");
+    if (!setup_atlas()) return;
+
+    float result = forge_ui__ascender_px(&test_atlas);
+
+    /* Compute expected value from atlas fields using the same formula */
+    float scale = test_atlas.pixel_height / (float)test_atlas.units_per_em;
+    float expected = (float)test_atlas.ascender * scale;
+    ASSERT_NEAR(result, expected, 0.001f);
+
+    /* Sanity: result should be positive for a real font (ascender > 0) */
+    ASSERT_TRUE(result > 0.0f);
+}
+
+static void test_ascender_px_null_atlas(void)
+{
+    TEST("ascender_px: returns 0 for NULL atlas");
+    float result = forge_ui__ascender_px(NULL);
+    ASSERT_NEAR(result, 0.0f, 0.001f);
+}
+
+static void test_ascender_px_zero_upm(void)
+{
+    TEST("ascender_px: returns 0 when units_per_em is 0");
+    ForgeUiFontAtlas fake;
+    SDL_memset(&fake, 0, sizeof(fake));
+    fake.pixel_height = 28.0f;
+    fake.units_per_em = 0;     /* invalid / zero */
+    fake.ascender     = 800;
+
+    float result = forge_ui__ascender_px(&fake);
+    ASSERT_NEAR(result, 0.0f, 0.001f);
+}
+
+static void test_ascender_px_zero_ascender(void)
+{
+    TEST("ascender_px: returns 0 when ascender is 0");
+    ForgeUiFontAtlas fake;
+    SDL_memset(&fake, 0, sizeof(fake));
+    fake.pixel_height = 28.0f;
+    fake.units_per_em = 2048;
+    fake.ascender     = 0;     /* ascender is zero */
+
+    float result = forge_ui__ascender_px(&fake);
+    ASSERT_NEAR(result, 0.0f, 0.001f);
+}
+
 /* ── forge_ui_ctx_init tests ────────────────────────────────────────────── */
 
 static void test_init_success(void)
@@ -4044,12 +4095,14 @@ static void test_button_layout_null_atlas_no_advance(void)
 
 /* ── Panel and scrolling tests (Lesson 09 audit) ───────────────────────── */
 
-/* Helper: set up a ctx with atlas for panel tests */
-static void panel_test_setup(ForgeUiContext *ctx)
+/* Helper: set up a ctx with atlas for panel tests.
+ * Returns true on success; callers must check before using ctx. */
+static bool panel_test_setup(ForgeUiContext *ctx)
 {
-    if (!setup_atlas()) return;
-    forge_ui_ctx_init(ctx, &test_atlas);
+    if (!setup_atlas()) return false;
+    if (!forge_ui_ctx_init(ctx, &test_atlas)) return false;
     forge_ui_ctx_begin(ctx, 0.0f, 0.0f, false);
+    return true;
 }
 
 static void panel_test_teardown(ForgeUiContext *ctx)
@@ -4268,7 +4321,7 @@ static void test_panel_begin_null_scroll_y(void)
     TEST("panel_begin: null scroll_y returns false");
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 200, 200 }, NULL));
     panel_test_teardown(&ctx);
@@ -4280,7 +4333,7 @@ static void test_panel_begin_id_zero(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, FORGE_UI_ID_NONE, "Test",
                 (ForgeUiRect){ 0, 0, 200, 200 }, &scroll_y));
     panel_test_teardown(&ctx);
@@ -4292,7 +4345,7 @@ static void test_panel_begin_id_uint32_max(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, UINT32_MAX, "Test",
                 (ForgeUiRect){ 0, 0, 200, 200 }, &scroll_y));
     panel_test_teardown(&ctx);
@@ -4304,7 +4357,7 @@ static void test_panel_begin_nested_rejected(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y1 = 0.0f, scroll_y2 = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 10, "Panel A",
                 (ForgeUiRect){ 0, 0, 200, 200 }, &scroll_y1));
@@ -4325,7 +4378,7 @@ static void test_panel_begin_zero_width_rejected(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 0, 200 }, &scroll_y));
     panel_test_teardown(&ctx);
@@ -4337,7 +4390,7 @@ static void test_panel_begin_negative_height_rejected(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 200, -50 }, &scroll_y));
     panel_test_teardown(&ctx);
@@ -4349,7 +4402,7 @@ static void test_panel_begin_nan_scroll_sanitized(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = NAN;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
     ASSERT_NEAR(scroll_y, 0.0f, 0.001f);
@@ -4363,7 +4416,7 @@ static void test_panel_begin_negative_scroll_sanitized(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = -10.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
     ASSERT_NEAR(scroll_y, 0.0f, 0.001f);
@@ -4379,7 +4432,7 @@ static void test_panel_begin_sets_clip(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y));
@@ -4404,7 +4457,7 @@ static void test_panel_end_clears_clip(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
@@ -4421,7 +4474,7 @@ static void test_panel_end_without_begin(void)
     TEST("panel_end: no-op when no panel is active");
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     int depth_before = ctx.layout_depth;
     forge_ui_ctx_panel_end(&ctx);  /* should be no-op */
@@ -4437,7 +4490,7 @@ static void test_panel_end_clamps_scroll(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 9999.0f;  /* way too large */
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
@@ -4454,7 +4507,7 @@ static void test_panel_layout_push_pop_balanced(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     int depth_before = ctx.layout_depth;
     forge_ui_ctx_panel_begin(&ctx, 1, "Test",
@@ -4497,7 +4550,7 @@ static void test_panel_scroll_offset_applied(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 50.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 300, 400 }, &scroll_y);
@@ -4517,7 +4570,7 @@ static void test_panel_scroll_zero_no_offset(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 300, 400 }, &scroll_y);
@@ -4537,7 +4590,7 @@ static void test_panel_begin_layout_stack_full(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     /* Fill the layout stack to max */
     ForgeUiRect area = { 0, 0, 500, 500 };
@@ -4570,7 +4623,7 @@ static void test_panel_end_thumb_clamped_to_track(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     /* Panel is just barely tall enough to have a content area
      * but the content area will be shorter than MIN_THUMB (20px) */
@@ -4625,7 +4678,7 @@ static void test_panel_begin_null_title_ok(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, NULL,
                 (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
@@ -4641,7 +4694,7 @@ static void test_panel_begin_emits_draw_data(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     int v_before = ctx.vertex_count;
     forge_ui_ctx_panel_begin(&ctx, 1, "Title",
@@ -4661,7 +4714,7 @@ static void test_panel_end_scrollbar_on_overflow(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
@@ -4683,7 +4736,7 @@ static void test_panel_end_no_scrollbar_zero_track(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     /* Panel barely has room for the title bar — content_rect.h ≈ 0.
      * title=30 + 2*pad=20 = 50, so a 51px panel gives ~1px content.
@@ -4707,7 +4760,7 @@ static void test_panel_end_no_scrollbar_when_fits(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 300, 500 }, &scroll_y);
@@ -4928,7 +4981,7 @@ static void test_panel_begin_nan_width_rejected(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, NAN, 200 }, &scroll_y));
     ASSERT_TRUE(!ctx._panel_active);
@@ -4941,7 +4994,7 @@ static void test_panel_begin_nan_height_rejected(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
     ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
                 (ForgeUiRect){ 0, 0, 200, NAN }, &scroll_y));
     ASSERT_TRUE(!ctx._panel_active);
@@ -4978,7 +5031,7 @@ static void test_panel_begin_id_max_minus_one_ok(void)
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
     float scroll_y = 0.0f;
-    panel_test_setup(&ctx);
+    if (!panel_test_setup(&ctx)) return;
 
     /* UINT32_MAX-1 is valid; scrollbar uses id+1 = UINT32_MAX (non-zero) */
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, UINT32_MAX - 1, "Test",
@@ -5042,6 +5095,12 @@ int main(int argc, char *argv[])
     test_rect_contains_top_edge();
     test_rect_contains_bottom_edge();
     test_rect_contains_zero_size();
+
+    /* Ascender pixel helper */
+    test_ascender_px_normal();
+    test_ascender_px_null_atlas();
+    test_ascender_px_zero_upm();
+    test_ascender_px_zero_ascender();
 
     /* Init */
     test_init_success();
