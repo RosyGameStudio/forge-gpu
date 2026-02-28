@@ -507,7 +507,7 @@ forge-gpu/
 │   │   └── README.md      Usage guide, scene hierarchy, materials
 │   ├── ui/                UI library (font parsing, atlas, immediate-mode controls)
 │   │   ├── forge_ui.h     TTF parser, rasterizer, atlas packer (header-only)
-│   │   ├── forge_ui_ctx.h Immediate-mode context: labels, buttons, checkboxes, sliders, text input, layout
+│   │   ├── forge_ui_ctx.h Immediate-mode context: labels, buttons, checkboxes, sliders, text input, layout, panels
 │   │   └── README.md      Usage guide and supported features
 │   ├── raster/            CPU triangle rasterizer (edge function method)
 │   │   └── forge_raster.h Rasterizer implementation (header-only)
