@@ -679,8 +679,12 @@ static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
  *
  * Returns false without drawing if validation fails: NULL ctx/atlas/scroll_y,
  * nested panel (one already active), id == FORGE_UI_ID_NONE or UINT32_MAX,
- * or non-positive rect dimensions.  On false the caller must still call
- * panel_end (which is a safe no-op when no panel is active). */
+ * non-finite rect origin, or non-positive rect dimensions.
+ *
+ * On false the caller must NOT call panel_end.  In the nested-panel case
+ * an outer panel is still active, and calling panel_end would close that
+ * outer panel instead of the rejected one.  Only call panel_end after
+ * panel_begin returns true. */
 static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
                                              Uint32 id,
                                              const char *title,
@@ -1945,6 +1949,14 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
     if (id >= UINT32_MAX) {
         SDL_Log("forge_ui_ctx_panel_begin: id must be < UINT32_MAX "
                 "(scrollbar uses id+1)");
+        return false;
+    }
+
+    /* Reject non-finite origin.  NaN or ±Inf in rect.x/rect.y would
+     * propagate into every vertex position, clip rect, and content area
+     * computation, corrupting the draw data. */
+    if (!isfinite(rect.x) || !isfinite(rect.y)) {
+        SDL_Log("forge_ui_ctx_panel_begin: rect origin must be finite");
         return false;
     }
 

@@ -5146,6 +5146,58 @@ static void test_panel_begin_nan_height_rejected(void)
     panel_test_teardown(&ctx);
 }
 
+static void test_panel_begin_nan_x_rejected(void)
+{
+    TEST("panel_begin: NaN x rejected");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    if (!panel_test_setup(&ctx)) return;
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ NAN, 0, 200, 200 }, &scroll_y));
+    ASSERT_TRUE(!ctx._panel_active);
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_inf_x_rejected(void)
+{
+    TEST("panel_begin: +Inf x rejected");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    if (!panel_test_setup(&ctx)) return;
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ INFINITY, 0, 200, 200 }, &scroll_y));
+    ASSERT_TRUE(!ctx._panel_active);
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_nan_y_rejected(void)
+{
+    TEST("panel_begin: NaN y rejected");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    if (!panel_test_setup(&ctx)) return;
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, NAN, 200, 200 }, &scroll_y));
+    ASSERT_TRUE(!ctx._panel_active);
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_inf_y_rejected(void)
+{
+    TEST("panel_begin: +Inf y rejected");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    if (!panel_test_setup(&ctx)) return;
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, INFINITY, 200, 200 }, &scroll_y));
+    ASSERT_TRUE(!ctx._panel_active);
+    panel_test_teardown(&ctx);
+}
+
 static void test_emit_quad_clipped_zero_height(void)
 {
     TEST("emit_quad_clipped: zero-height quad emits nothing");
@@ -5512,6 +5564,10 @@ int main(int argc, char *argv[])
     test_panel_begin_negative_height_rejected();
     test_panel_begin_nan_width_rejected();
     test_panel_begin_nan_height_rejected();
+    test_panel_begin_nan_x_rejected();
+    test_panel_begin_inf_x_rejected();
+    test_panel_begin_nan_y_rejected();
+    test_panel_begin_inf_y_rejected();
     test_panel_begin_nan_scroll_sanitized();
     test_panel_begin_negative_scroll_sanitized();
 
