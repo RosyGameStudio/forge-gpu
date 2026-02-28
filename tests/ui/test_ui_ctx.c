@@ -4802,6 +4802,100 @@ static void test_text_input_partially_visible_accepts_keyboard(void)
     forge_ui_ctx_free(&ctx);
 }
 
+/* ── Scroll pre-clamp: content shrinkage ──────────────────────────────────── */
+
+static void test_panel_scroll_preclamp_on_panel_resize(void)
+{
+    TEST("panel_begin: pre-clamps scroll_y when visible area grows");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+
+    /* Frame 1: small panel (200px) with enough content to scroll */
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+    forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    /* 10 items × (30+8 spacing) ≈ 370px content in ~150px visible area.
+     * max_scroll ≈ 220. */
+    for (int i = 0; i < 10; i++) {
+        forge_ui_ctx_layout_next(&ctx, 30.0f);
+    }
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Scroll to 200px (valid for this panel size) */
+    scroll_y = 200.0f;
+
+    /* Frame 2: panel grows to 600px — visible area is now ~560px.
+     * Same 10 items (~370px) now FIT entirely, so max_scroll = 0.
+     * The pre-clamp uses prev content_height (~370) and new visible_h
+     * (~560): prev_max = 370-560 = negative → 0.  scroll_y (200) > 0,
+     * so it clamps to 0 immediately — no blank-space flash. */
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+    forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ 0, 0, 300, 600 }, &scroll_y);
+
+    /* scroll_y should already be 0 thanks to pre-clamp */
+    ASSERT_NEAR(scroll_y, 0.0f, 0.01f);
+
+    /* First widget should be at content area top, not offset */
+    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, 30.0f);
+    ASSERT_NEAR(r.y, ctx._panel.content_rect.y, 0.01f);
+
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_panel_scroll_content_shrink_one_frame_lag(void)
+{
+    TEST("panel_end: clamps scroll_y after content shrinks (one-frame lag)");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+
+    /* Frame 1: lots of content, scroll to 400px */
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+    forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    for (int i = 0; i < 30; i++) {
+        forge_ui_ctx_layout_next(&ctx, 30.0f);
+    }
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    scroll_y = 400.0f;
+
+    /* Frame 2: content shrinks to 3 items.  The pre-clamp cannot help
+     * here because it uses the previous frame's (large) content_height.
+     * But panel_end WILL clamp scroll_y to the new max_scroll. */
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+    forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    for (int i = 0; i < 3; i++) {
+        forge_ui_ctx_layout_next(&ctx, 30.0f);
+    }
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* After panel_end's final clamp, scroll_y should be 0
+     * (3 items fit within the visible area) */
+    ASSERT_NEAR(scroll_y, 0.0f, 0.01f);
+
+    /* Frame 3: with scroll_y now 0, content is properly visible */
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+    forge_ui_ctx_panel_begin(&ctx, 1, "List",
+                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, 30.0f);
+    ASSERT_NEAR(r.y, ctx._panel.content_rect.y, 0.01f);  /* visible */
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    forge_ui_ctx_free(&ctx);
+}
+
 /* ── Additional validation tests (review pass) ───────────────────────────── */
 
 static void test_panel_begin_nan_width_rejected(void)
@@ -5216,6 +5310,10 @@ int main(int argc, char *argv[])
     test_panel_begin_emits_draw_data();
     test_panel_begin_null_title_ok();
     test_panel_mouse_wheel_scroll();
+
+    /* Panels -- scroll pre-clamp */
+    test_panel_scroll_preclamp_on_panel_resize();
+    test_panel_scroll_content_shrink_one_frame_lag();
 
     /* Panels -- ctx_begin reset */
     test_ctx_begin_resets_panel_state();

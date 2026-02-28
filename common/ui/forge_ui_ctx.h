@@ -1995,13 +1995,36 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
     if (content.w < 0.0f) content.w = 0.0f;
     if (content.h < 0.0f) content.h = 0.0f;
 
+    /* ── Pre-clamp scroll_y using last frame's content height ────────── */
+    /* The previous panel_end stored content_height in _panel.  Use it
+     * to clamp the *incoming* scroll_y before applying the scroll offset
+     * to widget positions.  This helps when the visible area grows
+     * (e.g. panel resize): prev_max shrinks and the stale scroll_y
+     * that was valid last frame now exceeds the new max.
+     *
+     * Limitation: when content *shrinks* between frames (e.g. items
+     * removed from a list), prev_max is based on the old (large)
+     * content height, so it won't clamp aggressively enough.  The
+     * panel may show blank space for one frame until panel_end
+     * recomputes the true max.  This one-frame lag is inherent to
+     * immediate-mode UI — the current frame's content height is not
+     * known until all widgets have been placed.
+     *
+     * On the very first frame content_height is 0, so prev_max is 0
+     * and any stale scroll_y is clamped to 0 — correct behavior. */
+    float prev_max = ctx->_panel.content_height - content.h;
+    if (prev_max < 0.0f) prev_max = 0.0f;
+    if (*scroll_y > prev_max) *scroll_y = prev_max;
+
     /* ── Store panel state ────────────────────────────────────────────── */
     ctx->_panel.rect = rect;
     ctx->_panel.content_rect = content;
     ctx->_panel.scroll_y = scroll_y;
-    ctx->_panel.content_height = 0.0f;
     ctx->_panel.id = id;
     ctx->_panel_active = true;
+    /* content_height is intentionally NOT zeroed here.  The previous
+     * frame's value is needed for the pre-clamp above; panel_end will
+     * overwrite it with this frame's measured height. */
 
     /* ── Apply mouse wheel scrolling ──────────────────────────────────── */
     if (ctx->scroll_delta != 0.0f &&
