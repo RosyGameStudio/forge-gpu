@@ -7168,7 +7168,7 @@ def diagram_mouse_wheel_and_drag():
     ax.text(
         px + pw / 2,
         py - 0.6,
-        "scroll_y = (thumb_y - track_y) / (track_h - thumb_h) * max_scroll",
+        "scroll_y = (track_y + track_h - thumb_h - thumb_y) / (track_h - thumb_h) * max_scroll",
         color=STYLE["warn"],
         fontsize=7,
         family="monospace",

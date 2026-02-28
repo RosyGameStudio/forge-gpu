@@ -4820,7 +4820,6 @@ static void test_text_input_clipped_ignores_keyboard(void)
     TEST("text_input: keyboard input suppressed when clipped out of view");
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
-    float scroll_y = 0.0f;
     if (!forge_ui_ctx_init(&ctx, &test_atlas)) return;
 
     /* Frame 1: click to focus the text input */
@@ -4860,7 +4859,6 @@ static void test_text_input_partially_visible_accepts_keyboard(void)
     TEST("text_input: keyboard input accepted when partially visible in clip");
     if (!setup_atlas()) return;
     ForgeUiContext ctx;
-    float scroll_y = 0.0f;
     if (!forge_ui_ctx_init(&ctx, &test_atlas)) return;
 
     /* Frame 1: focus the text input */
