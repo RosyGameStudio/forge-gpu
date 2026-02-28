@@ -107,6 +107,51 @@ static int fail_count = 0;
 #define ASCII_END         126
 #define ASCII_COUNT       (ASCII_END - ASCII_START + 1)
 
+/* ── Test constants ────────────────────────────────────────────────────── */
+
+/* Standard window geometry used across most tests */
+#define TEST_WIN_X        10.0f
+#define TEST_WIN_Y        10.0f
+#define TEST_WIN_W        200.0f
+#define TEST_WIN_H        200.0f
+
+/* Larger window used in draw-data tests */
+#define TEST_WIN_DRAW_W   250.0f
+#define TEST_WIN_DRAW_H   300.0f
+
+/* Second overlapping window position */
+#define TEST_WIN2_X       50.0f
+#define TEST_WIN2_Y       50.0f
+
+/* Window IDs */
+#define TEST_WIN_ID_1     100u
+#define TEST_WIN_ID_2     200u
+
+/* Label rendering */
+#define TEST_LABEL_PX     24
+#define TEST_LABEL_R      0.9f
+#define TEST_LABEL_G      0.9f
+#define TEST_LABEL_B      0.9f
+#define TEST_LABEL_A      1.0f
+
+/* Drag test */
+#define TEST_DRAG_PRESS_X 150.0f   /* title bar center: 50 + 200*0.5 */
+#define TEST_DRAG_PRESS_Y  65.0f   /* title bar center: 50 + 15      */
+#define TEST_DRAG_DELTA_X  30.0f
+#define TEST_DRAG_DELTA_Y  20.0f
+
+/* Mouse position outside all windows */
+#define TEST_MOUSE_FAR    500.0f
+
+/* Prev-frame-data test */
+#define TEST_PREV_WIN_X   100.0f
+#define TEST_PREV_WIN_Y   200.0f
+#define TEST_PREV_WIN_W   300.0f
+#define TEST_PREV_WIN_H   400.0f
+#define TEST_PREV_WIN_Z   5
+#define TEST_PREV_WIN_ID  42u
+#define TEST_NEAR_EPS     0.01f
+
 static ForgeUiFont      test_font;
 static ForgeUiFontAtlas  test_atlas;
 static bool font_loaded  = false;
@@ -244,7 +289,7 @@ static void test_free_clears_ctx(void)
     }
 
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
     forge_ui_wctx_free(&wctx);
     ASSERT_TRUE(wctx.ctx == NULL);
     ASSERT_EQ_INT(wctx.active_window_idx, -1);
@@ -263,14 +308,14 @@ static void test_window_begin_null_state(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
 
-    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, 100, "Test", NULL));
+    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Test", NULL));
 
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
@@ -284,12 +329,12 @@ static void test_window_begin_id_none(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 10, 10, 200, 200 }, .z_order = 0
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
@@ -310,9 +355,9 @@ static void test_window_begin_zero_width(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
         .rect = { 10, 10, 0, 200 }, .z_order = 0
@@ -320,7 +365,7 @@ static void test_window_begin_zero_width(void)
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, 100, "Test", &ws));
+    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Test", &ws));
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
     forge_ui_wctx_free(&wctx);
@@ -333,9 +378,9 @@ static void test_window_begin_nan_x(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
         .rect = { NAN, 10, 200, 200 }, .z_order = 0
@@ -343,7 +388,7 @@ static void test_window_begin_nan_x(void)
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, 100, "Test", &ws));
+    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Test", &ws));
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
     forge_ui_wctx_free(&wctx);
@@ -356,9 +401,9 @@ static void test_window_begin_inf_y(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
         .rect = { 10, INFINITY, 200, 200 }, .z_order = 0
@@ -366,7 +411,7 @@ static void test_window_begin_inf_y(void)
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, 100, "Test", &ws));
+    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Test", &ws));
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
     forge_ui_wctx_free(&wctx);
@@ -379,9 +424,9 @@ static void test_window_begin_nan_width(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
         .rect = { 10, 10, NAN, 200 }, .z_order = 0
@@ -389,7 +434,7 @@ static void test_window_begin_nan_width(void)
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, 100, "Test", &ws));
+    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Test", &ws));
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
     forge_ui_wctx_free(&wctx);
@@ -403,19 +448,19 @@ static void test_window_begin_null_atlas(void)
 
     /* Build a context then NULL out its atlas to test the guard */
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ctx.atlas = NULL;  /* simulate missing atlas */
 
     ForgeUiWindowState ws = {
-        .rect = { 10, 10, 200, 200 }, .z_order = 0
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, 100, "Test", &ws));
+    ASSERT_TRUE(!forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Test", &ws));
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
 
@@ -435,23 +480,24 @@ static void test_window_emits_draw_data(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 10, 10, 250, 300 },
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_DRAW_W, TEST_WIN_DRAW_H },
         .scroll_y = 0, .collapsed = false, .z_order = 0
     };
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
 
-    bool opened = forge_ui_wctx_window_begin(&wctx, 100, "Test Window", &ws);
+    bool opened = forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Test Window", &ws);
     ASSERT_TRUE(opened);
     if (opened) {
-        forge_ui_ctx_label_layout(wctx.ctx, "Hello", 24,
-                                   0.9f, 0.9f, 0.9f, 1.0f);
+        forge_ui_ctx_label_layout(wctx.ctx, "Hello", TEST_LABEL_PX,
+                                   TEST_LABEL_R, TEST_LABEL_G,
+                                   TEST_LABEL_B, TEST_LABEL_A);
         forge_ui_wctx_window_end(&wctx);
     }
 
@@ -474,19 +520,19 @@ static void test_window_collapsed_returns_false(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 10, 10, 250, 300 },
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_DRAW_W, TEST_WIN_DRAW_H },
         .scroll_y = 0, .collapsed = true, .z_order = 0
     };
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
 
-    bool opened = forge_ui_wctx_window_begin(&wctx, 100, "Collapsed", &ws);
+    bool opened = forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Collapsed", &ws);
     ASSERT_TRUE(!opened);
     /* Do NOT call window_end when begin returns false */
 
@@ -509,19 +555,20 @@ static void test_window_collapsed_still_renders_title_bar(void)
     ForgeUiWindowContext wctx;
 
     /* Frame 1: expanded */
-    forge_ui_ctx_init(&ctx, &test_atlas);
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 10, 10, 250, 300 },
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_DRAW_W, TEST_WIN_DRAW_H },
         .scroll_y = 0, .collapsed = false, .z_order = 0
     };
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Win", &ws)) {
-        forge_ui_ctx_label_layout(wctx.ctx, "Label", 24,
-                                   0.9f, 0.9f, 0.9f, 1.0f);
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Win", &ws)) {
+        forge_ui_ctx_label_layout(wctx.ctx, "Label", TEST_LABEL_PX,
+                                   TEST_LABEL_R, TEST_LABEL_G,
+                                   TEST_LABEL_B, TEST_LABEL_A);
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -531,16 +578,17 @@ static void test_window_collapsed_still_renders_title_bar(void)
     forge_ui_ctx_free(&ctx);
 
     /* Frame 2: collapsed */
-    forge_ui_ctx_init(&ctx, &test_atlas);
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ws.collapsed = true;
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Win", &ws)) {
-        forge_ui_ctx_label_layout(wctx.ctx, "Label", 24,
-                                   0.9f, 0.9f, 0.9f, 1.0f);
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Win", &ws)) {
+        forge_ui_ctx_label_layout(wctx.ctx, "Label", TEST_LABEL_PX,
+                                   TEST_LABEL_R, TEST_LABEL_G,
+                                   TEST_LABEL_B, TEST_LABEL_A);
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -563,39 +611,39 @@ static void test_z_order_bring_to_front(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState w1 = {
-        .rect = { 10, 10, 200, 200 }, .z_order = 0
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
     ForgeUiWindowState w2 = {
-        .rect = { 50, 50, 200, 200 }, .z_order = 1
+        .rect = { TEST_WIN2_X, TEST_WIN2_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 1
     };
 
     /* Frame 0: no interaction, establishes prev frame data */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W1", &w1)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W1", &w1)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "W2", &w2)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "W2", &w2)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
 
     /* Frame 1: click on W1 title bar to bring it to front */
-    float click_x = 60.0f;  /* inside W1 title bar */
-    float click_y = 25.0f;
+    float click_x = 60.0f;  /* inside W1 title bar (between x=10..210) */
+    float click_y = 25.0f;  /* inside title bar height (y=10..40) */
 
     forge_ui_ctx_begin(&ctx, click_x, click_y, true);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W1", &w1)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W1", &w1)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "W2", &w2)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "W2", &w2)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -614,24 +662,24 @@ static void test_z_order_overflow_guarded(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState w1 = {
-        .rect = { 10, 10, 200, 200 }, .z_order = INT_MAX
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = INT_MAX
     };
     ForgeUiWindowState w2 = {
-        .rect = { 50, 50, 200, 200 }, .z_order = INT_MAX - 1
+        .rect = { TEST_WIN2_X, TEST_WIN2_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = INT_MAX - 1
     };
 
     /* Frame 0: establish prev */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W1", &w1)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W1", &w1)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "W2", &w2)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "W2", &w2)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -640,10 +688,10 @@ static void test_z_order_overflow_guarded(void)
     /* Frame 1: click W2 to try to bring to front */
     forge_ui_ctx_begin(&ctx, 60, 65, true);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W1", &w1)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W1", &w1)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "W2", &w2)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "W2", &w2)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -667,29 +715,31 @@ static void test_deferred_draw_z_order(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     /* W1 declared first but z=1 (front), W2 declared second but z=0 (back) */
     ForgeUiWindowState w1 = {
-        .rect = { 10, 10, 200, 200 }, .z_order = 1
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 1
     };
     ForgeUiWindowState w2 = {
-        .rect = { 100, 100, 200, 200 }, .z_order = 0
+        .rect = { 100, 100, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
 
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Front", &w1)) {
-        forge_ui_ctx_label_layout(wctx.ctx, "Front", 24,
-                                   0.9f, 0.9f, 0.9f, 1.0f);
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Front", &w1)) {
+        forge_ui_ctx_label_layout(wctx.ctx, "Front", TEST_LABEL_PX,
+                                   TEST_LABEL_R, TEST_LABEL_G,
+                                   TEST_LABEL_B, TEST_LABEL_A);
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "Back", &w2)) {
-        forge_ui_ctx_label_layout(wctx.ctx, "Back", 24,
-                                   0.9f, 0.9f, 0.9f, 1.0f);
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "Back", &w2)) {
+        forge_ui_ctx_label_layout(wctx.ctx, "Back", TEST_LABEL_PX,
+                                   TEST_LABEL_R, TEST_LABEL_G,
+                                   TEST_LABEL_B, TEST_LABEL_A);
         forge_ui_wctx_window_end(&wctx);
     }
 
@@ -710,14 +760,18 @@ static void test_multiple_windows_all_rendered(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
-    ForgeUiWindowState wins[3];
-    for (int i = 0; i < 3; i++) {
+    #define TEST_MULTI_WIN_COUNT 3
+    #define TEST_MULTI_WIN_STEP 50.0f
+    ForgeUiWindowState wins[TEST_MULTI_WIN_COUNT];
+    for (int i = 0; i < TEST_MULTI_WIN_COUNT; i++) {
         wins[i] = (ForgeUiWindowState){
-            .rect = { 10.0f + 50.0f * i, 10.0f + 50.0f * i, 200, 200 },
+            .rect = { TEST_WIN_X + TEST_MULTI_WIN_STEP * i,
+                      TEST_WIN_Y + TEST_MULTI_WIN_STEP * i,
+                      TEST_WIN_W, TEST_WIN_H },
             .z_order = i
         };
     }
@@ -725,14 +779,14 @@ static void test_multiple_windows_all_rendered(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
 
-    for (int i = 0; i < 3; i++) {
-        Uint32 id = (Uint32)(100 + i * 100);
+    for (int i = 0; i < TEST_MULTI_WIN_COUNT; i++) {
+        Uint32 id = (Uint32)(TEST_WIN_ID_1 + (Uint32)i * TEST_WIN_ID_1);
         if (forge_ui_wctx_window_begin(&wctx, id, "Win", &wins[i])) {
             forge_ui_wctx_window_end(&wctx);
         }
     }
 
-    ASSERT_EQ_INT(wctx.window_count, 3);
+    ASSERT_EQ_INT(wctx.window_count, TEST_MULTI_WIN_COUNT);
 
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
@@ -753,24 +807,23 @@ static void test_drag_moves_window(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 50, 50, 200, 200 }, .z_order = 0
+        .rect = { TEST_WIN2_X, TEST_WIN2_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
     float orig_x = ws.rect.x;
     float orig_y = ws.rect.y;
 
-    /* Title bar center: x = 50 + 200*0.5 = 150, y = 50 + 15 = 65 */
-    float press_x = 150.0f;
-    float press_y = 65.0f;
+    float press_x = TEST_DRAG_PRESS_X;
+    float press_y = TEST_DRAG_PRESS_Y;
 
     /* Frame 0: establish prev_window data (idle) */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Drag Me", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Drag Me", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -779,27 +832,27 @@ static void test_drag_moves_window(void)
     /* Frame 1: press on title bar */
     forge_ui_ctx_begin(&ctx, press_x, press_y, true);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Drag Me", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Drag Me", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
 
-    /* Frame 2: drag 30px right and 20px down */
-    float drag_x = press_x + 30.0f;
-    float drag_y = press_y + 20.0f;
+    /* Frame 2: drag by delta */
+    float drag_x = press_x + TEST_DRAG_DELTA_X;
+    float drag_y = press_y + TEST_DRAG_DELTA_Y;
 
     forge_ui_ctx_begin(&ctx, drag_x, drag_y, true);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Drag Me", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Drag Me", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
 
     /* Window should have moved by the drag delta */
-    ASSERT_NEAR(ws.rect.x, orig_x + 30.0f, 1.0f);
-    ASSERT_NEAR(ws.rect.y, orig_y + 20.0f, 1.0f);
+    ASSERT_NEAR(ws.rect.x, orig_x + TEST_DRAG_DELTA_X, 1.0f);
+    ASSERT_NEAR(ws.rect.y, orig_y + TEST_DRAG_DELTA_Y, 1.0f);
 
     forge_ui_wctx_free(&wctx);
     forge_ui_ctx_free(&ctx);
@@ -815,12 +868,12 @@ static void test_collapse_toggle(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 50, 50, 200, 200 },
+        .rect = { TEST_WIN2_X, TEST_WIN2_Y, TEST_WIN_W, TEST_WIN_H },
         .collapsed = false, .z_order = 0
     };
 
@@ -832,7 +885,7 @@ static void test_collapse_toggle(void)
     /* Frame 0: idle -- establish prev data */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Toggle", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Toggle", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -843,7 +896,7 @@ static void test_collapse_toggle(void)
     /* Frame 1: press on toggle */
     forge_ui_ctx_begin(&ctx, toggle_cx, toggle_cy, true);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Toggle", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Toggle", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -852,7 +905,7 @@ static void test_collapse_toggle(void)
     /* Frame 2: release on toggle -- should collapse */
     forge_ui_ctx_begin(&ctx, toggle_cx, toggle_cy, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Toggle", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Toggle", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -874,25 +927,25 @@ static void test_hovered_window_id_set(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     /* Two overlapping windows */
     ForgeUiWindowState w1 = {
-        .rect = { 10, 10, 200, 200 }, .z_order = 0
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
     ForgeUiWindowState w2 = {
-        .rect = { 50, 50, 200, 200 }, .z_order = 1
+        .rect = { TEST_WIN2_X, TEST_WIN2_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 1
     };
 
     /* Frame 0: establish prev */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W1", &w1)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W1", &w1)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "W2", &w2)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "W2", &w2)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -905,10 +958,10 @@ static void test_hovered_window_id_set(void)
      * available one frame after the windows are declared. */
     forge_ui_ctx_begin(&ctx, 100, 100, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W1", &w1)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W1", &w1)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "W2", &w2)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "W2", &w2)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -919,12 +972,12 @@ static void test_hovered_window_id_set(void)
     forge_ui_ctx_begin(&ctx, 100, 100, false);
     forge_ui_wctx_begin(&wctx);
 
-    ASSERT_EQ_U32(wctx.hovered_window_id, 200);
+    ASSERT_EQ_U32(wctx.hovered_window_id, TEST_WIN_ID_2);
 
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W1", &w1)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W1", &w1)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "W2", &w2)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "W2", &w2)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -940,30 +993,30 @@ static void test_hovered_window_none_outside(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 10, 10, 100, 100 }, .z_order = 0
+        .rect = { TEST_WIN_X, TEST_WIN_Y, 100, 100 }, .z_order = 0
     };
 
     /* Frame 0: establish prev */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);
 
-    /* Frame 1: mouse at (500, 500) -- far outside the window */
-    forge_ui_ctx_begin(&ctx, 500, 500, false);
+    /* Frame 1: mouse far outside the window */
+    forge_ui_ctx_begin(&ctx, TEST_MOUSE_FAR, TEST_MOUSE_FAR, false);
     forge_ui_wctx_begin(&wctx);
 
     ASSERT_EQ_U32(wctx.hovered_window_id, FORGE_UI_ID_NONE);
 
-    if (forge_ui_wctx_window_begin(&wctx, 100, "W", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -983,29 +1036,29 @@ static void test_collapsed_hover_rect_title_only(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     /* Collapsed window at y=10 with full height 200, but only title bar
      * (30px) should block input.  Place another window behind it in the
      * "ghost" content area (y=50 to y=210). */
     ForgeUiWindowState collapsed_win = {
-        .rect = { 10, 10, 200, 200 },
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H },
         .collapsed = true, .z_order = 1
     };
     ForgeUiWindowState behind_win = {
-        .rect = { 10, 60, 200, 200 },
+        .rect = { TEST_WIN_X, 60, TEST_WIN_W, TEST_WIN_H },
         .z_order = 0
     };
 
     /* Frame 0: establish prev */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Collapsed", &collapsed_win)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Collapsed", &collapsed_win)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "Behind", &behind_win)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "Behind", &behind_win)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -1014,10 +1067,10 @@ static void test_collapsed_hover_rect_title_only(void)
     /* Frame 1: declare again so prev data has 2 windows (one-frame lag) */
     forge_ui_ctx_begin(&ctx, 50, 100, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Collapsed", &collapsed_win)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Collapsed", &collapsed_win)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "Behind", &behind_win)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "Behind", &behind_win)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -1029,12 +1082,12 @@ static void test_collapsed_hover_rect_title_only(void)
     forge_ui_ctx_begin(&ctx, 50, 100, false);
     forge_ui_wctx_begin(&wctx);
 
-    ASSERT_EQ_U32(wctx.hovered_window_id, 200);
+    ASSERT_EQ_U32(wctx.hovered_window_id, TEST_WIN_ID_2);
 
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Collapsed", &collapsed_win)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Collapsed", &collapsed_win)) {
         forge_ui_wctx_window_end(&wctx);
     }
-    if (forge_ui_wctx_window_begin(&wctx, 200, "Behind", &behind_win)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "Behind", &behind_win)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -1054,19 +1107,19 @@ static void test_free_while_redirected(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 10, 10, 200, 200 }, .z_order = 0
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
 
     /* Open window but don't call window_end -- simulate early exit */
-    bool opened = forge_ui_wctx_window_begin(&wctx, 100, "Win", &ws);
+    bool opened = forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Win", &ws);
     ASSERT_TRUE(opened);
 
     /* Free while redirected -- must restore context buffers */
@@ -1093,9 +1146,9 @@ static void test_window_end_without_begin(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
@@ -1121,18 +1174,18 @@ static void test_wctx_begin_restores_unclosed_window(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 10, 10, 200, 200 }, .z_order = 0
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
 
     /* Frame 0: open window but DON'T call window_end */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    bool opened = forge_ui_wctx_window_begin(&wctx, 100, "Win", &ws);
+    bool opened = forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Win", &ws);
     ASSERT_TRUE(opened);
     /* Skip window_end intentionally */
 
@@ -1146,7 +1199,7 @@ static void test_wctx_begin_restores_unclosed_window(void)
     forge_ui_wctx_begin(&wctx);
 
     /* Should be able to open a new window normally */
-    if (forge_ui_wctx_window_begin(&wctx, 100, "Win", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "Win", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
 
@@ -1170,14 +1223,14 @@ static void test_max_windows_rejected(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState states[FORGE_UI_WINDOW_MAX + 1];
     for (int i = 0; i <= FORGE_UI_WINDOW_MAX; i++) {
         states[i] = (ForgeUiWindowState){
-            .rect = { 10.0f + 5.0f * i, 10.0f, 100, 100 },
+            .rect = { TEST_WIN_X + 5.0f * i, TEST_WIN_Y, 100, 100 },
             .z_order = i
         };
     }
@@ -1218,25 +1271,25 @@ static void test_nested_windows_rejected(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState w1 = {
-        .rect = { 10, 10, 200, 200 }, .z_order = 0
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 0
     };
     ForgeUiWindowState w2 = {
-        .rect = { 50, 50, 200, 200 }, .z_order = 1
+        .rect = { TEST_WIN2_X, TEST_WIN2_Y, TEST_WIN_W, TEST_WIN_H }, .z_order = 1
     };
 
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
 
-    bool first = forge_ui_wctx_window_begin(&wctx, 100, "W1", &w1);
+    bool first = forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_1, "W1", &w1);
     ASSERT_TRUE(first);
 
     /* Try to open a second window while the first is still open */
-    bool nested = forge_ui_wctx_window_begin(&wctx, 200, "W2", &w2);
+    bool nested = forge_ui_wctx_window_begin(&wctx, TEST_WIN_ID_2, "W2", &w2);
     ASSERT_TRUE(!nested);
 
     forge_ui_wctx_window_end(&wctx);
@@ -1275,18 +1328,20 @@ static void test_prev_frame_data_saved(void)
     if (!setup_atlas()) return;
 
     ForgeUiContext ctx;
-    forge_ui_ctx_init(&ctx, &test_atlas);
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     ForgeUiWindowContext wctx;
-    forge_ui_wctx_init(&wctx, &ctx);
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
 
     ForgeUiWindowState ws = {
-        .rect = { 100, 200, 300, 400 }, .z_order = 5
+        .rect = { TEST_PREV_WIN_X, TEST_PREV_WIN_Y,
+                  TEST_PREV_WIN_W, TEST_PREV_WIN_H },
+        .z_order = TEST_PREV_WIN_Z
     };
 
     /* Frame 0: declare one window */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     forge_ui_wctx_begin(&wctx);
-    if (forge_ui_wctx_window_begin(&wctx, 42, "Test", &ws)) {
+    if (forge_ui_wctx_window_begin(&wctx, TEST_PREV_WIN_ID, "Test", &ws)) {
         forge_ui_wctx_window_end(&wctx);
     }
     forge_ui_wctx_end(&wctx);
@@ -1297,10 +1352,10 @@ static void test_prev_frame_data_saved(void)
     forge_ui_wctx_begin(&wctx);
 
     ASSERT_EQ_INT(wctx.prev_window_count, 1);
-    ASSERT_EQ_U32(wctx.prev_window_ids[0], 42);
-    ASSERT_EQ_INT(wctx.prev_window_z_orders[0], 5);
-    ASSERT_NEAR(wctx.prev_window_rects[0].x, 100.0f, 0.01f);
-    ASSERT_NEAR(wctx.prev_window_rects[0].y, 200.0f, 0.01f);
+    ASSERT_EQ_U32(wctx.prev_window_ids[0], TEST_PREV_WIN_ID);
+    ASSERT_EQ_INT(wctx.prev_window_z_orders[0], TEST_PREV_WIN_Z);
+    ASSERT_NEAR(wctx.prev_window_rects[0].x, TEST_PREV_WIN_X, TEST_NEAR_EPS);
+    ASSERT_NEAR(wctx.prev_window_rects[0].y, TEST_PREV_WIN_Y, TEST_NEAR_EPS);
 
     forge_ui_wctx_end(&wctx);
     forge_ui_ctx_end(&ctx);

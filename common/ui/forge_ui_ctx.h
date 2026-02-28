@@ -1066,7 +1066,7 @@ static inline void forge_ui_ctx_free(ForgeUiContext *ctx)
     ctx->scroll_delta = 0.0f;
     ctx->has_clip = false;
     ctx->_panel_active = false;
-    ctx->_panel.scroll_y = NULL;
+    SDL_memset(&ctx->_panel, 0, sizeof(ctx->_panel));
     ctx->_panel_content_start_y = 0.0f;
 }
 
@@ -1081,9 +1081,11 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
 
     /* Snapshot the mouse state for this frame.  All widget calls see the
      * same position and button state, ensuring consistent hit-testing even
-     * if the OS delivers new input events between widget calls. */
-    ctx->mouse_x = mouse_x;
-    ctx->mouse_y = mouse_y;
+     * if the OS delivers new input events between widget calls.
+     * Clamp NaN/Inf to 0 so downstream slider and scrollbar drag
+     * calculations never produce NaN values written to caller data. */
+    ctx->mouse_x = isfinite(mouse_x) ? mouse_x : 0.0f;
+    ctx->mouse_y = isfinite(mouse_y) ? mouse_y : 0.0f;
     ctx->mouse_down = mouse_down;
 
     /* Reset hot for this frame -- widgets will claim it during processing */
@@ -2129,6 +2131,7 @@ static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx)
     if (max_scroll < 0.0f) max_scroll = 0.0f;
 
     float *scroll_y = ctx->_panel.scroll_y;
+    ctx->_panel.scroll_y = NULL;  /* clear before early returns to prevent stale ref */
     if (!scroll_y) return;  /* defensive: should not happen given panel_begin checks */
     if (!(*scroll_y <= max_scroll)) *scroll_y = max_scroll;
     if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;

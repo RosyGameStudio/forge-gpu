@@ -39,14 +39,16 @@
  *   forge_ui_wctx_init(&wctx, &ctx);
  *
  *   // Each frame:
+ *   forge_ui_ctx_begin(&ctx, mouse_x, mouse_y, mouse_down);
  *   forge_ui_wctx_begin(&wctx);
  *   if (forge_ui_wctx_window_begin(&wctx, 100, "My Window", &win)) {
- *       forge_ui_ctx_label_layout(wctx.ctx, "Hello", 26, 0.9, 0.9, 0.9, 1);
+ *       forge_ui_ctx_label_layout(wctx.ctx, "Hello", 26, 0.9f, 0.9f, 0.9f, 1.0f);
  *       forge_ui_wctx_window_end(&wctx);
  *   }
  *   forge_ui_wctx_end(&wctx);
+ *   forge_ui_ctx_end(&ctx);
  *
- *   // Use wctx.ctx->vertices, wctx.ctx->indices for rendering
+ *   // Use ctx.vertices, ctx.indices for rendering
  *
  * SPDX-License-Identifier: Zlib
  */
@@ -183,9 +185,10 @@ typedef struct ForgeUiWindowContext {
     float                grab_offset_x;
     float                grab_offset_y;
 
-    /* Previous frame's window entries -- stored so wctx_begin can
-     * determine hovered_window_id using last frame's z-order and rects.
-     * Only id, state pointer, and count are used from the previous frame. */
+    /* Previous frame's window data -- stored so wctx_begin can determine
+     * hovered_window_id.  Uses all three arrays: ids (to record the
+     * winner), rects (for mouse hit testing), and z_orders (to pick
+     * the topmost window under the cursor). */
     Uint32               prev_window_ids[FORGE_UI_WINDOW_MAX];
     ForgeUiRect          prev_window_rects[FORGE_UI_WINDOW_MAX];
     int                  prev_window_z_orders[FORGE_UI_WINDOW_MAX];
@@ -229,8 +232,8 @@ static inline void forge_ui_wctx_end(ForgeUiWindowContext *wctx);
  * dragging and z-ordering, and if not collapsed set up clipping
  * and layout for child widgets.
  *
- * id:    unique non-zero widget ID (scrollbar uses id+1, collapse
- *        toggle uses id+2)
+ * id:    unique non-zero widget ID less than UINT32_MAX-1 (scrollbar
+ *        uses id+1, collapse toggle uses id+2)
  * title: text displayed in the title bar
  * state: pointer to application-owned ForgeUiWindowState
  *
@@ -403,6 +406,14 @@ static inline void forge_ui_wctx_free(ForgeUiWindowContext *wctx)
 
     wctx->window_count = 0;
     wctx->active_window_idx = -1;
+    wctx->hovered_window_id = FORGE_UI_ID_NONE;
+    wctx->prev_window_count = 0;
+    wctx->saved_vertices = NULL;
+    wctx->saved_indices = NULL;
+    wctx->saved_vertex_count = 0;
+    wctx->saved_vertex_capacity = 0;
+    wctx->saved_index_count = 0;
+    wctx->saved_index_capacity = 0;
     wctx->ctx = NULL;
 }
 
@@ -424,9 +435,10 @@ static inline void forge_ui_wctx_begin(ForgeUiWindowContext *wctx)
     }
 
     /* ── Determine hovered window from previous frame's data ──────────── */
-    /* Iterate previous frame's windows in descending z-order to find
+    /* Scan all previous frame's windows (in declaration order) to find
      * which window (if any) the mouse cursor is over.  The highest-z
-     * window wins.  This pre-pass ensures that during the current frame's
+     * window among those containing the cursor wins.  This pre-pass
+     * ensures that during the current frame's
      * widget processing, hit tests inside a window only succeed if that
      * window is the hovered window.  This prevents clicking through a
      * foreground window to activate a widget in a background window. */
@@ -590,6 +602,13 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
     /* ── Reject if already inside a window ─────────────────────────────── */
     if (wctx->active_window_idx >= 0) {
         SDL_Log("forge_ui_wctx_window_begin: nested windows not supported");
+        return false;
+    }
+
+    /* ── Reject if a standalone panel is currently active ───────────────── */
+    if (ctx->_panel_active) {
+        SDL_Log("forge_ui_wctx_window_begin: a panel is already active "
+                "(close it with panel_end before opening a window)");
         return false;
     }
 
@@ -877,11 +896,18 @@ static inline void forge_ui_wctx_window_end(ForgeUiWindowContext *wctx)
     ForgeUiContext *ctx = wctx->ctx;
 
     /* Guard: if the panel state was not set up (e.g. misuse with
-     * multiple window contexts), log and restore buffers without
-     * running panel_end, which would operate on stale state. */
+     * multiple window contexts), log, clean up, and restore buffers
+     * without running panel_end, which would operate on stale state. */
     if (!ctx->_panel_active) {
         SDL_Log("forge_ui_wctx_window_end: panel not active "
                 "(missing window_begin?)");
+        ctx->has_clip = false;
+        int widx = wctx->active_window_idx;
+        wctx->window_entries[widx].vertex_count = 0;
+        wctx->window_entries[widx].index_count = 0;
+        wctx->window_entries[widx].id = FORGE_UI_ID_NONE;
+        wctx->window_entries[widx].state = NULL;
+        wctx->window_count--;
         forge_ui_win__restore_from_window(wctx);
         return;
     }

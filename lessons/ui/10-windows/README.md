@@ -204,12 +204,11 @@ window.
 
 The solution is a **pre-pass** at the start of each frame:
 
-1. `forge_ui_wctx_begin()` iterates the **previous frame's** window entries
-   in z-order (we cannot use the current frame's data because windows have not
-   been declared yet).
-2. For each window, it checks whether the mouse position is inside the
-   window's rect.
-3. The highest-z window containing the mouse becomes `hovered_window_id`.
+1. `forge_ui_wctx_begin()` scans all **previous frame's** window entries
+   (in declaration order) and finds the one with the highest z-order whose
+   rect contains the mouse cursor. We cannot use the current frame's data
+   because windows have not been declared yet.
+2. The highest-z window containing the mouse becomes `hovered_window_id`.
 4. During widget processing, hit tests inside a window only succeed if that
    window's ID matches `hovered_window_id`. Widgets in other windows at the
    same screen position silently fail their hit tests.
@@ -226,8 +225,8 @@ The collapse toggle is a small triangle button in the title bar:
 ![Collapse toggle](assets/collapse_toggle.png)
 
 - **Expanded** (down-pointing triangle): the window draws its full background,
-  content area with clipping, scrollbar, and all child widgets. Content height
-  is the full `rect.h`.
+  content area with clipping, scrollbar, and all child widgets. The visible
+  content height is `rect.h - title_height - 2 * padding`.
 - **Collapsed** (right-pointing triangle): `window_begin` returns `false`.
   The caller skips all widget declarations and does **not** call
   `window_end`. Only the title bar is drawn. Content height is effectively
