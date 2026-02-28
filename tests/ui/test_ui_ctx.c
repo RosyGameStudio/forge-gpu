@@ -190,20 +190,33 @@ static void test_rect_contains_zero_size(void)
 
 /* ── forge_ui__ascender_px tests ────────────────────────────────────────── */
 
-static void test_ascender_px_normal(void)
+static void test_ascender_px_known_values(void)
 {
-    TEST("ascender_px: computes correct value from real atlas");
+    TEST("ascender_px: correct result for known inputs");
+    /* Use a fake atlas with hand-picked values so we can verify the
+     * result against a pre-computed constant, not the same formula. */
+    ForgeUiFontAtlas fake;
+    SDL_memset(&fake, 0, sizeof(fake));
+    fake.pixel_height = 32.0f;
+    fake.units_per_em = 1000;
+    fake.ascender     = 800;
+
+    /* Expected: scale = 32/1000 = 0.032, ascender_px = 800*0.032 = 25.6 */
+    float result = forge_ui__ascender_px(&fake);
+    ASSERT_NEAR(result, 25.6f, 0.001f);
+}
+
+static void test_ascender_px_real_atlas(void)
+{
+    TEST("ascender_px: positive result from real font atlas");
     if (!setup_atlas()) return;
 
     float result = forge_ui__ascender_px(&test_atlas);
 
-    /* Compute expected value from atlas fields using the same formula */
-    float scale = test_atlas.pixel_height / (float)test_atlas.units_per_em;
-    float expected = (float)test_atlas.ascender * scale;
-    ASSERT_NEAR(result, expected, 0.001f);
-
-    /* Sanity: result should be positive for a real font (ascender > 0) */
+    /* A real font always has a positive ascender */
     ASSERT_TRUE(result > 0.0f);
+    /* Result must be less than the full pixel height */
+    ASSERT_TRUE(result < test_atlas.pixel_height);
 }
 
 static void test_ascender_px_null_atlas(void)
@@ -5097,7 +5110,8 @@ int main(int argc, char *argv[])
     test_rect_contains_zero_size();
 
     /* Ascender pixel helper */
-    test_ascender_px_normal();
+    test_ascender_px_known_values();
+    test_ascender_px_real_atlas();
     test_ascender_px_null_atlas();
     test_ascender_px_zero_upm();
     test_ascender_px_zero_ascender();
