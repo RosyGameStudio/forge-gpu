@@ -204,6 +204,62 @@
  * that log via SDL_Log and return safely on overflow/underflow. */
 #define FORGE_UI_LAYOUT_MAX_DEPTH  8
 
+/* ── Panel style ───────────────────────────────────────────────────────── */
+
+/* Title bar height and content padding (pixels) */
+#define FORGE_UI_PANEL_TITLE_HEIGHT    30.0f
+#define FORGE_UI_PANEL_PADDING         10.0f
+
+/* Panel background RGBA (dark blue-gray) */
+#define FORGE_UI_PANEL_BG_R     0.14f
+#define FORGE_UI_PANEL_BG_G     0.14f
+#define FORGE_UI_PANEL_BG_B     0.18f
+#define FORGE_UI_PANEL_BG_A     1.00f
+
+/* Title bar background RGBA (slightly lighter) */
+#define FORGE_UI_PANEL_TITLE_BG_R   0.18f
+#define FORGE_UI_PANEL_TITLE_BG_G   0.18f
+#define FORGE_UI_PANEL_TITLE_BG_B   0.24f
+#define FORGE_UI_PANEL_TITLE_BG_A   1.00f
+
+/* Title bar text color (near-white) */
+#define FORGE_UI_PANEL_TITLE_TEXT_R  0.90f
+#define FORGE_UI_PANEL_TITLE_TEXT_G  0.90f
+#define FORGE_UI_PANEL_TITLE_TEXT_B  0.95f
+#define FORGE_UI_PANEL_TITLE_TEXT_A  1.00f
+
+/* ── Scrollbar style ───────────────────────────────────────────────────── */
+
+#define FORGE_UI_SCROLLBAR_WIDTH        10.0f  /* scrollbar track width (pixels) */
+#define FORGE_UI_SCROLLBAR_MIN_THUMB    20.0f  /* minimum thumb height (pixels) */
+
+/* Scrollbar track RGBA */
+#define FORGE_UI_SB_TRACK_R    0.10f
+#define FORGE_UI_SB_TRACK_G    0.10f
+#define FORGE_UI_SB_TRACK_B    0.14f
+#define FORGE_UI_SB_TRACK_A    1.00f
+
+/* Scrollbar thumb RGBA by state */
+#define FORGE_UI_SB_NORMAL_R   0.35f
+#define FORGE_UI_SB_NORMAL_G   0.35f
+#define FORGE_UI_SB_NORMAL_B   0.42f
+#define FORGE_UI_SB_NORMAL_A   1.00f
+
+#define FORGE_UI_SB_HOT_R      0.45f
+#define FORGE_UI_SB_HOT_G      0.45f
+#define FORGE_UI_SB_HOT_B      0.55f
+#define FORGE_UI_SB_HOT_A      1.00f
+
+#define FORGE_UI_SB_ACTIVE_R   0.31f
+#define FORGE_UI_SB_ACTIVE_G   0.76f
+#define FORGE_UI_SB_ACTIVE_B   0.97f
+#define FORGE_UI_SB_ACTIVE_A   1.00f
+
+/* ── Scroll speed ──────────────────────────────────────────────────────── */
+
+/* Pixels scrolled per unit of mouse wheel delta */
+#define FORGE_UI_SCROLL_SPEED  30.0f
+
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
 /* A rectangle used for both hit testing and draw emission.  The layout
@@ -249,6 +305,20 @@ typedef struct ForgeUiLayout {
     float                    remaining_h;  /* height left for more widgets */
     int                      item_count;   /* widgets placed so far (for spacing) */
 } ForgeUiLayout;
+
+/* Panel state used internally by panel_begin/panel_end.
+ *
+ * A panel is a titled, clipped container that holds child widgets.
+ * The caller provides the outer rect and a pointer to their scroll_y;
+ * panel_begin computes the content_rect and sets the clip rect;
+ * panel_end computes the content_height and draws the scrollbar. */
+typedef struct ForgeUiPanel {
+    ForgeUiRect  rect;           /* outer bounds (background fill) */
+    ForgeUiRect  content_rect;   /* inner bounds after title bar and padding */
+    float       *scroll_y;       /* pointer to caller's scroll offset */
+    float        content_height; /* total height of child widgets (set by panel_end) */
+    Uint32       id;             /* widget ID for the panel (scrollbar uses id+1) */
+} ForgeUiPanel;
 
 /* Application-owned text input state.
  *
@@ -333,6 +403,25 @@ typedef struct ForgeUiContext {
      * during a press edge this frame.  Used by ctx_end to detect "click
      * outside" for focus loss. */
     bool _ti_press_claimed;
+
+    /* Mouse wheel scroll delta for the current frame.  Positive values
+     * scroll downward.  Set by the caller after forge_ui_ctx_begin(). */
+    float scroll_delta;
+
+    /* Clip rect for panel content area.  When has_clip is true, all
+     * vertex-emitting functions clip quads against this rect: fully
+     * outside quads are discarded, partially outside quads are trimmed
+     * with UV remapping, and hit tests also respect the clip rect. */
+    ForgeUiRect clip_rect;
+    bool        has_clip;
+
+    /* Internal panel state.  _panel_active is true between panel_begin
+     * and panel_end; _panel holds the current panel's geometry and
+     * scroll pointer; _panel_content_start_y records the layout cursor
+     * at panel_begin so panel_end can compute content_height. */
+    bool         _panel_active;
+    ForgeUiPanel _panel;
+    float        _panel_content_start_y;
 
     /* Layout stack — automatic widget positioning.
      *
@@ -572,6 +661,31 @@ static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
                                                float min_val, float max_val,
                                                float size);
 
+/* ── Panel API ─────────────────────────────────────────────────────────── */
+
+/* Begin a panel: draw background and title bar, set the clip rect, and
+ * push a vertical layout for child widgets.  The caller declares widgets
+ * between panel_begin and panel_end.
+ *
+ * id:        unique non-zero widget ID (scrollbar thumb uses id+1)
+ * title:     text displayed in the title bar (centered)
+ * rect:      outer bounds of the panel in screen pixels
+ * scroll_y:  pointer to the caller's scroll offset (persists across frames)
+ *
+ * Always returns true (the caller should always declare children and call
+ * panel_end). */
+static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
+                                             Uint32 id,
+                                             const char *title,
+                                             ForgeUiRect rect,
+                                             float *scroll_y);
+
+/* End a panel: compute content_height from how far the layout cursor
+ * advanced, pop the layout, clear the clip rect, clamp scroll_y to
+ * [0, max_scroll], and draw the scrollbar track and interactive thumb
+ * if content overflows the visible area. */
+static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx);
+
 /* ── Internal Helpers ───────────────────────────────────────────────────── */
 
 /* Test whether a point is inside a rectangle. */
@@ -580,6 +694,20 @@ static inline bool forge_ui__rect_contains(ForgeUiRect rect,
 {
     return px >= rect.x && px < rect.x + rect.w &&
            py >= rect.y && py < rect.y + rect.h;
+}
+
+/* Test whether the mouse is over a widget, respecting the clip rect.
+ * When clipping is active, a widget that has been scrolled out of the
+ * visible area must not respond to mouse interaction. */
+static inline bool forge_ui__widget_mouse_over(const ForgeUiContext *ctx,
+                                                ForgeUiRect rect)
+{
+    if (!forge_ui__rect_contains(rect, ctx->mouse_x, ctx->mouse_y))
+        return false;
+    if (ctx->has_clip &&
+        !forge_ui__rect_contains(ctx->clip_rect, ctx->mouse_x, ctx->mouse_y))
+        return false;
+    return true;
 }
 
 /* Ensure vertex buffer has room for `count` more vertices. */
@@ -664,6 +792,34 @@ static inline void forge_ui__emit_rect(ForgeUiContext *ctx,
                                        float r, float g, float b, float a)
 {
     if (!ctx->atlas) return;
+
+    /* ── Clip against clip_rect if active ────────────────────────────── */
+    if (ctx->has_clip) {
+        float cx0 = ctx->clip_rect.x;
+        float cy0 = ctx->clip_rect.y;
+        float cx1 = cx0 + ctx->clip_rect.w;
+        float cy1 = cy0 + ctx->clip_rect.h;
+
+        float rx0 = rect.x;
+        float ry0 = rect.y;
+        float rx1 = rect.x + rect.w;
+        float ry1 = rect.y + rect.h;
+
+        /* Fully outside -- discard */
+        if (rx1 <= cx0 || rx0 >= cx1 || ry1 <= cy0 || ry0 >= cy1) return;
+
+        /* Trim to intersection (solid rects use a single UV point so
+         * only positions change -- no UV remapping needed) */
+        if (rx0 < cx0) rx0 = cx0;
+        if (ry0 < cy0) ry0 = cy0;
+        if (rx1 > cx1) rx1 = cx1;
+        if (ry1 > cy1) ry1 = cy1;
+        rect.x = rx0;
+        rect.y = ry0;
+        rect.w = rx1 - rx0;
+        rect.h = ry1 - ry0;
+    }
+
     if (!forge_ui__grow_vertices(ctx, 4)) return;
     if (!forge_ui__grow_indices(ctx, 6)) return;
 
@@ -690,12 +846,84 @@ static inline void forge_ui__emit_rect(ForgeUiContext *ctx,
     ctx->index_count += 6;
 }
 
+/* Emit a single clipped quad (4 vertices, 6 indices) with UV remapping.
+ * The quad is defined by the first 4 vertices at src[0..3] in the order:
+ * top-left, top-right, bottom-right, bottom-left.  Positions and UVs are
+ * clipped proportionally so the visible portion samples the correct region
+ * of the font atlas texture. */
+static inline void forge_ui__emit_quad_clipped(ForgeUiContext *ctx,
+                                                const ForgeUiVertex *src,
+                                                const ForgeUiRect *clip)
+{
+    /* Original quad bounds */
+    float x0 = src[0].pos_x, x1 = src[1].pos_x;
+    float y0 = src[0].pos_y, y1 = src[2].pos_y;
+
+    float cx0 = clip->x, cy0 = clip->y;
+    float cx1 = cx0 + clip->w, cy1 = cy0 + clip->h;
+
+    /* Fully outside -- discard */
+    if (x1 <= cx0 || x0 >= cx1 || y1 <= cy0 || y0 >= cy1) return;
+
+    /* Compute clipped bounds */
+    float nx0 = (x0 < cx0) ? cx0 : x0;
+    float ny0 = (y0 < cy0) ? cy0 : y0;
+    float nx1 = (x1 > cx1) ? cx1 : x1;
+    float ny1 = (y1 > cy1) ? cy1 : y1;
+
+    /* Proportional UV remapping */
+    float u0 = src[0].uv_u, u1 = src[1].uv_u;
+    float v0 = src[0].uv_v, v1 = src[2].uv_v;
+
+    float inv_w = (x1 != x0) ? 1.0f / (x1 - x0) : 0.0f;
+    float inv_h = (y1 != y0) ? 1.0f / (y1 - y0) : 0.0f;
+
+    float nu0 = u0 + (u1 - u0) * (nx0 - x0) * inv_w;
+    float nu1 = u0 + (u1 - u0) * (nx1 - x0) * inv_w;
+    float nv0 = v0 + (v1 - v0) * (ny0 - y0) * inv_h;
+    float nv1 = v0 + (v1 - v0) * (ny1 - y0) * inv_h;
+
+    if (!forge_ui__grow_vertices(ctx, 4)) return;
+    if (!forge_ui__grow_indices(ctx, 6)) return;
+
+    Uint32 base = (Uint32)ctx->vertex_count;
+    float r = src[0].r, g = src[0].g, b = src[0].b, a = src[0].a;
+
+    ForgeUiVertex *v = &ctx->vertices[ctx->vertex_count];
+    v[0] = (ForgeUiVertex){ nx0, ny0, nu0, nv0, r, g, b, a };
+    v[1] = (ForgeUiVertex){ nx1, ny0, nu1, nv0, r, g, b, a };
+    v[2] = (ForgeUiVertex){ nx1, ny1, nu1, nv1, r, g, b, a };
+    v[3] = (ForgeUiVertex){ nx0, ny1, nu0, nv1, r, g, b, a };
+    ctx->vertex_count += 4;
+
+    Uint32 *idx = &ctx->indices[ctx->index_count];
+    idx[0] = base + 0;  idx[1] = base + 1;  idx[2] = base + 2;
+    idx[3] = base + 0;  idx[4] = base + 2;  idx[5] = base + 3;
+    ctx->index_count += 6;
+}
+
 /* Append vertices and indices from a text layout into the context's
- * draw buffers.  Offsets indices by the current vertex count. */
+ * draw buffers.  When clipping is active, processes each glyph quad
+ * individually with UV remapping; otherwise bulk-copies all data. */
 static inline void forge_ui__emit_text_layout(ForgeUiContext *ctx,
                                               const ForgeUiTextLayout *layout)
 {
     if (!layout || layout->vertex_count == 0 || !layout->vertices || !layout->indices) return;
+
+    /* ── Per-quad clipping path (when has_clip is true) ──────────────── */
+    if (ctx->has_clip) {
+        /* Each glyph is a quad: 4 vertices, 6 indices.  Iterate per-quad
+         * and clip individually with UV remapping. */
+        int quad_count = layout->vertex_count / 4;
+        for (int q = 0; q < quad_count; q++) {
+            forge_ui__emit_quad_clipped(ctx,
+                                         &layout->vertices[q * 4],
+                                         &ctx->clip_rect);
+        }
+        return;
+    }
+
+    /* ── Bulk copy path (no clipping) ────────────────────────────────── */
     if (!forge_ui__grow_vertices(ctx, layout->vertex_count)) return;
     if (!forge_ui__grow_indices(ctx, layout->index_count)) return;
 
@@ -839,6 +1067,12 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
     ctx->key_escape = false;
     ctx->_ti_press_claimed = false;
 
+    /* Reset scroll and panel state for this frame.  The caller sets
+     * scroll_delta after begin if mouse wheel input is available. */
+    ctx->scroll_delta = 0.0f;
+    ctx->has_clip = false;
+    ctx->_panel_active = false;
+
     /* Reset layout stack for this frame.  Warn if the previous frame had
      * unmatched push/pop calls -- this is a programming error. */
     if (ctx->layout_depth != 0) {
@@ -930,7 +1164,7 @@ static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
     /* ── Hit testing ──────────────────────────────────────────────────── */
     /* Check if the mouse cursor is within this button's bounding rect.
      * If so, this widget becomes a candidate for hot. */
-    bool mouse_over = forge_ui__rect_contains(rect, ctx->mouse_x, ctx->mouse_y);
+    bool mouse_over = forge_ui__widget_mouse_over(ctx, rect);
 
     if (mouse_over) {
         ctx->next_hot = id;
@@ -1025,7 +1259,7 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
     /* The hit area covers the entire widget rect (box + label region).
      * This gives users a generous click target -- they can click on the
      * label text, not just the small box. */
-    bool mouse_over = forge_ui__rect_contains(rect, ctx->mouse_x, ctx->mouse_y);
+    bool mouse_over = forge_ui__widget_mouse_over(ctx, rect);
     if (mouse_over) {
         ctx->next_hot = id;
     }
@@ -1124,7 +1358,7 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
     /* The hit area covers the entire widget rect.  Clicking anywhere on
      * the track (not just the thumb) activates the slider and snaps the
      * value to the click position. */
-    bool mouse_over = forge_ui__rect_contains(rect, ctx->mouse_x, ctx->mouse_y);
+    bool mouse_over = forge_ui__widget_mouse_over(ctx, rect);
     if (mouse_over) {
         ctx->next_hot = id;
     }
@@ -1261,7 +1495,7 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
     bool is_focused = (ctx->focused == id);
 
     /* ── Hit testing ──────────────────────────────────────────────────── */
-    bool mouse_over = forge_ui__rect_contains(rect, ctx->mouse_x, ctx->mouse_y);
+    bool mouse_over = forge_ui__widget_mouse_over(ctx, rect);
     if (mouse_over) {
         ctx->next_hot = id;
     }
@@ -1572,6 +1806,16 @@ static inline ForgeUiRect forge_ui_ctx_layout_next(ForgeUiContext *ctx,
     }
 
     layout->item_count++;
+
+    /* Apply scroll offset when inside an active panel.  The widget's
+     * logical position stays unchanged in the layout cursor, but the
+     * returned rect is shifted upward by scroll_y so that content
+     * scrolls visually.  The clip rect (set by panel_begin) discards
+     * any quads that fall outside the visible area. */
+    if (ctx->_panel_active && ctx->_panel.scroll_y) {
+        result.y -= *ctx->_panel.scroll_y;
+    }
+
     return result;
 }
 
@@ -1636,6 +1880,196 @@ static inline bool forge_ui_ctx_slider_layout(ForgeUiContext *ctx,
     if (!(max_val > min_val)) return false;  /* also rejects NaN */
     ForgeUiRect rect = forge_ui_ctx_layout_next(ctx, size);
     return forge_ui_ctx_slider(ctx, id, value, min_val, max_val, rect);
+}
+
+/* ── Panel implementation ───────────────────────────────────────────────── */
+
+static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
+                                             Uint32 id,
+                                             const char *title,
+                                             ForgeUiRect rect,
+                                             float *scroll_y)
+{
+    if (!ctx || !ctx->atlas || id == FORGE_UI_ID_NONE || !scroll_y) return false;
+
+    /* ── Draw panel background ────────────────────────────────────────── */
+    forge_ui__emit_rect(ctx, rect,
+                        FORGE_UI_PANEL_BG_R, FORGE_UI_PANEL_BG_G,
+                        FORGE_UI_PANEL_BG_B, FORGE_UI_PANEL_BG_A);
+
+    /* ── Draw title bar ───────────────────────────────────────────────── */
+    ForgeUiRect title_rect = {
+        rect.x, rect.y,
+        rect.w, FORGE_UI_PANEL_TITLE_HEIGHT
+    };
+    forge_ui__emit_rect(ctx, title_rect,
+                        FORGE_UI_PANEL_TITLE_BG_R, FORGE_UI_PANEL_TITLE_BG_G,
+                        FORGE_UI_PANEL_TITLE_BG_B, FORGE_UI_PANEL_TITLE_BG_A);
+
+    /* Center the title text in the title bar */
+    if (title && title[0] != '\0') {
+        ForgeUiTextMetrics m = forge_ui_text_measure(ctx->atlas, title, NULL);
+        float ascender_px = 0.0f;
+        if (ctx->atlas->units_per_em > 0) {
+            float scale = ctx->atlas->pixel_height / (float)ctx->atlas->units_per_em;
+            ascender_px = (float)ctx->atlas->ascender * scale;
+        }
+        float tx = rect.x + (rect.w - m.width) * 0.5f;
+        float ty = rect.y + (FORGE_UI_PANEL_TITLE_HEIGHT - m.height) * 0.5f
+                   + ascender_px;
+        forge_ui_ctx_label(ctx, title, tx, ty,
+                           FORGE_UI_PANEL_TITLE_TEXT_R, FORGE_UI_PANEL_TITLE_TEXT_G,
+                           FORGE_UI_PANEL_TITLE_TEXT_B, FORGE_UI_PANEL_TITLE_TEXT_A);
+    }
+
+    /* ── Compute content area ─────────────────────────────────────────── */
+    float pad = FORGE_UI_PANEL_PADDING;
+    ForgeUiRect content = {
+        rect.x + pad,
+        rect.y + FORGE_UI_PANEL_TITLE_HEIGHT + pad,
+        rect.w - 2.0f * pad - FORGE_UI_SCROLLBAR_WIDTH,
+        rect.h - FORGE_UI_PANEL_TITLE_HEIGHT - 2.0f * pad
+    };
+    if (content.w < 0.0f) content.w = 0.0f;
+    if (content.h < 0.0f) content.h = 0.0f;
+
+    /* ── Store panel state ────────────────────────────────────────────── */
+    ctx->_panel.rect = rect;
+    ctx->_panel.content_rect = content;
+    ctx->_panel.scroll_y = scroll_y;
+    ctx->_panel.content_height = 0.0f;
+    ctx->_panel.id = id;
+    ctx->_panel_active = true;
+
+    /* ── Apply mouse wheel scrolling ──────────────────────────────────── */
+    if (ctx->scroll_delta != 0.0f &&
+        forge_ui__rect_contains(content, ctx->mouse_x, ctx->mouse_y)) {
+        *scroll_y += ctx->scroll_delta * FORGE_UI_SCROLL_SPEED;
+        if (*scroll_y < 0.0f) *scroll_y = 0.0f;
+        /* Upper clamp happens in panel_end once content_height is known */
+    }
+
+    /* ── Set clip rect to the content area ────────────────────────────── */
+    ctx->clip_rect = content;
+    ctx->has_clip = true;
+
+    /* ── Push a vertical layout inside the content area ───────────────── */
+    forge_ui_ctx_layout_push(ctx, content,
+                              FORGE_UI_LAYOUT_VERTICAL,
+                              0.0f, 8.0f);
+
+    /* Record the layout cursor start position so panel_end can compute
+     * how far child widgets advanced (= content_height) */
+    if (ctx->layout_depth > 0) {
+        ctx->_panel_content_start_y =
+            ctx->layout_stack[ctx->layout_depth - 1].cursor_y;
+    }
+
+    return true;
+}
+
+static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx)
+{
+    if (!ctx || !ctx->_panel_active) return;
+
+    /* ── Compute content height from layout cursor advancement ────────── */
+    float content_h = 0.0f;
+    if (ctx->layout_depth > 0) {
+        float cursor_now = ctx->layout_stack[ctx->layout_depth - 1].cursor_y;
+        content_h = cursor_now - ctx->_panel_content_start_y;
+        if (content_h < 0.0f) content_h = 0.0f;
+    }
+    ctx->_panel.content_height = content_h;
+
+    /* ── Pop the internal layout ──────────────────────────────────────── */
+    forge_ui_ctx_layout_pop(ctx);
+
+    /* ── Clear clip rect and panel state ──────────────────────────────── */
+    ctx->has_clip = false;
+    ctx->_panel_active = false;
+
+    /* ── Clamp scroll_y to [0, max_scroll] ────────────────────────────── */
+    float visible_h = ctx->_panel.content_rect.h;
+    float max_scroll = content_h - visible_h;
+    if (max_scroll < 0.0f) max_scroll = 0.0f;
+
+    float *scroll_y = ctx->_panel.scroll_y;
+    if (*scroll_y > max_scroll) *scroll_y = max_scroll;
+    if (*scroll_y < 0.0f) *scroll_y = 0.0f;
+
+    /* ── Draw scrollbar (only if content overflows) ───────────────────── */
+    if (content_h <= visible_h) return;
+
+    ForgeUiRect cr = ctx->_panel.content_rect;
+    float track_x = ctx->_panel.rect.x + ctx->_panel.rect.w
+                     - FORGE_UI_PANEL_PADDING - FORGE_UI_SCROLLBAR_WIDTH;
+    float track_y = cr.y;
+    float track_h = cr.h;
+    float track_w = FORGE_UI_SCROLLBAR_WIDTH;
+
+    /* Track background */
+    ForgeUiRect track_rect = { track_x, track_y, track_w, track_h };
+    forge_ui__emit_rect(ctx, track_rect,
+                        FORGE_UI_SB_TRACK_R, FORGE_UI_SB_TRACK_G,
+                        FORGE_UI_SB_TRACK_B, FORGE_UI_SB_TRACK_A);
+
+    /* Thumb geometry */
+    float thumb_h = track_h * visible_h / content_h;
+    if (thumb_h < FORGE_UI_SCROLLBAR_MIN_THUMB)
+        thumb_h = FORGE_UI_SCROLLBAR_MIN_THUMB;
+    float thumb_range = track_h - thumb_h;
+    float t = (max_scroll > 0.0f) ? *scroll_y / max_scroll : 0.0f;
+    float thumb_y = track_y + t * thumb_range;
+
+    ForgeUiRect thumb_rect = { track_x, thumb_y, track_w, thumb_h };
+    Uint32 sb_id = ctx->_panel.id + 1;
+
+    /* ── Scrollbar thumb interaction (same drag pattern as slider) ────── */
+    bool thumb_over = forge_ui__rect_contains(thumb_rect,
+                                               ctx->mouse_x, ctx->mouse_y);
+    if (thumb_over) {
+        ctx->next_hot = sb_id;
+    }
+
+    bool mouse_pressed = ctx->mouse_down && !ctx->mouse_down_prev;
+    if (mouse_pressed && ctx->next_hot == sb_id) {
+        ctx->active = sb_id;
+    }
+
+    /* Drag: map mouse y to scroll_y while active */
+    if (ctx->active == sb_id && ctx->mouse_down) {
+        float drag_t = 0.0f;
+        if (thumb_range > 0.0f) {
+            drag_t = (ctx->mouse_y - track_y - thumb_h * 0.5f) / thumb_range;
+        }
+        if (drag_t < 0.0f) drag_t = 0.0f;
+        if (drag_t > 1.0f) drag_t = 1.0f;
+        *scroll_y = drag_t * max_scroll;
+    }
+
+    /* Release: clear active */
+    if (ctx->active == sb_id && !ctx->mouse_down) {
+        ctx->active = FORGE_UI_ID_NONE;
+    }
+
+    /* ── Choose thumb color by state ──────────────────────────────────── */
+    float th_r, th_g, th_b, th_a;
+    if (ctx->active == sb_id) {
+        th_r = FORGE_UI_SB_ACTIVE_R;  th_g = FORGE_UI_SB_ACTIVE_G;
+        th_b = FORGE_UI_SB_ACTIVE_B;  th_a = FORGE_UI_SB_ACTIVE_A;
+    } else if (ctx->hot == sb_id) {
+        th_r = FORGE_UI_SB_HOT_R;  th_g = FORGE_UI_SB_HOT_G;
+        th_b = FORGE_UI_SB_HOT_B;  th_a = FORGE_UI_SB_HOT_A;
+    } else {
+        th_r = FORGE_UI_SB_NORMAL_R;  th_g = FORGE_UI_SB_NORMAL_G;
+        th_b = FORGE_UI_SB_NORMAL_B;  th_a = FORGE_UI_SB_NORMAL_A;
+    }
+
+    /* Recompute thumb_y after potential drag update */
+    t = (max_scroll > 0.0f) ? *scroll_y / max_scroll : 0.0f;
+    thumb_y = track_y + t * thumb_range;
+    thumb_rect = (ForgeUiRect){ track_x, thumb_y, track_w, thumb_h };
+    forge_ui__emit_rect(ctx, thumb_rect, th_r, th_g, th_b, th_a);
 }
 
 #endif /* FORGE_UI_CTX_H */
