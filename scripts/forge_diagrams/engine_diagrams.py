@@ -2739,8 +2739,24 @@ def diagram_three_areas():
     # Box parameters: (x, y, width, height, label, subtitle, color)
     boxes = [
         (0.2, 1.5, 3.2, 3.0, "Working\nDirectory", "Files on disk", STYLE["accent2"]),
-        (4.4, 1.5, 3.2, 3.0, "Staging Area\n(Index)", "Next commit\npreview", STYLE["warn"]),
-        (8.6, 1.5, 3.2, 3.0, "Repository\n(HEAD)", "Committed\nhistory", STYLE["accent3"]),
+        (
+            4.4,
+            1.5,
+            3.2,
+            3.0,
+            "Staging Area\n(Index)",
+            "Next commit\npreview",
+            STYLE["warn"],
+        ),
+        (
+            8.6,
+            1.5,
+            3.2,
+            3.0,
+            "Repository\n(HEAD)",
+            "Committed\nhistory",
+            STYLE["accent3"],
+        ),
     ]
 
     for bx, by, bw, bh, label, sub, color in boxes:
@@ -2927,7 +2943,14 @@ def diagram_worktree_architecture():
     # Worktree boxes
     wt_data = [
         (0.2, 0.2, "forge-gpu/", "main", STYLE["accent1"], "You work here"),
-        (4.2, 0.2, "forge-gpu-bloom/", "feature-bloom", STYLE["accent2"], "Agent works here"),
+        (
+            4.2,
+            0.2,
+            "forge-gpu-bloom/",
+            "feature-bloom",
+            STYLE["accent2"],
+            "Agent works here",
+        ),
         (8.2, 0.2, "forge-gpu-fog/", "feature-fog", STYLE["accent3"], "Another agent"),
     ]
 
@@ -3001,9 +3024,7 @@ def diagram_worktree_architecture():
 # ---------------------------------------------------------------------------
 def diagram_submodule_vs_fetchcontent():
     """Side-by-side comparison of submodules vs FetchContent."""
-    fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(13, 6), facecolor=STYLE["bg"]
-    )
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 6), facecolor=STYLE["bg"])
 
     for ax in (ax1, ax2):
         ax.set_facecolor(STYLE["bg"])

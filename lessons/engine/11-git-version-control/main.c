@@ -63,9 +63,9 @@ static FileVersion version_create(const char *name, const char *contents)
 #define MAX_FILES 8
 
 typedef struct GitArea {
-    const char *name;
-    FileVersion files[MAX_FILES];
-    int         count;
+    const char *name;               /* area label ("working dir", "staging", "HEAD") */
+    FileVersion files[MAX_FILES];   /* file snapshots stored in this area */
+    int         count;              /* number of files currently in the area */
 } GitArea;
 
 static void area_init(GitArea *area, const char *name)
