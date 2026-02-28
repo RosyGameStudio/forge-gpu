@@ -84,6 +84,20 @@
 #define SLIDER_HEIGHT     30.0f   /* height of slider widget */
 #define LABEL_HEIGHT      26.0f   /* height of each label row */
 
+/* ── Slider demo range ─────────────────────────────────────────────────── */
+#define SLIDER_MIN        0.0f    /* slider minimum value */
+#define SLIDER_MAX      100.0f    /* slider maximum value */
+#define SLIDER_INITIAL   50.0f    /* slider starting value */
+
+/* ── Simulated scroll amount ───────────────────────────────────────────── */
+#define SCROLL_STEP       2.0f    /* mouse wheel delta per simulated scroll */
+
+/* ── Idle cursor position margin ───────────────────────────────────────── */
+#define IDLE_CURSOR_MARGIN  20.0f  /* pixels from edge for idle cursor */
+
+/* ── Checkbox click nudge ──────────────────────────────────────────────── */
+#define CB_CLICK_NUDGE   10.0f    /* horizontal offset into checkbox hit area */
+
 /* ── Widget IDs ──────────────────────────────────────────────────────────── */
 /* Settings window: ID 100, scrollbar 101, collapse toggle 102 */
 #define ID_SETTINGS_WIN     100
@@ -155,9 +169,9 @@ static bool render_frame_bmp(const char *path,
     forge_raster_clear(&fb, BG_CLEAR_R, BG_CLEAR_G, BG_CLEAR_B, BG_CLEAR_A);
 
     ForgeRasterTexture tex = {
-        atlas->pixels,
-        atlas->width,
-        atlas->height
+        .pixels = atlas->pixels,
+        .width  = atlas->width,
+        .height = atlas->height
     };
 
     forge_raster_triangles_indexed(
@@ -213,7 +227,7 @@ static void declare_windows(ForgeUiWindowContext *wctx,
                 &checkboxes[i], CHECKBOX_HEIGHT);
         }
         (void)forge_ui_ctx_slider_layout(
-            ctx, ID_SLIDER, slider_val, 0.0f, 100.0f, SLIDER_HEIGHT);
+            ctx, ID_SLIDER, slider_val, SLIDER_MIN, SLIDER_MAX, SLIDER_HEIGHT);
         forge_ui_wctx_window_end(wctx);
     }
 
@@ -361,7 +375,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < CHECKBOX_COUNT; i++) {
         checkboxes[i] = (i % 2 == 0);  /* every other checkbox starts checked */
     }
-    float slider_val = 50.0f;
+    float slider_val = SLIDER_INITIAL;
 
     /* Window states (application-owned, persist across frames) */
     ForgeUiWindowState settings_win = {
@@ -386,8 +400,8 @@ int main(int argc, char *argv[])
     bool had_render_error = false;
 
     /* ── Cursor positions for simulated interactions ──────────────────── */
-    float idle_mx = FB_WIDTH - 20.0f;
-    float idle_my = 20.0f;
+    float idle_mx = FB_WIDTH - IDLE_CURSOR_MARGIN;
+    float idle_my = IDLE_CURSOR_MARGIN;
 
     /* Settings title bar center for dragging */
     float settings_title_cx = SETTINGS_X + SETTINGS_W * 0.5f;
@@ -403,7 +417,7 @@ int main(int argc, char *argv[])
     float info_content_cy = INFO_Y + FORGE_UI_WIN_TITLE_HEIGHT + INFO_H * 0.3f;
 
     /* Checkbox click position in Settings (first checkbox) */
-    float cb_click_x = SETTINGS_X + FORGE_UI_WIN_PADDING + 10.0f;
+    float cb_click_x = SETTINGS_X + FORGE_UI_WIN_PADDING + CB_CLICK_NUDGE;
     float cb_click_y = SETTINGS_Y + FORGE_UI_WIN_TITLE_HEIGHT
                        + FORGE_UI_WIN_PADDING + CHECKBOX_HEIGHT * 0.5f;
 
@@ -447,11 +461,11 @@ int main(int argc, char *argv[])
           "Release -- Info window expanded again" },
 
         /* Frame 8: Scroll down in Info window */
-        { info_content_cx, info_content_cy, false, 2.0f,
+        { info_content_cx, info_content_cy, false, SCROLL_STEP,
           "Mouse wheel scroll down in Info window" },
 
         /* Frame 9: Continue scrolling */
-        { info_content_cx, info_content_cy, false, 2.0f,
+        { info_content_cx, info_content_cy, false, SCROLL_STEP,
           "Continue scrolling Info content" },
 
         /* Frame 10: Click checkbox in Settings (overlapping Status) */

@@ -113,6 +113,11 @@
 #define FORGE_UI_WIN_TOGGLE_HOT_B  0.90f
 #define FORGE_UI_WIN_TOGGLE_HOT_A  1.00f
 
+/* Extra padding around the collapse toggle triangle to make the click
+ * target more forgiving.  The hit rect extends this many pixels beyond
+ * the triangle bounding box on each side. */
+#define FORGE_UI_WIN_TOGGLE_HIT_PAD  2.0f
+
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
 /* Application-owned window state that persists across frames.
@@ -143,13 +148,13 @@ typedef struct ForgeUiWindowEntry {
     Uint32               id;        /* widget ID for this window */
     ForgeUiWindowState  *state;     /* pointer to application-owned state */
 
-    /* Per-window draw list (temporary, reset each frame) */
-    ForgeUiVertex       *vertices;
-    int                  vertex_count;
-    int                  vertex_capacity;
-    Uint32              *indices;
-    int                  index_count;
-    int                  index_capacity;
+    /* Per-window draw list (temporary, filled during declaration, reset each frame) */
+    ForgeUiVertex       *vertices;         /* heap-allocated vertex array for this window */
+    int                  vertex_count;     /* number of vertices emitted so far */
+    int                  vertex_capacity;  /* current allocation size (grows dynamically) */
+    Uint32              *indices;          /* heap-allocated index array for this window */
+    int                  index_count;      /* number of indices emitted so far */
+    int                  index_capacity;   /* current allocation size (grows dynamically) */
 } ForgeUiWindowEntry;
 
 /* Window context that wraps a ForgeUiContext with window management.
@@ -710,8 +715,10 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
 
     /* Toggle hit rect (generous click target around the triangle) */
     ForgeUiRect toggle_hit_rect = {
-        toggle_cx - half - 2.0f, toggle_cy - half - 2.0f,
-        FORGE_UI_WIN_TOGGLE_SIZE + 4.0f, FORGE_UI_WIN_TOGGLE_SIZE + 4.0f
+        toggle_cx - half - FORGE_UI_WIN_TOGGLE_HIT_PAD,
+        toggle_cy - half - FORGE_UI_WIN_TOGGLE_HIT_PAD,
+        FORGE_UI_WIN_TOGGLE_SIZE + FORGE_UI_WIN_TOGGLE_HIT_PAD * 2.0f,
+        FORGE_UI_WIN_TOGGLE_SIZE + FORGE_UI_WIN_TOGGLE_HIT_PAD * 2.0f
     };
 
     bool toggle_over = can_receive_input &&

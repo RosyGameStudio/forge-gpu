@@ -209,7 +209,7 @@ The solution is a **pre-pass** at the start of each frame:
    rect contains the mouse cursor. We cannot use the current frame's data
    because windows have not been declared yet.
 2. The highest-z window containing the mouse becomes `hovered_window_id`.
-4. During widget processing, hit tests inside a window only succeed if that
+3. During widget processing, hit tests inside a window only succeed if that
    window's ID matches `hovered_window_id`. Widgets in other windows at the
    same screen position silently fail their hit tests.
 
@@ -270,7 +270,7 @@ forge_ui_wctx_begin(&wctx);
 
 /* Declare windows and their contents */
 if (forge_ui_wctx_window_begin(&wctx, 100, "My Window", &win_state)) {
-    forge_ui_ctx_label_layout(ctx, "Hello", 26.0f, 0.9f, 0.9f, 0.9f, 1.0f);
+    forge_ui_ctx_label_layout(wctx.ctx, "Hello", 26.0f, 0.9f, 0.9f, 0.9f, 1.0f);
     forge_ui_wctx_window_end(&wctx);
 }
 
@@ -314,6 +314,17 @@ In forge-gpu lessons:
 - [Engine Lesson 10 — CPU Rasterization](../../engine/10-cpu-rasterization/)
   provides the software rasterizer used to render BMP output
 
+## AI skill
+
+This lesson has a matching Claude Code skill:
+[`ui-lesson`](../../../.claude/skills/ui-lesson/SKILL.md) -- invoke it to
+scaffold new UI lessons following the same structure and conventions.
+
+A dedicated skill for draggable windows is available:
+[`draggable-windows`](../../../.claude/skills/draggable-windows/SKILL.md) --
+invoke it to add draggable, z-ordered windows to any `ForgeUiContext`
+application.
+
 ## Building
 
 ```bash
@@ -326,6 +337,12 @@ build\lessons\ui\10-windows\Debug\10-windows.exe
 # Linux / macOS
 ./build/lessons/ui/10-windows/10-windows
 ```
+
+## What's next
+
+- **[UI Lesson 11 -- Game UI](../11-game-ui/)** (planned) -- applying windows
+  and panels to game-specific UI patterns such as inventory screens, dialogue
+  boxes, and HUDs
 
 ## Exercises
 

@@ -7198,7 +7198,9 @@ def diagram_window_anatomy():
     # Window outer frame
     wx, wy, ww, wh = 1.5, 0.5, 7.0, 8.0
     win = mpatches.FancyBboxPatch(
-        (wx, wy), ww, wh,
+        (wx, wy),
+        ww,
+        wh,
         boxstyle="round,pad=0.08",
         facecolor=STYLE["surface"],
         edgecolor=STYLE["accent1"],
@@ -7209,7 +7211,9 @@ def diagram_window_anatomy():
     # Title bar
     th = 1.0
     title_rect = mpatches.FancyBboxPatch(
-        (wx + 0.05, wy + wh - th - 0.05), ww - 0.1, th,
+        (wx + 0.05, wy + wh - th - 0.05),
+        ww - 0.1,
+        th,
         boxstyle="round,pad=0.04",
         facecolor=STYLE["accent1"] + "40",
         edgecolor=STYLE["accent1"],
@@ -7221,10 +7225,11 @@ def diagram_window_anatomy():
     tri_x = wx + 0.4
     tri_cy = wy + wh - th / 2
     tri = plt.Polygon(
-        [[tri_x, tri_cy + 0.25], [tri_x, tri_cy - 0.25],
-         [tri_x + 0.35, tri_cy]],
-        closed=True, facecolor=STYLE["accent3"],
-        edgecolor=STYLE["accent3"], linewidth=1.5,
+        [[tri_x, tri_cy + 0.25], [tri_x, tri_cy - 0.25], [tri_x + 0.35, tri_cy]],
+        closed=True,
+        facecolor=STYLE["accent3"],
+        edgecolor=STYLE["accent3"],
+        linewidth=1.5,
     )
     ax.add_patch(tri)
 
@@ -7234,7 +7239,8 @@ def diagram_window_anatomy():
         xy=(tri_x + 0.15, tri_cy),
         xytext=(tri_x - 1.5, tri_cy + 1.2),
         color=STYLE["accent3"],
-        fontsize=9, fontweight="bold",
+        fontsize=9,
+        fontweight="bold",
         ha="center",
         arrowprops=dict(arrowstyle="->", color=STYLE["accent3"], lw=1.5),
         path_effects=stroke,
@@ -7242,9 +7248,12 @@ def diagram_window_anatomy():
 
     # Title text
     ax.text(
-        wx + 1.2, wy + wh - th / 2,
+        wx + 1.2,
+        wy + wh - th / 2,
         "Window Title",
-        color=STYLE["text"], fontsize=11, fontweight="bold",
+        color=STYLE["text"],
+        fontsize=11,
+        fontweight="bold",
         va="center",
         path_effects=stroke,
     )
@@ -7255,7 +7264,8 @@ def diagram_window_anatomy():
         xy=(wx + ww / 2, wy + wh - th / 2),
         xytext=(wx + ww + 1.5, wy + wh - 0.2),
         color=STYLE["accent1"],
-        fontsize=9, fontweight="bold",
+        fontsize=9,
+        fontweight="bold",
         ha="center",
         arrowprops=dict(arrowstyle="->", color=STYLE["accent1"], lw=1.5),
         path_effects=stroke,
@@ -7267,17 +7277,24 @@ def diagram_window_anatomy():
     cx, cy = wx + pad, wy + pad
     cw, ch = ww - 2 * pad - sbw, wh - th - 2 * pad
     content = mpatches.Rectangle(
-        (cx, cy), cw, ch,
+        (cx, cy),
+        cw,
+        ch,
         facecolor=STYLE["bg"] + "80",
         edgecolor=STYLE["accent2"],
-        linewidth=1, linestyle="--",
+        linewidth=1,
+        linestyle="--",
     )
     ax.add_patch(content)
     ax.text(
-        cx + cw / 2, cy + ch / 2,
+        cx + cw / 2,
+        cy + ch / 2,
         "content area\n(clipped)",
-        color=STYLE["accent2"], fontsize=10, fontweight="bold",
-        ha="center", va="center",
+        color=STYLE["accent2"],
+        fontsize=10,
+        fontweight="bold",
+        ha="center",
+        va="center",
         path_effects=stroke,
     )
 
@@ -7296,7 +7313,9 @@ def diagram_window_anatomy():
     # Scrollbar
     sx = wx + ww - pad - sbw
     scrollbar = mpatches.Rectangle(
-        (sx, cy), sbw, ch,
+        (sx, cy),
+        sbw,
+        ch,
         facecolor=STYLE["bg"] + "60",
         edgecolor=STYLE["text_dim"],
         linewidth=1,
@@ -7306,7 +7325,9 @@ def diagram_window_anatomy():
     # Scrollbar thumb
     thumb_h = ch * 0.3
     thumb = mpatches.FancyBboxPatch(
-        (sx + 0.05, cy + ch - thumb_h - 0.3), sbw - 0.1, thumb_h,
+        (sx + 0.05, cy + ch - thumb_h - 0.3),
+        sbw - 0.1,
+        thumb_h,
         boxstyle="round,pad=0.03",
         facecolor=STYLE["accent1"] + "80",
         edgecolor=STYLE["accent1"],
@@ -7328,23 +7349,31 @@ def diagram_window_anatomy():
     # Resize grip placeholder (grayed out, future work)
     grip_sz = 0.5
     grip = mpatches.Rectangle(
-        (wx + ww - grip_sz - 0.1, wy + 0.1), grip_sz, grip_sz,
+        (wx + ww - grip_sz - 0.1, wy + 0.1),
+        grip_sz,
+        grip_sz,
         facecolor=STYLE["text_dim"] + "20",
         edgecolor=STYLE["text_dim"] + "50",
-        linewidth=1, linestyle=":",
+        linewidth=1,
+        linestyle=":",
     )
     ax.add_patch(grip)
     ax.text(
-        wx + ww + 0.3, wy + 0.35,
+        wx + ww + 0.3,
+        wy + 0.35,
         "resize grip\n(future work)",
         color=STYLE["text_dim"],
-        fontsize=8, fontstyle="italic",
+        fontsize=8,
+        fontstyle="italic",
         path_effects=stroke,
     )
 
     ax.set_title(
         "Window Anatomy",
-        color=STYLE["text"], fontsize=14, fontweight="bold", pad=12,
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
     )
 
     fig.tight_layout()
@@ -7370,7 +7399,9 @@ def diagram_z_order_model():
         oy = 0.5 + i * 1.8
         w, h = 4.0, 2.5
         rect = mpatches.FancyBboxPatch(
-            (ox, oy), w, h,
+            (ox, oy),
+            w,
+            h,
             boxstyle="round,pad=0.06",
             facecolor=colors[i] + "35",
             edgecolor=colors[i],
@@ -7378,10 +7409,14 @@ def diagram_z_order_model():
         )
         ax.add_patch(rect)
         ax.text(
-            ox + w / 2, oy + h / 2,
+            ox + w / 2,
+            oy + h / 2,
             labels[i],
-            color=colors[i], fontsize=11, fontweight="bold",
-            ha="center", va="center",
+            color=colors[i],
+            fontsize=11,
+            fontweight="bold",
+            ha="center",
+            va="center",
             path_effects=stroke,
         )
 
@@ -7398,10 +7433,14 @@ def diagram_z_order_model():
         ),
     )
     ax.text(
-        0.5, 3.5,
+        0.5,
+        3.5,
         "click\nbrings\nto front",
-        color=STYLE["warn"], fontsize=10, fontweight="bold",
-        ha="center", va="center",
+        color=STYLE["warn"],
+        fontsize=10,
+        fontweight="bold",
+        ha="center",
+        va="center",
         path_effects=stroke,
     )
 
@@ -7413,25 +7452,34 @@ def diagram_z_order_model():
         arrowprops=dict(arrowstyle="-|>", color=STYLE["text_dim"], lw=1.5),
     )
     ax.text(
-        10.0, 3.8,
+        10.0,
+        3.8,
         "z (draw order)\nhigher = on top",
-        color=STYLE["text_dim"], fontsize=9,
-        ha="center", va="center",
+        color=STYLE["text_dim"],
+        fontsize=9,
+        ha="center",
+        va="center",
         path_effects=stroke,
     )
 
     # Result label
     ax.text(
-        7.0, 6.8,
+        7.0,
+        6.8,
         "after click: A.z = max(z) + 1",
-        color=STYLE["warn"], fontsize=9, fontweight="bold",
+        color=STYLE["warn"],
+        fontsize=9,
+        fontweight="bold",
         ha="center",
         path_effects=stroke,
     )
 
     ax.set_title(
         "Z-Order Model",
-        color=STYLE["text"], fontsize=14, fontweight="bold", pad=12,
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
     )
 
     fig.tight_layout()
@@ -7469,7 +7517,9 @@ def diagram_drag_mechanics():
 
         # Window body
         win = mpatches.FancyBboxPatch(
-            (wx, wy), ww, wh,
+            (wx, wy),
+            ww,
+            wh,
             boxstyle="round,pad=0.05",
             facecolor=STYLE["surface"],
             edgecolor=phase_colors[i],
@@ -7479,7 +7529,9 @@ def diagram_drag_mechanics():
 
         # Title bar
         title = mpatches.Rectangle(
-            (wx + 0.03, wy + wh - th), ww - 0.06, th,
+            (wx + 0.03, wy + wh - th),
+            ww - 0.06,
+            th,
             facecolor=phase_colors[i] + "40",
             edgecolor=phase_colors[i],
             linewidth=1,
@@ -7496,21 +7548,29 @@ def diagram_drag_mechanics():
                 xy=(wx, wy + wh),
                 xytext=(mx, my),
                 arrowprops=dict(
-                    arrowstyle="<->", color=STYLE["warn"], lw=1.5,
+                    arrowstyle="<->",
+                    color=STYLE["warn"],
+                    lw=1.5,
                     linestyle="--",
                 ),
             )
             ax.text(
-                (mx + wx) / 2 - 0.8, (my + wy + wh) / 2 + 0.3,
+                (mx + wx) / 2 - 0.8,
+                (my + wy + wh) / 2 + 0.3,
                 "grab_offset",
-                color=STYLE["warn"], fontsize=9, fontweight="bold",
+                color=STYLE["warn"],
+                fontsize=9,
+                fontweight="bold",
                 path_effects=stroke,
             )
             ax.text(
-                3.5, 0.5,
+                3.5,
+                0.5,
                 "grab_offset = mouse - rect.origin",
-                color=STYLE["text_dim"], fontsize=8,
-                ha="center", family="monospace",
+                color=STYLE["text_dim"],
+                fontsize=8,
+                ha="center",
+                family="monospace",
                 path_effects=stroke,
             )
         elif i == 1:
@@ -7522,29 +7582,41 @@ def diagram_drag_mechanics():
                 arrowprops=dict(arrowstyle="-|>", color=STYLE["warn"], lw=2),
             )
             ax.text(
-                3.5, 0.5,
+                3.5,
+                0.5,
                 "rect = mouse - grab_offset",
-                color=STYLE["text_dim"], fontsize=8,
-                ha="center", family="monospace",
+                color=STYLE["text_dim"],
+                fontsize=8,
+                ha="center",
+                family="monospace",
                 path_effects=stroke,
             )
         else:
             ax.text(
-                3.5, 0.5,
+                3.5,
+                0.5,
                 "active = ID_NONE",
-                color=STYLE["text_dim"], fontsize=8,
-                ha="center", family="monospace",
+                color=STYLE["text_dim"],
+                fontsize=8,
+                ha="center",
+                family="monospace",
                 path_effects=stroke,
             )
 
         ax.set_title(
             phase_titles[i],
-            color=phase_colors[i], fontsize=12, fontweight="bold", pad=8,
+            color=phase_colors[i],
+            fontsize=12,
+            fontweight="bold",
+            pad=8,
         )
 
     fig.suptitle(
         "Drag Mechanics",
-        color=STYLE["text"], fontsize=14, fontweight="bold", y=0.98,
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        y=0.98,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     save(fig, "ui/10-windows", "drag_mechanics.png")
@@ -7562,9 +7634,12 @@ def diagram_deferred_draw_pipeline():
 
     # Phase 1: Declaration (left side)
     ax.text(
-        2.5, 7.5,
+        2.5,
+        7.5,
         "Declaration Phase",
-        color=STYLE["text"], fontsize=12, fontweight="bold",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
         ha="center",
         path_effects=stroke,
     )
@@ -7576,7 +7651,9 @@ def diagram_deferred_draw_pipeline():
     for i in range(3):
         y = 5.5 - i * 2.2
         box = mpatches.FancyBboxPatch(
-            (0.5, y), 4.0, 1.5,
+            (0.5, y),
+            4.0,
+            1.5,
             boxstyle="round,pad=0.06",
             facecolor=win_colors[i] + "25",
             edgecolor=win_colors[i],
@@ -7584,17 +7661,23 @@ def diagram_deferred_draw_pipeline():
         )
         ax.add_patch(box)
         ax.text(
-            1.2, y + 0.75,
+            1.2,
+            y + 0.75,
             win_labels[i],
-            color=win_colors[i], fontsize=9, fontweight="bold",
+            color=win_colors[i],
+            fontsize=9,
+            fontweight="bold",
             va="center",
             path_effects=stroke,
         )
         ax.text(
-            3.3, y + 0.75,
+            3.3,
+            y + 0.75,
             "V[] I[]",
-            color=STYLE["text_dim"], fontsize=9,
-            family="monospace", va="center",
+            color=STYLE["text_dim"],
+            fontsize=9,
+            family="monospace",
+            va="center",
             path_effects=stroke,
         )
 
@@ -7606,25 +7689,33 @@ def diagram_deferred_draw_pipeline():
         arrowprops=dict(arrowstyle="-|>", color=STYLE["warn"], lw=2.5),
     )
     ax.text(
-        6.0, 4.2,
+        6.0,
+        4.2,
         "sort by z_order",
-        color=STYLE["warn"], fontsize=10, fontweight="bold",
+        color=STYLE["warn"],
+        fontsize=10,
+        fontweight="bold",
         ha="center",
         path_effects=stroke,
     )
 
     # Phase 2: Final buffer (right side)
     ax.text(
-        10.5, 7.5,
+        10.5,
+        7.5,
         "Final Buffer (back-to-front)",
-        color=STYLE["text"], fontsize=12, fontweight="bold",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
         ha="center",
         path_effects=stroke,
     )
 
     # Main buffer with ordered window data
     main_box = mpatches.FancyBboxPatch(
-        (7.5, 0.5), 6.0, 6.0,
+        (7.5, 0.5),
+        6.0,
+        6.0,
         boxstyle="round,pad=0.08",
         facecolor=STYLE["surface"],
         edgecolor=STYLE["text"],
@@ -7634,17 +7725,22 @@ def diagram_deferred_draw_pipeline():
 
     # Non-window background widgets
     bg_box = mpatches.Rectangle(
-        (7.8, 5.2), 5.4, 0.8,
+        (7.8, 5.2),
+        5.4,
+        0.8,
         facecolor=STYLE["text_dim"] + "20",
         edgecolor=STYLE["text_dim"],
         linewidth=1,
     )
     ax.add_patch(bg_box)
     ax.text(
-        10.5, 5.6,
+        10.5,
+        5.6,
         "non-window widgets (background)",
-        color=STYLE["text_dim"], fontsize=8,
-        ha="center", va="center",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="center",
+        va="center",
         path_effects=stroke,
     )
 
@@ -7653,17 +7749,23 @@ def diagram_deferred_draw_pipeline():
     for i in range(3):
         y = 3.8 - i * 1.3
         seg = mpatches.Rectangle(
-            (7.8, y), 5.4, 0.9,
+            (7.8, y),
+            5.4,
+            0.9,
             facecolor=win_colors[i] + "25",
             edgecolor=win_colors[i],
             linewidth=1,
         )
         ax.add_patch(seg)
         ax.text(
-            10.5, y + 0.45,
+            10.5,
+            y + 0.45,
             seg_labels[i],
-            color=win_colors[i], fontsize=9, fontweight="bold",
-            ha="center", va="center",
+            color=win_colors[i],
+            fontsize=9,
+            fontweight="bold",
+            ha="center",
+            va="center",
             path_effects=stroke,
         )
 
@@ -7675,10 +7777,13 @@ def diagram_deferred_draw_pipeline():
         arrowprops=dict(arrowstyle="-|>", color=STYLE["text_dim"], lw=1.5),
     )
     ax.text(
-        14.0, 3.5,
+        14.0,
+        3.5,
         "draw\norder",
-        color=STYLE["text_dim"], fontsize=8,
-        ha="left", va="center",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="left",
+        va="center",
         path_effects=stroke,
     )
 
@@ -7698,29 +7803,39 @@ def diagram_input_routing_overlap():
 
     # Window A (lower z, partially behind)
     wa = mpatches.FancyBboxPatch(
-        (0.5, 1.0), 5.5, 5.5,
+        (0.5, 1.0),
+        5.5,
+        5.5,
         boxstyle="round,pad=0.06",
         facecolor=STYLE["accent2"] + "25",
         edgecolor=STYLE["accent2"],
-        linewidth=2, linestyle="--",
+        linewidth=2,
+        linestyle="--",
     )
     ax.add_patch(wa)
     ax.text(
-        1.5, 5.5,
+        1.5,
+        5.5,
         "Window A (z=0)",
-        color=STYLE["accent2"], fontsize=11, fontweight="bold",
+        color=STYLE["accent2"],
+        fontsize=11,
+        fontweight="bold",
         path_effects=stroke,
     )
     ax.text(
-        1.5, 2.0,
+        1.5,
+        2.0,
         "hit tests FAIL\n(not hovered window)",
-        color=STYLE["accent2"], fontsize=9,
+        color=STYLE["accent2"],
+        fontsize=9,
         path_effects=stroke,
     )
 
     # Window B (higher z, in front)
     wb = mpatches.FancyBboxPatch(
-        (3.0, 2.0), 5.5, 5.5,
+        (3.0, 2.0),
+        5.5,
+        5.5,
         boxstyle="round,pad=0.06",
         facecolor=STYLE["accent1"] + "30",
         edgecolor=STYLE["accent1"],
@@ -7728,24 +7843,32 @@ def diagram_input_routing_overlap():
     )
     ax.add_patch(wb)
     ax.text(
-        4.0, 6.5,
+        4.0,
+        6.5,
         "Window B (z=1)",
-        color=STYLE["accent1"], fontsize=11, fontweight="bold",
+        color=STYLE["accent1"],
+        fontsize=11,
+        fontweight="bold",
         path_effects=stroke,
     )
     ax.text(
-        6.5, 4.5,
+        6.5,
+        4.5,
         "hit tests PASS\n(hovered window)",
-        color=STYLE["accent1"], fontsize=9,
+        color=STYLE["accent1"],
+        fontsize=9,
         path_effects=stroke,
     )
 
     # Overlap region highlight
     overlap = mpatches.Rectangle(
-        (3.0, 2.0), 3.0, 4.5,
+        (3.0, 2.0),
+        3.0,
+        4.5,
         facecolor=STYLE["warn"] + "15",
         edgecolor=STYLE["warn"],
-        linewidth=1.5, linestyle=":",
+        linewidth=1.5,
+        linestyle=":",
     )
     ax.add_patch(overlap)
 
@@ -7757,16 +7880,20 @@ def diagram_input_routing_overlap():
         xy=(mx, my),
         xytext=(mx - 2.5, my - 1.5),
         color=STYLE["warn"],
-        fontsize=9, fontweight="bold",
+        fontsize=9,
+        fontweight="bold",
         arrowprops=dict(arrowstyle="->", color=STYLE["warn"], lw=1.5),
         path_effects=stroke,
     )
 
     # Resolution label
     ax.text(
-        5.0, 0.3,
+        5.0,
+        0.3,
         "hovered_window_id = B  (highest z containing mouse)",
-        color=STYLE["text"], fontsize=10, fontweight="bold",
+        color=STYLE["text"],
+        fontsize=10,
+        fontweight="bold",
         ha="center",
         path_effects=stroke,
         bbox=dict(
@@ -7778,7 +7905,10 @@ def diagram_input_routing_overlap():
 
     ax.set_title(
         "Input Routing for Overlapping Windows",
-        color=STYLE["text"], fontsize=14, fontweight="bold", pad=12,
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
     )
 
     fig.tight_layout()
@@ -7808,7 +7938,9 @@ def diagram_collapse_toggle():
             wy = 0.5
             wh = 5.5
             win = mpatches.FancyBboxPatch(
-                (wx, wy), ww, wh,
+                (wx, wy),
+                ww,
+                wh,
                 boxstyle="round,pad=0.06",
                 facecolor=STYLE["surface"],
                 edgecolor=STYLE["accent1"],
@@ -7818,17 +7950,23 @@ def diagram_collapse_toggle():
 
             # Content area
             content = mpatches.Rectangle(
-                (wx + 0.3, wy + 0.3), ww - 0.6, wh - th - 0.6,
+                (wx + 0.3, wy + 0.3),
+                ww - 0.6,
+                wh - th - 0.6,
                 facecolor=STYLE["bg"] + "60",
                 edgecolor=STYLE["accent2"],
-                linewidth=1, linestyle="--",
+                linewidth=1,
+                linestyle="--",
             )
             ax.add_patch(content)
             ax.text(
-                wx + ww / 2, wy + (wh - th) / 2,
+                wx + ww / 2,
+                wy + (wh - th) / 2,
                 "content area\n(widgets here)",
-                color=STYLE["accent2"], fontsize=10,
-                ha="center", va="center",
+                color=STYLE["accent2"],
+                fontsize=10,
+                ha="center",
+                va="center",
                 path_effects=stroke,
             )
 
@@ -7840,9 +7978,11 @@ def diagram_collapse_toggle():
                 arrowprops=dict(arrowstyle="<->", color=STYLE["text_dim"], lw=1.5),
             )
             ax.text(
-                wx + ww + 0.6, wy + wh / 2,
-                f"full\nheight",
-                color=STYLE["text_dim"], fontsize=9,
+                wx + ww + 0.6,
+                wy + wh / 2,
+                "full\nheight",
+                color=STYLE["text_dim"],
+                fontsize=9,
                 va="center",
                 path_effects=stroke,
             )
@@ -7851,7 +7991,9 @@ def diagram_collapse_toggle():
             wy = 4.0
             wh = th + 0.1
             win = mpatches.FancyBboxPatch(
-                (wx, wy), ww, wh,
+                (wx, wy),
+                ww,
+                wh,
                 boxstyle="round,pad=0.06",
                 facecolor=STYLE["surface"],
                 edgecolor=STYLE["accent1"],
@@ -7867,25 +8009,31 @@ def diagram_collapse_toggle():
                 arrowprops=dict(arrowstyle="<->", color=STYLE["text_dim"], lw=1.5),
             )
             ax.text(
-                wx + ww + 0.6, wy + wh / 2,
+                wx + ww + 0.6,
+                wy + wh / 2,
                 "title\nonly",
-                color=STYLE["text_dim"], fontsize=9,
+                color=STYLE["text_dim"],
+                fontsize=9,
                 va="center",
                 path_effects=stroke,
             )
 
             # Content height = 0 annotation
             ax.text(
-                wx + ww / 2, wy - 0.8,
+                wx + ww / 2,
+                wy - 0.8,
                 "content height = 0\n(no widgets emitted)",
-                color=STYLE["accent2"], fontsize=9,
+                color=STYLE["accent2"],
+                fontsize=9,
                 ha="center",
                 path_effects=stroke,
             )
 
         # Title bar
         title_bar = mpatches.Rectangle(
-            (wx + 0.05, wy + wh - th), ww - 0.1, th,
+            (wx + 0.05, wy + wh - th),
+            ww - 0.1,
+            th,
             facecolor=STYLE["accent1"] + "35",
             edgecolor=STYLE["accent1"],
             linewidth=1,
@@ -7897,36 +8045,47 @@ def diagram_collapse_toggle():
         tcy = wy + wh - th / 2
         if arrows[i] == "down":
             tri = plt.Polygon(
-                [[tcx - 0.2, tcy + 0.15], [tcx + 0.2, tcy + 0.15],
-                 [tcx, tcy - 0.2]],
-                closed=True, facecolor=STYLE["accent3"],
-                edgecolor=STYLE["accent3"], linewidth=1.5,
+                [[tcx - 0.2, tcy + 0.15], [tcx + 0.2, tcy + 0.15], [tcx, tcy - 0.2]],
+                closed=True,
+                facecolor=STYLE["accent3"],
+                edgecolor=STYLE["accent3"],
+                linewidth=1.5,
             )
         else:
             tri = plt.Polygon(
-                [[tcx - 0.12, tcy + 0.2], [tcx - 0.12, tcy - 0.2],
-                 [tcx + 0.2, tcy]],
-                closed=True, facecolor=STYLE["accent3"],
-                edgecolor=STYLE["accent3"], linewidth=1.5,
+                [[tcx - 0.12, tcy + 0.2], [tcx - 0.12, tcy - 0.2], [tcx + 0.2, tcy]],
+                closed=True,
+                facecolor=STYLE["accent3"],
+                edgecolor=STYLE["accent3"],
+                linewidth=1.5,
             )
         ax.add_patch(tri)
 
         ax.text(
-            wx + 1.3, wy + wh - th / 2,
+            wx + 1.3,
+            wy + wh - th / 2,
             "My Window",
-            color=STYLE["text"], fontsize=10, fontweight="bold",
+            color=STYLE["text"],
+            fontsize=10,
+            fontweight="bold",
             va="center",
             path_effects=stroke,
         )
 
         ax.set_title(
             titles[i],
-            color=STYLE["text"], fontsize=11, fontweight="bold", pad=8,
+            color=STYLE["text"],
+            fontsize=11,
+            fontweight="bold",
+            pad=8,
         )
 
     fig.suptitle(
         "Collapse Toggle",
-        color=STYLE["text"], fontsize=14, fontweight="bold", y=0.98,
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        y=0.98,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     save(fig, "ui/10-windows", "collapse_toggle.png")
@@ -7945,7 +8104,9 @@ def diagram_window_state_persistence():
     # Central state box
     bx, by, bw, bh = 3.5, 2.5, 5.0, 5.0
     state_box = mpatches.FancyBboxPatch(
-        (bx, by), bw, bh,
+        (bx, by),
+        bw,
+        bh,
         boxstyle="round,pad=0.12",
         facecolor=STYLE["surface"],
         edgecolor=STYLE["accent1"],
@@ -7954,9 +8115,12 @@ def diagram_window_state_persistence():
     ax.add_patch(state_box)
 
     ax.text(
-        bx + bw / 2, by + bh - 0.4,
+        bx + bw / 2,
+        by + bh - 0.4,
         "ForgeUiWindowState",
-        color=STYLE["accent1"], fontsize=12, fontweight="bold",
+        color=STYLE["accent1"],
+        fontsize=12,
+        fontweight="bold",
         ha="center",
         path_effects=stroke,
     )
@@ -7972,16 +8136,21 @@ def diagram_window_state_persistence():
     for j, (name, desc, color) in enumerate(fields):
         fy = by + bh - 1.2 - j * 1.0
         ax.text(
-            bx + 0.5, fy,
+            bx + 0.5,
+            fy,
             name,
-            color=color, fontsize=11, fontweight="bold",
+            color=color,
+            fontsize=11,
+            fontweight="bold",
             family="monospace",
             path_effects=stroke,
         )
         ax.text(
-            bx + 2.8, fy,
+            bx + 2.8,
+            fy,
             desc,
-            color=STYLE["text_dim"], fontsize=9,
+            color=STYLE["text_dim"],
+            fontsize=9,
             path_effects=stroke,
         )
 
@@ -8001,14 +8170,19 @@ def diagram_window_state_persistence():
             xy=(target_x, fy),
             xytext=(tx + (1.5 if tx < bx else -1.5), ty),
             arrowprops=dict(
-                arrowstyle="-|>", color=color, lw=2,
+                arrowstyle="-|>",
+                color=color,
+                lw=2,
                 connectionstyle="arc3,rad=0.15",
             ),
         )
         ax.text(
-            tx, ty,
+            tx,
+            ty,
             label,
-            color=color, fontsize=10, fontweight="bold",
+            color=color,
+            fontsize=10,
+            fontweight="bold",
             ha="center" if tx < bx else "center",
             va="center",
             path_effects=stroke,
@@ -8021,16 +8195,22 @@ def diagram_window_state_persistence():
 
     # Frame label
     ax.text(
-        6.0, 0.8,
+        6.0,
+        0.8,
         "application-owned: survives across frames",
-        color=STYLE["text_dim"], fontsize=10,
-        ha="center", fontstyle="italic",
+        color=STYLE["text_dim"],
+        fontsize=10,
+        ha="center",
+        fontstyle="italic",
         path_effects=stroke,
     )
 
     ax.set_title(
         "Window State Persistence",
-        color=STYLE["text"], fontsize=14, fontweight="bold", pad=12,
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=12,
     )
 
     fig.tight_layout()
@@ -8082,7 +8262,9 @@ def diagram_window_vs_panel_comparison():
 
         # Header box
         hbox = mpatches.FancyBboxPatch(
-            (0.3, 6.5), 7.0, 1.0,
+            (0.3, 6.5),
+            7.0,
+            1.0,
             boxstyle="round,pad=0.08",
             facecolor=color + "30",
             edgecolor=color,
@@ -8090,10 +8272,14 @@ def diagram_window_vs_panel_comparison():
         )
         ax.add_patch(hbox)
         ax.text(
-            3.8, 7.0,
+            3.8,
+            7.0,
             header,
-            color=color, fontsize=12, fontweight="bold",
-            ha="center", va="center",
+            color=color,
+            fontsize=12,
+            fontweight="bold",
+            ha="center",
+            va="center",
             path_effects=stroke,
         )
 
@@ -8105,22 +8291,30 @@ def diagram_window_vs_panel_comparison():
             feat_color = STYLE["text"] if has_it else STYLE["text_dim"]
 
             ax.text(
-                1.0, fy,
+                1.0,
+                fy,
                 marker,
-                color=marker_color, fontsize=10,
-                family="monospace", fontweight="bold",
+                color=marker_color,
+                fontsize=10,
+                family="monospace",
+                fontweight="bold",
                 path_effects=stroke,
             )
             ax.text(
-                2.0, fy,
+                2.0,
+                fy,
                 feat,
-                color=feat_color, fontsize=10,
+                color=feat_color,
+                fontsize=10,
                 path_effects=stroke,
             )
 
     fig.suptitle(
         "Window vs Panel Comparison",
-        color=STYLE["text"], fontsize=14, fontweight="bold", y=0.98,
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        y=0.98,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     save(fig, "ui/10-windows", "window_vs_panel_comparison.png")
