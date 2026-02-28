@@ -7077,7 +7077,7 @@ def diagram_mouse_wheel_and_drag():
     # Formula
     ax.text(
         px + pw / 2,
-        py - 0.2,
+        py - 0.6,
         "scroll_y += delta * SCROLL_SPEED",
         color=STYLE["warn"],
         fontsize=8,
@@ -7167,7 +7167,7 @@ def diagram_mouse_wheel_and_drag():
     # Formula
     ax.text(
         px + pw / 2,
-        py - 0.2,
+        py - 0.6,
         "scroll_y = (thumb_y - track_y) / (track_h - thumb_h) * max_scroll",
         color=STYLE["warn"],
         fontsize=7,
@@ -7176,5 +7176,5 @@ def diagram_mouse_wheel_and_drag():
         path_effects=[pe.withStroke(linewidth=2, foreground=STYLE["bg"])],
     )
 
-    fig.tight_layout(rect=[0, 0.05, 1, 0.92])
+    fig.tight_layout(rect=[0, 0.08, 1, 0.92])
     save(fig, "ui/09-panels-and-scrolling", "mouse_wheel_and_drag.png")
