@@ -1161,11 +1161,16 @@ static inline void forge_ui_ctx_end(ForgeUiContext *ctx)
 
     /* Safety net: if a panel was opened but never closed, clean up the
      * panel state and pop its layout so the damage is confined to this
-     * frame rather than leaking into the next one. */
+     * frame rather than leaking into the next one.  We also clear the
+     * panel identity fields so the pre-clamp check on the next frame
+     * cannot match against a panel that was never properly closed. */
     if (ctx->_panel_active) {
         SDL_Log("forge_ui_ctx_end: panel still active (missing panel_end call)");
         ctx->has_clip = false;
         ctx->_panel_active = false;
+        ctx->_panel.id = FORGE_UI_ID_NONE;
+        ctx->_panel.scroll_y = NULL;
+        ctx->_panel.content_height = 0.0f;
         if (ctx->layout_depth > 0) {
             forge_ui_ctx_layout_pop(ctx);
         }
