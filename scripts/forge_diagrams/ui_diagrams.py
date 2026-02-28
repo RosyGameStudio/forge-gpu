@@ -8183,7 +8183,7 @@ def diagram_window_state_persistence():
             color=color,
             fontsize=10,
             fontweight="bold",
-            ha="center" if tx < bx else "center",
+            ha="center",
             va="center",
             path_effects=stroke,
             bbox=dict(

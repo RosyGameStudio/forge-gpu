@@ -1967,7 +1967,7 @@ int main(int argc, char *argv[])
     test_covered_window_blocks_keyboard();
 
     SDL_Log("");
-    SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
+    SDL_Log("=== Results: %d tests, %d assertions passed, %d failed ===",
             test_count, pass_count, fail_count);
 
     /* Cleanup */
