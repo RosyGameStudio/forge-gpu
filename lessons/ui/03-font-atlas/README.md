@@ -54,17 +54,17 @@ writes three BMP files:
 
 **Full atlas** — every printable ASCII character packed into rows:
 
-![Font atlas](assets/atlas.bmp)
+![Font atlas](assets/atlas.png)
 
 **Debug atlas** — same image with 1px outlines around each glyph rectangle,
 making the shelf rows and padding gaps visible:
 
-![Debug atlas with outlines](assets/atlas_debug.bmp)
+![Debug atlas with outlines](assets/atlas_debug.png)
 
 **Extracted glyph** — the letter 'A' extracted from the atlas using its UV
 coordinates, proving the UV round-trip is correct:
 
-![Glyph A extracted from atlas](assets/glyph_A_from_atlas.bmp)
+![Glyph A extracted from atlas](assets/glyph_A_from_atlas.png)
 
 ## Key concepts
 
@@ -403,15 +403,15 @@ the texture format details — this lesson produces the CPU-side data.
 How do you validate that packing is correct? The demo program performs
 two verification steps:
 
-1. **Visual inspection**: write the atlas to `atlas.bmp` and open it.
+1. **Visual inspection**: write the atlas to `atlas.png` and open it.
    Check for overlapping glyphs (glyphs drawn on top of each other),
    cut-off glyphs (bitmaps extending past the atlas boundary), and
    correct padding (visible gaps between adjacent glyphs). The debug
-   BMP `atlas_debug.bmp` draws outlines around each glyph rectangle
+   BMP `atlas_debug.png` draws outlines around each glyph rectangle
    to make the shelf structure visible.
 
 2. **UV round-trip**: extract glyph 'A' from the atlas using its UV
-   coordinates and write it as a separate BMP (`glyph_A_from_atlas.bmp`).
+   coordinates and write it as a separate BMP (`glyph_A_from_atlas.png`).
    If the extracted image matches the original rasterized 'A', the UV
    coordinates are correct. This proves the full pipeline works:
    rasterize → pack → compute UVs → extract via UVs.

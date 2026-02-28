@@ -50,7 +50,7 @@ text content) — and simulates 12 frames of interaction.
 
 | Frame 0 | Frame 1 |
 |---------|---------|
-| ![Initial view](assets/windows_frame_0.bmp) | ![Bring Settings to front](assets/windows_frame_1.bmp) |
+| ![Initial view](assets/windows_frame_0.png) | ![Bring Settings to front](assets/windows_frame_1.png) |
 
 Frame 0 shows the initial arrangement with Info (z=2) on top. Frame 1 clicks
 the Settings title bar, promoting it to the highest z-order and beginning a
@@ -60,7 +60,7 @@ drag.
 
 | Frame 2 | Frame 3 |
 |---------|---------|
-| ![Dragging](assets/windows_frame_2.bmp) | ![Released](assets/windows_frame_3.bmp) |
+| ![Dragging](assets/windows_frame_2.png) | ![Released](assets/windows_frame_3.png) |
 
 The Settings window follows the cursor while maintaining the grab offset — the
 yellow dot stays at the same relative position within the title bar. Frame 3
@@ -70,7 +70,7 @@ shows the window at its new position after release.
 
 | Frame 5 | Frame 7 |
 |---------|---------|
-| ![Info collapsed](assets/windows_frame_5.bmp) | ![Info expanded](assets/windows_frame_7.bmp) |
+| ![Info collapsed](assets/windows_frame_5.png) | ![Info expanded](assets/windows_frame_7.png) |
 
 Frame 5: the Info window is collapsed to its title bar only (right-pointing
 triangle). Frame 7: expanded again (down-pointing triangle), content restored.
@@ -79,7 +79,7 @@ triangle). Frame 7: expanded again (down-pointing triangle), content restored.
 
 | Frame 9 | Frame 11 |
 |---------|----------|
-| ![Scrolled](assets/windows_frame_9.bmp) | ![Checkbox toggle](assets/windows_frame_11.bmp) |
+| ![Scrolled](assets/windows_frame_9.png) | ![Checkbox toggle](assets/windows_frame_11.png) |
 
 Frame 9: Info content scrolled down via mouse wheel. Frame 11: a checkbox in
 the Settings window is toggled while Settings overlaps Status — input routing
