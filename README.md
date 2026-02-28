@@ -34,8 +34,8 @@ you can use in your own projects.
 glTF scene loading, UI, and CPU rasterization. Documented, tested, and ready
 to drop into your own projects.
 
-**AI-ready skills** — Every lesson distills into a
-[Claude Code skill](https://code.claude.com/docs/en/skills). Copy
+**AI-ready skills** — Key lessons distill into
+[Claude Code skills](https://code.claude.com/docs/en/skills). Copy
 `.claude/skills/` into your project and build with AI that knows the same
 patterns you learned.
 
@@ -565,8 +565,8 @@ forge-gpu/
 
 ## Skills — Build with AI
 
-Every lesson distills into a **[Claude Code skill](https://code.claude.com/docs/en/skills)**
-that teaches AI agents the same pattern. Copy `.claude/skills/` into your own
+Key lessons distill into **[Claude Code skills](https://code.claude.com/docs/en/skills)**
+that teach AI agents the same patterns. Copy `.claude/skills/` into your own
 project to enable Claude to build games and tools with you.
 
 ### Building skills (use these in your projects)
