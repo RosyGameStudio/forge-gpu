@@ -112,9 +112,9 @@ For textured glyph quads, clipping also remaps UV coordinates.
 When a glyph quad extends past the clip edge, the visible portion must sample
 the correct subset of the glyph texture. The proportional formula:
 
-```text
-clipped_u = u0 + (u1 - u0) * (clipped_x - x0) / (x1 - x0)
-```
+$$
+\text{clipped}\_u = u_0 + (u_1 - u_0) \times \frac{\text{clipped}\_x - x_0}{x_1 - x_0}
+$$
 
 ![UV remap on clip](assets/uv_remap_on_clip.png)
 
@@ -167,11 +167,17 @@ of a raw `rect_contains` check.
 The scrollbar thumb height is proportional to how much of the content is
 visible at once:
 
-```text
-thumb_h   = track_h * visible_h / content_h
-thumb_y   = track_y + (scroll_y / max_scroll) * (track_h - thumb_h)
-max_scroll = content_h - visible_h
-```
+$$
+\text{thumb}\_h = \text{track}\_h \times \frac{\text{visible}\_h}{\text{content}\_h}
+$$
+
+$$
+\text{thumb}\_y = \text{track}\_y + \frac{\text{scroll}\_y}{\text{max}\_\text{scroll}} \times (\text{track}\_h - \text{thumb}\_h)
+$$
+
+$$
+\text{max}\_\text{scroll} = \text{content}\_h - \text{visible}\_h
+$$
 
 ![Scrollbar proportions](assets/scrollbar_proportions.png)
 

@@ -1951,8 +1951,11 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
         return false;
     }
 
-    /* Sanitize *scroll_y -- NaN or negative values would corrupt layout */
-    if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;  /* catches NaN too */
+    /* Sanitize *scroll_y: a negative offset would shift content downward
+     * (exposing blank space above the first widget), and NaN would poison
+     * every layout_next position.  The !(x >= 0) form catches both cases
+     * in one comparison because NaN comparisons always return false. */
+    if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;
 
     /* ── Draw panel background ────────────────────────────────────────── */
     forge_ui__emit_rect(ctx, rect,
@@ -2031,14 +2034,20 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
         forge_ui__rect_contains(content, ctx->mouse_x, ctx->mouse_y)) {
         *scroll_y += ctx->scroll_delta * FORGE_UI_SCROLL_SPEED;
         if (*scroll_y < 0.0f) *scroll_y = 0.0f;
-        /* Upper clamp happens in panel_end once content_height is known */
+        /* Upper clamp is deferred to panel_end because content_height
+         * is not known until all child widgets have been laid out. */
     }
 
-    /* ── Set clip rect to the content area ────────────────────────────── */
+    /* ── Set clip rect so child widgets outside the content area are
+     *    discarded (fully outside) or trimmed (partially outside).
+     *    This is what makes scrolling work: widgets placed above or
+     *    below the visible region are clipped rather than drawn. ────── */
     ctx->clip_rect = content;
     ctx->has_clip = true;
 
-    /* ── Push a vertical layout inside the content area ───────────────── */
+    /* ── Push a vertical layout (no extra padding, 8px spacing between
+     *    child widgets) so children fill the content width and stack
+     *    downward with consistent gaps. ───────────────────────────────── */
     if (!forge_ui_ctx_layout_push(ctx, content,
                                    FORGE_UI_LAYOUT_VERTICAL,
                                    0.0f, 8.0f)) {
@@ -2078,15 +2087,19 @@ static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx)
     ctx->has_clip = false;
     ctx->_panel_active = false;
 
-    /* ── Clamp scroll_y to [0, max_scroll] ────────────────────────────── */
+    /* ── Clamp scroll_y now that this frame's content_height is known.
+     *    panel_begin could only pre-clamp against the *previous* frame's
+     *    height; this is the authoritative clamp using measured data.
+     *    The !(x <= y) / !(x >= y) pattern forces NaN to the boundary
+     *    values, preventing it from propagating into next frame. ──────── */
     float visible_h = ctx->_panel.content_rect.h;
     float max_scroll = content_h - visible_h;
     if (max_scroll < 0.0f) max_scroll = 0.0f;
 
     float *scroll_y = ctx->_panel.scroll_y;
     if (!scroll_y) return;  /* defensive: should not happen given panel_begin checks */
-    if (!(*scroll_y <= max_scroll)) *scroll_y = max_scroll;  /* catches NaN too */
-    if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;  /* catches NaN too */
+    if (!(*scroll_y <= max_scroll)) *scroll_y = max_scroll;
+    if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;
 
     /* ── Draw scrollbar (only if content overflows AND track is usable) ── */
     if (content_h <= visible_h) return;
