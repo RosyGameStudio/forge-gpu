@@ -291,7 +291,47 @@ sections.
 
 ---
 
-## 10. Concept introduction for new readers
+## 10. README consistency with code changes
+
+**Any change to lesson code, common/ libraries, or project structure must be
+reflected in every README that references it.** Stale READMEs are how the
+project ends up with documented functions that don't exist, missing lessons in
+track tables, and outdated "coming soon" text for features that shipped months
+ago.
+
+**What to check:**
+
+- [ ] **Lesson README matches lesson code:** If the lesson's C code was changed
+  (new uniforms, renamed structs, added features, changed behavior), the
+  lesson's own `README.md` must reflect those changes — code snippets,
+  descriptions, and exercises should match the current code
+- [ ] **Track README lists the lesson:** Verify the lesson appears in its
+  track-level README table (`lessons/gpu/README.md`, `lessons/math/README.md`,
+  `lessons/engine/README.md`, or `lessons/ui/README.md`) with correct title,
+  description, and cross-references
+- [ ] **common/ library READMEs updated:** If the lesson adds or changes
+  functions, types, constants, or behavior in any `common/` library (math, obj,
+  gltf, ui, raster, capture), the corresponding `common/<lib>/README.md` must
+  document the additions — new function signatures, new types, new constants,
+  updated limitations or supported features
+- [ ] **Math lesson cross-references:** If the lesson uses a math concept that
+  has a matching math lesson, verify the GPU track README's "When to read math
+  lessons" list includes it
+- [ ] **Skills list updated:** If a new skill was created for this lesson,
+  verify it appears in the GPU track README's "Available skills" list
+- [ ] **No stale "coming soon" text:** Search the track README and lesson
+  READMEs for phrases like "coming soon", "future lesson", "not yet", or
+  "planned" that reference content this lesson now provides, and update them
+- [ ] **Where It's Used updated:** If the lesson uses a `common/` library,
+  verify the library's README lists this lesson in its "Where It's Used" section
+
+**How to check:** Read the lesson's code changes, then search every README that
+could reference them. Use `grep -r "lesson-name\|LibraryType\|function_name"`
+to find all mentions that might need updating.
+
+---
+
+## 11. Concept introduction for new readers
 
 **Lessons are written for readers who know nothing unless a previous lesson
 taught it.** Every concept, API, tool, or term that appears for the first time
@@ -344,7 +384,7 @@ no, it needs a definition or a link.
 
 ---
 
-## 11. Markdown linting
+## 12. Markdown linting
 
 Run the linter and resolve all issues.
 
@@ -361,7 +401,7 @@ npx markdownlint-cli2 "lessons/gpu/NN-name/**/*.md" "lessons/math/NN-name/**/*.m
 
 ---
 
-## 12. Python linting (if scripts were modified)
+## 13. Python linting (if scripts were modified)
 
 If any Python scripts in `scripts/` were added or modified:
 
@@ -376,7 +416,7 @@ ruff format --check scripts/
 
 ---
 
-## 13. Build and shader compilation
+## 14. Build and shader compilation
 
 Verify the lesson compiles and shaders are up to date.
 
@@ -408,10 +448,11 @@ Final Pass Results — Lesson NN: Name
  7. Spec accuracy         ✅ PASS
  8. Skill completeness    ✅ PASS
  9. README structure      ✅ PASS
-10. Concept introduction  ✅ PASS
-11. Markdown lint         ✅ PASS
-12. Python lint           ⏭️  SKIP  (no scripts modified)
-13. Build & shaders       ✅ PASS
+10. README consistency    ✅ PASS  (track, library, and skill READMEs checked)
+11. Concept introduction  ✅ PASS
+12. Markdown lint         ✅ PASS
+13. Python lint           ⏭️  SKIP  (no scripts modified)
+14. Build & shaders       ✅ PASS
 ```
 
 For each WARN or FAIL, list the specific file, line, and issue with a suggested
