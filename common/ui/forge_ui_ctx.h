@@ -1539,8 +1539,23 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
         ctx->active = FORGE_UI_ID_NONE;
     }
 
-    /* ── Keyboard input processing (only when focused) ────────────────── */
-    if (is_focused) {
+    /* ── Keyboard input processing (only when focused AND visible) ────── */
+    /* When a panel clips this widget off-screen, the widget rect lies
+     * entirely outside the clip rect.  Accepting keyboard input for an
+     * invisible widget would silently mutate the buffer with no visual
+     * feedback, so we suppress editing until the widget scrolls back
+     * into view.  Focus is intentionally preserved so the cursor
+     * reappears when the user scrolls back. */
+    bool visible = true;
+    if (ctx->has_clip) {
+        float cx1 = ctx->clip_rect.x + ctx->clip_rect.w;
+        float cy1 = ctx->clip_rect.y + ctx->clip_rect.h;
+        float rx1 = rect.x + rect.w;
+        float ry1 = rect.y + rect.h;
+        visible = !(rx1 <= ctx->clip_rect.x || rect.x >= cx1 ||
+                     ry1 <= ctx->clip_rect.y || rect.y >= cy1);
+    }
+    if (is_focused && visible) {
         /* Editing operations are mutually exclusive within a single frame.
          * When SDL delivers both a text input event and a key event in the
          * same frame, applying both would operate on inconsistent state

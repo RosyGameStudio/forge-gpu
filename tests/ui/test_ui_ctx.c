@@ -4723,6 +4723,85 @@ static void test_panel_mouse_wheel_scroll(void)
     forge_ui_ctx_free(&ctx);
 }
 
+/* ── Text input: clipped visibility suppresses keyboard input ─────────────── */
+
+static void test_text_input_clipped_ignores_keyboard(void)
+{
+    TEST("text_input: keyboard input suppressed when clipped out of view");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+
+    /* Frame 1: click to focus the text input */
+    ForgeUiRect ti_rect = { 20, 80, 200, 30 };
+    char buf[64] = "hello";
+    ForgeUiTextInputState state = { buf, 64, 5, 5 };
+
+    forge_ui_ctx_begin(&ctx, 120.0f, 95.0f, true);  /* mouse inside ti_rect */
+    forge_ui_ctx_text_input(&ctx, 100, &state, ti_rect, true);
+    forge_ui_ctx_end(&ctx);
+
+    /* Frame 2: release inside → acquires focus */
+    forge_ui_ctx_begin(&ctx, 120.0f, 95.0f, false);
+    forge_ui_ctx_text_input(&ctx, 100, &state, ti_rect, true);
+    forge_ui_ctx_end(&ctx);
+    ASSERT_EQ_U32(ctx.focused, 100);
+
+    /* Frame 3: set clip rect that excludes the text input, type a character */
+    forge_ui_ctx_begin(&ctx, 120.0f, 95.0f, false);
+    ctx.has_clip = true;
+    ctx.clip_rect = (ForgeUiRect){ 0, 0, 50, 50 };  /* ti_rect is outside */
+    ctx.text_input = "X";
+    forge_ui_ctx_text_input(&ctx, 100, &state, ti_rect, true);
+    forge_ui_ctx_end(&ctx);
+
+    /* Buffer should be unchanged -- keyboard input was suppressed */
+    ASSERT_EQ_INT(state.length, 5);
+    ASSERT_TRUE(SDL_strcmp(buf, "hello") == 0);
+    /* Focus should be preserved so it works again when scrolled back */
+    ASSERT_EQ_U32(ctx.focused, 100);
+
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_text_input_partially_visible_accepts_keyboard(void)
+{
+    TEST("text_input: keyboard input accepted when partially visible in clip");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+
+    /* Frame 1: focus the text input */
+    ForgeUiRect ti_rect = { 20, 40, 200, 30 };
+    char buf[64] = "hi";
+    ForgeUiTextInputState state = { buf, 64, 2, 2 };
+
+    forge_ui_ctx_begin(&ctx, 120.0f, 55.0f, true);
+    forge_ui_ctx_text_input(&ctx, 100, &state, ti_rect, true);
+    forge_ui_ctx_end(&ctx);
+
+    forge_ui_ctx_begin(&ctx, 120.0f, 55.0f, false);
+    forge_ui_ctx_text_input(&ctx, 100, &state, ti_rect, true);
+    forge_ui_ctx_end(&ctx);
+    ASSERT_EQ_U32(ctx.focused, 100);
+
+    /* Frame 3: clip rect overlaps ti_rect partially (clip top half) */
+    forge_ui_ctx_begin(&ctx, 120.0f, 55.0f, false);
+    ctx.has_clip = true;
+    ctx.clip_rect = (ForgeUiRect){ 0, 0, 300, 55 };  /* covers y 0-55, ti is 40-70 */
+    ctx.text_input = "!";
+    forge_ui_ctx_text_input(&ctx, 100, &state, ti_rect, true);
+    forge_ui_ctx_end(&ctx);
+
+    /* Partially visible → input accepted */
+    ASSERT_EQ_INT(state.length, 3);
+    ASSERT_TRUE(SDL_strcmp(buf, "hi!") == 0);
+
+    forge_ui_ctx_free(&ctx);
+}
+
 /* ── Additional validation tests (review pass) ───────────────────────────── */
 
 static void test_panel_begin_nan_width_rejected(void)
@@ -5020,6 +5099,10 @@ int main(int argc, char *argv[])
 
     /* Text input -- null-termination validation (audit fix) */
     test_text_input_bad_null_termination();
+
+    /* Text input -- clipped visibility */
+    test_text_input_clipped_ignores_keyboard();
+    test_text_input_partially_visible_accepts_keyboard();
 
     /* Layout -- push/pop basics */
     test_layout_push_returns_true();
