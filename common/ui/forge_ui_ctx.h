@@ -1112,6 +1112,8 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
     ctx->key_end = false;
     ctx->key_escape = false;
     ctx->_ti_press_claimed = false;
+    /* Reset suppression so widgets outside windows (or before the first
+     * window_begin call) can receive keyboard input normally. */
     ctx->_keyboard_input_suppressed = false;
 
     /* Reset scroll and panel state for this frame.  The caller sets

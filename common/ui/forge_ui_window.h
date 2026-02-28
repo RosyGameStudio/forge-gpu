@@ -42,7 +42,7 @@
  *   forge_ui_ctx_begin(&ctx, mouse_x, mouse_y, mouse_down);
  *   forge_ui_wctx_begin(&wctx);
  *   if (forge_ui_wctx_window_begin(&wctx, 100, "My Window", &win)) {
- *       forge_ui_ctx_label_layout(wctx.ctx, "Hello", 26, 0.9f, 0.9f, 0.9f, 1.0f);
+ *       forge_ui_ctx_label_layout(wctx.ctx, "Hello", 26.0f, 0.9f, 0.9f, 0.9f, 1.0f);
  *       forge_ui_wctx_window_end(&wctx);
  *   }
  *   forge_ui_wctx_end(&wctx);
@@ -360,7 +360,10 @@ static inline void forge_ui_win__restore_from_window(
 
     ForgeUiWindowEntry *entry = &wctx->window_entries[idx];
 
-    /* Save back the window's updated buffer state (may have grown) */
+    /* Save the window's final buffer state back to its entry.  Widget
+     * emit calls may have reallocated the buffers (growing capacity),
+     * so the entry's pointers and counts must reflect the current ctx
+     * state — not the values from redirect_to_window. */
     entry->vertices = ctx->vertices;
     entry->vertex_count = ctx->vertex_count;
     entry->vertex_capacity = ctx->vertex_capacity;

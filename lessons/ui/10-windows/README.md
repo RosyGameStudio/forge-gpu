@@ -270,7 +270,7 @@ forge_ui_wctx_begin(&wctx);
 
 /* Declare windows and their contents */
 if (forge_ui_wctx_window_begin(&wctx, 100, "My Window", &win_state)) {
-    forge_ui_ctx_label_layout(ctx, "Hello", 26, 0.9f, 0.9f, 0.9f, 1.0f);
+    forge_ui_ctx_label_layout(ctx, "Hello", 26.0f, 0.9f, 0.9f, 0.9f, 1.0f);
     forge_ui_wctx_window_end(&wctx);
 }
 
