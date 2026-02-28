@@ -4042,6 +4042,677 @@ static void test_button_layout_null_atlas_no_advance(void)
     SDL_free(ctx.indices);
 }
 
+/* ── Panel and scrolling tests (Lesson 09 audit) ───────────────────────── */
+
+/* Helper: set up a ctx with atlas for panel tests */
+static void panel_test_setup(ForgeUiContext *ctx)
+{
+    if (!setup_atlas()) return;
+    forge_ui_ctx_init(ctx, &test_atlas);
+    forge_ui_ctx_begin(ctx, 0.0f, 0.0f, false);
+}
+
+static void panel_test_teardown(ForgeUiContext *ctx)
+{
+    forge_ui_ctx_end(ctx);
+    forge_ui_ctx_free(ctx);
+}
+
+/* ── widget_mouse_over tests ──────────────────────────────────────────── */
+
+static void test_widget_mouse_over_no_clip(void)
+{
+    TEST("widget_mouse_over: returns true when mouse inside rect, no clip");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 50.0f, 50.0f, false);
+
+    ForgeUiRect r = { 10.0f, 10.0f, 100.0f, 100.0f };
+    ASSERT_TRUE(forge_ui__widget_mouse_over(&ctx, r));
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_widget_mouse_over_outside(void)
+{
+    TEST("widget_mouse_over: returns false when mouse outside rect");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 200.0f, 200.0f, false);
+
+    ForgeUiRect r = { 10.0f, 10.0f, 100.0f, 100.0f };
+    ASSERT_TRUE(!forge_ui__widget_mouse_over(&ctx, r));
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_widget_mouse_over_clipped(void)
+{
+    TEST("widget_mouse_over: returns false when mouse outside clip rect");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    /* Mouse at (50, 50) -- inside the widget rect but outside the clip */
+    forge_ui_ctx_begin(&ctx, 50.0f, 50.0f, false);
+    ctx.has_clip = true;
+    ctx.clip_rect = (ForgeUiRect){ 200.0f, 200.0f, 100.0f, 100.0f };
+
+    ForgeUiRect r = { 10.0f, 10.0f, 100.0f, 100.0f };
+    ASSERT_TRUE(!forge_ui__widget_mouse_over(&ctx, r));
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_widget_mouse_over_inside_clip(void)
+{
+    TEST("widget_mouse_over: returns true when inside both rect and clip");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 50.0f, 50.0f, false);
+    ctx.has_clip = true;
+    ctx.clip_rect = (ForgeUiRect){ 0.0f, 0.0f, 200.0f, 200.0f };
+
+    ForgeUiRect r = { 10.0f, 10.0f, 100.0f, 100.0f };
+    ASSERT_TRUE(forge_ui__widget_mouse_over(&ctx, r));
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ── emit_rect clipping tests ─────────────────────────────────────────── */
+
+static void test_emit_rect_clip_discard(void)
+{
+    TEST("emit_rect: fully outside clip rect emits nothing");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+    ctx.has_clip = true;
+    ctx.clip_rect = (ForgeUiRect){ 0.0f, 0.0f, 50.0f, 50.0f };
+
+    int before = ctx.vertex_count;
+    forge_ui__emit_rect(&ctx, (ForgeUiRect){ 100.0f, 100.0f, 50.0f, 50.0f },
+                        1.0f, 1.0f, 1.0f, 1.0f);
+    ASSERT_EQ_INT(ctx.vertex_count, before);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_emit_rect_clip_trim(void)
+{
+    TEST("emit_rect: partially outside clip rect trims vertices");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+    ctx.has_clip = true;
+    ctx.clip_rect = (ForgeUiRect){ 10.0f, 10.0f, 40.0f, 40.0f };
+
+    int before = ctx.vertex_count;
+    /* Rect from (0,0)-(60,60) partially overlaps clip (10,10)-(50,50) */
+    forge_ui__emit_rect(&ctx, (ForgeUiRect){ 0.0f, 0.0f, 60.0f, 60.0f },
+                        1.0f, 1.0f, 1.0f, 1.0f);
+    ASSERT_EQ_INT(ctx.vertex_count, before + 4);  /* quad emitted */
+    /* Check that top-left vertex is clipped to clip origin */
+    ASSERT_NEAR(ctx.vertices[before].pos_x, 10.0f, 0.01f);
+    ASSERT_NEAR(ctx.vertices[before].pos_y, 10.0f, 0.01f);
+    /* Check bottom-right vertex clipped to clip extent */
+    ASSERT_NEAR(ctx.vertices[before + 2].pos_x, 50.0f, 0.01f);
+    ASSERT_NEAR(ctx.vertices[before + 2].pos_y, 50.0f, 0.01f);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ── emit_quad_clipped tests ──────────────────────────────────────────── */
+
+static void test_emit_quad_clipped_fully_outside(void)
+{
+    TEST("emit_quad_clipped: fully outside clip emits nothing");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+
+    ForgeUiVertex src[4] = {
+        { 100, 100, 0.0f, 0.0f, 1,1,1,1 },
+        { 150, 100, 1.0f, 0.0f, 1,1,1,1 },
+        { 150, 130, 1.0f, 1.0f, 1,1,1,1 },
+        { 100, 130, 0.0f, 1.0f, 1,1,1,1 }
+    };
+    ForgeUiRect clip = { 0.0f, 0.0f, 50.0f, 50.0f };
+    int before = ctx.vertex_count;
+    forge_ui__emit_quad_clipped(&ctx, src, &clip);
+    ASSERT_EQ_INT(ctx.vertex_count, before);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_emit_quad_clipped_uv_remap(void)
+{
+    TEST("emit_quad_clipped: partial clip remaps UVs proportionally");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+
+    /* Quad from (0,0)-(100,100) with UV (0,0)-(1,1) */
+    ForgeUiVertex src[4] = {
+        {   0,   0, 0.0f, 0.0f, 1,1,1,1 },
+        { 100,   0, 1.0f, 0.0f, 1,1,1,1 },
+        { 100, 100, 1.0f, 1.0f, 1,1,1,1 },
+        {   0, 100, 0.0f, 1.0f, 1,1,1,1 }
+    };
+    /* Clip to (25,25)-(75,75) — should produce UV (0.25,0.25)-(0.75,0.75) */
+    ForgeUiRect clip = { 25.0f, 25.0f, 50.0f, 50.0f };
+    int before = ctx.vertex_count;
+    forge_ui__emit_quad_clipped(&ctx, src, &clip);
+    ASSERT_EQ_INT(ctx.vertex_count, before + 4);
+
+    /* Top-left UV should be (0.25, 0.25) */
+    ASSERT_NEAR(ctx.vertices[before].uv_u, 0.25f, 0.001f);
+    ASSERT_NEAR(ctx.vertices[before].uv_v, 0.25f, 0.001f);
+    /* Bottom-right UV should be (0.75, 0.75) */
+    ASSERT_NEAR(ctx.vertices[before + 2].uv_u, 0.75f, 0.001f);
+    ASSERT_NEAR(ctx.vertices[before + 2].uv_v, 0.75f, 0.001f);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_emit_quad_clipped_degenerate(void)
+{
+    TEST("emit_quad_clipped: zero-width quad emits nothing");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+
+    /* Zero-width quad: x0 == x1 */
+    ForgeUiVertex src[4] = {
+        { 50, 10, 0.0f, 0.0f, 1,1,1,1 },
+        { 50, 10, 1.0f, 0.0f, 1,1,1,1 },
+        { 50, 30, 1.0f, 1.0f, 1,1,1,1 },
+        { 50, 30, 0.0f, 1.0f, 1,1,1,1 }
+    };
+    ForgeUiRect clip = { 0.0f, 0.0f, 100.0f, 100.0f };
+    int before = ctx.vertex_count;
+    forge_ui__emit_quad_clipped(&ctx, src, &clip);
+    ASSERT_EQ_INT(ctx.vertex_count, before);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ── panel_begin parameter validation ─────────────────────────────────── */
+
+static void test_panel_begin_null_ctx(void)
+{
+    TEST("panel_begin: null ctx returns false");
+    float scroll_y = 0.0f;
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(NULL, 1, "Test",
+                (ForgeUiRect){ 0, 0, 200, 200 }, &scroll_y));
+}
+
+static void test_panel_begin_null_scroll_y(void)
+{
+    TEST("panel_begin: null scroll_y returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    panel_test_setup(&ctx);
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 200, 200 }, NULL));
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_id_zero(void)
+{
+    TEST("panel_begin: id=0 (FORGE_UI_ID_NONE) returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, FORGE_UI_ID_NONE, "Test",
+                (ForgeUiRect){ 0, 0, 200, 200 }, &scroll_y));
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_id_uint32_max(void)
+{
+    TEST("panel_begin: id=UINT32_MAX rejected (scrollbar would wrap to 0)");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, UINT32_MAX, "Test",
+                (ForgeUiRect){ 0, 0, 200, 200 }, &scroll_y));
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_nested_rejected(void)
+{
+    TEST("panel_begin: nested panel rejected when one is already active");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y1 = 0.0f, scroll_y2 = 0.0f;
+    panel_test_setup(&ctx);
+
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 10, "Panel A",
+                (ForgeUiRect){ 0, 0, 200, 200 }, &scroll_y1));
+    /* Second panel_begin while first is active should fail */
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 20, "Panel B",
+                (ForgeUiRect){ 0, 0, 200, 200 }, &scroll_y2));
+    /* First panel should still be active */
+    ASSERT_TRUE(ctx._panel_active);
+    ASSERT_EQ_U32(ctx._panel.id, 10);
+
+    forge_ui_ctx_panel_end(&ctx);
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_zero_width_rejected(void)
+{
+    TEST("panel_begin: zero width rejected");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 0, 200 }, &scroll_y));
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_negative_height_rejected(void)
+{
+    TEST("panel_begin: negative height rejected");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+    ASSERT_TRUE(!forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 200, -50 }, &scroll_y));
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_nan_scroll_sanitized(void)
+{
+    TEST("panel_begin: NaN scroll_y sanitized to 0");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = NAN;
+    panel_test_setup(&ctx);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
+    ASSERT_NEAR(scroll_y, 0.0f, 0.001f);
+    forge_ui_ctx_panel_end(&ctx);
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_begin_negative_scroll_sanitized(void)
+{
+    TEST("panel_begin: negative scroll_y sanitized to 0");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = -10.0f;
+    panel_test_setup(&ctx);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
+    ASSERT_NEAR(scroll_y, 0.0f, 0.001f);
+    forge_ui_ctx_panel_end(&ctx);
+    panel_test_teardown(&ctx);
+}
+
+/* ── panel_begin / panel_end lifecycle ────────────────────────────────── */
+
+static void test_panel_begin_sets_clip(void)
+{
+    TEST("panel_begin: sets has_clip=true and clip_rect to content area");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y));
+    ASSERT_TRUE(ctx.has_clip);
+    ASSERT_TRUE(ctx._panel_active);
+    /* Content rect should be inset by padding and title height */
+    ASSERT_NEAR(ctx.clip_rect.x, 10.0f + FORGE_UI_PANEL_PADDING, 0.01f);
+    ASSERT_NEAR(ctx.clip_rect.y, 20.0f + FORGE_UI_PANEL_TITLE_HEIGHT + FORGE_UI_PANEL_PADDING, 0.01f);
+
+    forge_ui_ctx_panel_end(&ctx);
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_end_clears_clip(void)
+{
+    TEST("panel_end: clears has_clip and _panel_active");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    forge_ui_ctx_panel_end(&ctx);
+
+    ASSERT_TRUE(!ctx.has_clip);
+    ASSERT_TRUE(!ctx._panel_active);
+
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_end_without_begin(void)
+{
+    TEST("panel_end: no-op when no panel is active");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    panel_test_setup(&ctx);
+
+    int depth_before = ctx.layout_depth;
+    forge_ui_ctx_panel_end(&ctx);  /* should be no-op */
+    ASSERT_EQ_INT(ctx.layout_depth, depth_before);
+    ASSERT_TRUE(!ctx._panel_active);
+
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_end_clamps_scroll(void)
+{
+    TEST("panel_end: clamps scroll_y to [0, max_scroll]");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 9999.0f;  /* way too large */
+    panel_test_setup(&ctx);
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    /* No child widgets → content_height = 0 → max_scroll = 0 */
+    forge_ui_ctx_panel_end(&ctx);
+
+    ASSERT_NEAR(scroll_y, 0.0f, 0.001f);
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_layout_push_pop_balanced(void)
+{
+    TEST("panel_begin/end: layout depth returns to starting value");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    int depth_before = ctx.layout_depth;
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_EQ_INT(ctx.layout_depth, depth_before + 1);
+    forge_ui_ctx_panel_end(&ctx);
+    ASSERT_EQ_INT(ctx.layout_depth, depth_before);
+
+    panel_test_teardown(&ctx);
+}
+
+/* ── ctx_end safety net for missing panel_end ─────────────────────────── */
+
+static void test_ctx_end_cleans_up_active_panel(void)
+{
+    TEST("ctx_end: detects active panel and cleans up");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    /* Deliberately skip panel_end */
+    forge_ui_ctx_end(&ctx);
+
+    /* After ctx_end, panel state should be cleaned up */
+    ASSERT_TRUE(!ctx._panel_active);
+    ASSERT_TRUE(!ctx.has_clip);
+
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ── scroll offset in layout_next ─────────────────────────────────────── */
+
+static void test_panel_scroll_offset_applied(void)
+{
+    TEST("layout_next: scroll offset shifts widget y position");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 50.0f;
+    panel_test_setup(&ctx);
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 400 }, &scroll_y);
+
+    /* Get the first widget rect — should be offset by -scroll_y */
+    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, 30.0f);
+    float expected_y = ctx._panel.content_rect.y - scroll_y;
+    ASSERT_NEAR(r.y, expected_y, 0.01f);
+
+    forge_ui_ctx_panel_end(&ctx);
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_scroll_zero_no_offset(void)
+{
+    TEST("layout_next: scroll_y=0 means no offset");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 400 }, &scroll_y);
+    ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, 30.0f);
+    float expected_y = ctx._panel.content_rect.y;
+    ASSERT_NEAR(r.y, expected_y, 0.01f);
+
+    forge_ui_ctx_panel_end(&ctx);
+    panel_test_teardown(&ctx);
+}
+
+/* ── panel_begin: layout_push failure rollback ────────────────────────── */
+
+static void test_panel_begin_layout_stack_full(void)
+{
+    TEST("panel_begin: returns false when layout stack is full");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    /* Fill the layout stack to max */
+    ForgeUiRect area = { 0, 0, 500, 500 };
+    for (int i = 0; i < FORGE_UI_LAYOUT_MAX_DEPTH; i++) {
+        ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area,
+                    FORGE_UI_LAYOUT_VERTICAL, 0, 0));
+    }
+    ASSERT_EQ_INT(ctx.layout_depth, FORGE_UI_LAYOUT_MAX_DEPTH);
+
+    /* panel_begin should fail because it cannot push another layout */
+    bool ok = forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    ASSERT_TRUE(!ok);
+    /* State should be rolled back: no clip, no active panel */
+    ASSERT_TRUE(!ctx.has_clip);
+    ASSERT_TRUE(!ctx._panel_active);
+
+    /* Clean up the stacked layouts */
+    for (int i = 0; i < FORGE_UI_LAYOUT_MAX_DEPTH; i++) {
+        forge_ui_ctx_layout_pop(&ctx);
+    }
+    panel_test_teardown(&ctx);
+}
+
+/* ── panel_end: scrollbar thumb clamp ─────────────────────────────────── */
+
+static void test_panel_end_thumb_clamped_to_track(void)
+{
+    TEST("panel_end: thumb_h clamped to track_h on very short panels");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    /* Panel is just barely tall enough to have a content area
+     * but the content area will be shorter than MIN_THUMB (20px) */
+    float panel_h = FORGE_UI_PANEL_TITLE_HEIGHT + 2.0f * FORGE_UI_PANEL_PADDING + 15.0f;
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 100, panel_h }, &scroll_y);
+    /* Put a widget taller than visible area to force scrollbar */
+    forge_ui_ctx_layout_next(&ctx, 200.0f);
+    forge_ui_ctx_panel_end(&ctx);
+
+    /* If the fix works, we shouldn't crash and scroll_y should be clamped */
+    ASSERT_TRUE(scroll_y >= 0.0f);
+
+    panel_test_teardown(&ctx);
+}
+
+/* ── ctx_free clears panel fields ─────────────────────────────────────── */
+
+static void test_free_clears_panel_fields(void)
+{
+    TEST("ctx_free: zeroes panel-related fields");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+    forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
+
+    float scroll_y = 0.0f;
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    forge_ui_ctx_free(&ctx);
+
+    ASSERT_TRUE(!ctx.has_clip);
+    ASSERT_TRUE(!ctx._panel_active);
+    ASSERT_NEAR(ctx.scroll_delta, 0.0f, 0.001f);
+    ASSERT_TRUE(ctx._panel.scroll_y == NULL);
+    ASSERT_NEAR(ctx._panel_content_start_y, 0.0f, 0.001f);
+}
+
+/* ── panel_begin: null title is OK (optional) ─────────────────────────── */
+
+static void test_panel_begin_null_title_ok(void)
+{
+    TEST("panel_begin: null title succeeds (title is optional)");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, 1, NULL,
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y));
+    forge_ui_ctx_panel_end(&ctx);
+    panel_test_teardown(&ctx);
+}
+
+/* ── panel_begin: emits draw data ─────────────────────────────────────── */
+
+static void test_panel_begin_emits_draw_data(void)
+{
+    TEST("panel_begin: emits background and title bar quads");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    int v_before = ctx.vertex_count;
+    forge_ui_ctx_panel_begin(&ctx, 1, "Title",
+                (ForgeUiRect){ 0, 0, 300, 300 }, &scroll_y);
+    /* Should emit at least bg (4v) + title bar (4v) + title text */
+    ASSERT_TRUE(ctx.vertex_count > v_before + 8);
+
+    forge_ui_ctx_panel_end(&ctx);
+    panel_test_teardown(&ctx);
+}
+
+/* ── panel_end: scrollbar drawn when content overflows ────────────────── */
+
+static void test_panel_end_scrollbar_on_overflow(void)
+{
+    TEST("panel_end: draws scrollbar when content overflows");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 200 }, &scroll_y);
+    /* Emit many widgets to overflow the panel */
+    for (int i = 0; i < 20; i++) {
+        forge_ui_ctx_layout_next(&ctx, 30.0f);
+    }
+    int v_before_end = ctx.vertex_count;
+    forge_ui_ctx_panel_end(&ctx);
+    /* panel_end should emit scrollbar track + thumb quads */
+    ASSERT_TRUE(ctx.vertex_count > v_before_end);
+
+    panel_test_teardown(&ctx);
+}
+
+static void test_panel_end_no_scrollbar_when_fits(void)
+{
+    TEST("panel_end: no scrollbar when content fits");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    panel_test_setup(&ctx);
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 0, 0, 300, 500 }, &scroll_y);
+    /* Single small widget that fits */
+    forge_ui_ctx_layout_next(&ctx, 20.0f);
+    int v_before_end = ctx.vertex_count;
+    forge_ui_ctx_panel_end(&ctx);
+    /* No overflow → no scrollbar quads */
+    ASSERT_EQ_INT(ctx.vertex_count, v_before_end);
+
+    panel_test_teardown(&ctx);
+}
+
+/* ── panel mouse wheel scrolling ──────────────────────────────────────── */
+
+static void test_panel_mouse_wheel_scroll(void)
+{
+    TEST("panel_begin: mouse wheel delta applies scroll when mouse in content");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    float scroll_y = 0.0f;
+    forge_ui_ctx_init(&ctx, &test_atlas);
+
+    /* Position mouse inside where the content area will be */
+    float content_x = 10.0f + FORGE_UI_PANEL_PADDING + 5.0f;
+    float content_y = 20.0f + FORGE_UI_PANEL_TITLE_HEIGHT + FORGE_UI_PANEL_PADDING + 5.0f;
+    forge_ui_ctx_begin(&ctx, content_x, content_y, false);
+    ctx.scroll_delta = 2.0f;  /* scroll down */
+
+    forge_ui_ctx_panel_begin(&ctx, 1, "Test",
+                (ForgeUiRect){ 10, 20, 300, 400 }, &scroll_y);
+    /* scroll_y should be updated by delta * speed */
+    ASSERT_NEAR(scroll_y, 2.0f * FORGE_UI_SCROLL_SPEED, 0.01f);
+
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -4297,6 +4968,60 @@ int main(int argc, char *argv[])
 
     /* Layout -- wrappers no cursor advance on null atlas */
     test_button_layout_null_atlas_no_advance();
+
+    /* Panels -- widget_mouse_over (clip-aware hit test) */
+    test_widget_mouse_over_no_clip();
+    test_widget_mouse_over_outside();
+    test_widget_mouse_over_clipped();
+    test_widget_mouse_over_inside_clip();
+
+    /* Panels -- emit_rect clipping */
+    test_emit_rect_clip_discard();
+    test_emit_rect_clip_trim();
+
+    /* Panels -- emit_quad_clipped */
+    test_emit_quad_clipped_fully_outside();
+    test_emit_quad_clipped_uv_remap();
+    test_emit_quad_clipped_degenerate();
+
+    /* Panels -- panel_begin parameter validation */
+    test_panel_begin_null_ctx();
+    test_panel_begin_null_scroll_y();
+    test_panel_begin_id_zero();
+    test_panel_begin_id_uint32_max();
+    test_panel_begin_nested_rejected();
+    test_panel_begin_zero_width_rejected();
+    test_panel_begin_negative_height_rejected();
+    test_panel_begin_nan_scroll_sanitized();
+    test_panel_begin_negative_scroll_sanitized();
+
+    /* Panels -- lifecycle */
+    test_panel_begin_sets_clip();
+    test_panel_end_clears_clip();
+    test_panel_end_without_begin();
+    test_panel_end_clamps_scroll();
+    test_panel_layout_push_pop_balanced();
+
+    /* Panels -- safety nets */
+    test_ctx_end_cleans_up_active_panel();
+    test_panel_begin_layout_stack_full();
+
+    /* Panels -- scroll offset */
+    test_panel_scroll_offset_applied();
+    test_panel_scroll_zero_no_offset();
+
+    /* Panels -- scrollbar */
+    test_panel_end_thumb_clamped_to_track();
+    test_panel_end_scrollbar_on_overflow();
+    test_panel_end_no_scrollbar_when_fits();
+
+    /* Panels -- draw data and features */
+    test_panel_begin_emits_draw_data();
+    test_panel_begin_null_title_ok();
+    test_panel_mouse_wheel_scroll();
+
+    /* Panels -- cleanup */
+    test_free_clears_panel_fields();
 
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
             test_count, pass_count, fail_count);

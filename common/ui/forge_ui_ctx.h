@@ -862,8 +862,9 @@ static inline void forge_ui__emit_quad_clipped(ForgeUiContext *ctx,
     float cx0 = clip->x, cy0 = clip->y;
     float cx1 = cx0 + clip->w, cy1 = cy0 + clip->h;
 
-    /* Fully outside -- discard */
+    /* Fully outside or degenerate (zero area) -- discard */
     if (x1 <= cx0 || x0 >= cx1 || y1 <= cy0 || y0 >= cy1) return;
+    if (x0 >= x1 || y0 >= y1) return;
 
     /* Compute clipped bounds */
     float nx0 = (x0 < cx0) ? cx0 : x0;
@@ -1034,6 +1035,11 @@ static inline void forge_ui_ctx_free(ForgeUiContext *ctx)
     ctx->next_hot = FORGE_UI_ID_NONE;
     ctx->focused = FORGE_UI_ID_NONE;
     ctx->layout_depth = 0;
+    ctx->scroll_delta = 0.0f;
+    ctx->has_clip = false;
+    ctx->_panel_active = false;
+    ctx->_panel.scroll_y = NULL;
+    ctx->_panel_content_start_y = 0.0f;
 }
 
 static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
@@ -1072,6 +1078,7 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
     ctx->scroll_delta = 0.0f;
     ctx->has_clip = false;
     ctx->_panel_active = false;
+    ctx->_panel.scroll_y = NULL;
 
     /* Reset layout stack for this frame.  Warn if the previous frame had
      * unmatched push/pop calls -- this is a programming error. */
@@ -1126,6 +1133,18 @@ static inline void forge_ui_ctx_end(ForgeUiContext *ctx)
      * if the cursor slides off during a press. */
     if (ctx->active == FORGE_UI_ID_NONE) {
         ctx->hot = ctx->next_hot;
+    }
+
+    /* Safety net: if a panel was opened but never closed, clean up the
+     * panel state and pop its layout so the damage is confined to this
+     * frame rather than leaking into the next one. */
+    if (ctx->_panel_active) {
+        SDL_Log("forge_ui_ctx_end: panel still active (missing panel_end call)");
+        ctx->has_clip = false;
+        ctx->_panel_active = false;
+        if (ctx->layout_depth > 0) {
+            forge_ui_ctx_layout_pop(ctx);
+        }
     }
 
     /* Check for unmatched layout push/pop.  A non-zero depth here means
@@ -1892,6 +1911,34 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
 {
     if (!ctx || !ctx->atlas || id == FORGE_UI_ID_NONE || !scroll_y) return false;
 
+    /* Reject nested panels -- only one panel may be active at a time.
+     * Opening a second panel would overwrite the first's state, corrupt
+     * the clip rect, and misalign the layout stack. */
+    if (ctx->_panel_active) {
+        SDL_Log("forge_ui_ctx_panel_begin: nested panels not supported "
+                "(id=%u already active)", (unsigned)ctx->_panel.id);
+        return false;
+    }
+
+    /* The scrollbar uses id+1; reject UINT32_MAX to prevent wrapping to
+     * FORGE_UI_ID_NONE (the null sentinel), which would break the
+     * hot/active state machine for the scrollbar thumb. */
+    if (id >= UINT32_MAX) {
+        SDL_Log("forge_ui_ctx_panel_begin: id must be < UINT32_MAX "
+                "(scrollbar uses id+1)");
+        return false;
+    }
+
+    /* Reject non-positive or non-finite rect dimensions.  Using !(x > 0)
+     * instead of (x <= 0) also catches NaN. */
+    if (!(rect.w > 0.0f) || !(rect.h > 0.0f)) {
+        SDL_Log("forge_ui_ctx_panel_begin: rect dimensions must be positive");
+        return false;
+    }
+
+    /* Sanitize *scroll_y -- NaN or negative values would corrupt layout */
+    if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;  /* catches NaN too */
+
     /* ── Draw panel background ────────────────────────────────────────── */
     forge_ui__emit_rect(ctx, rect,
                         FORGE_UI_PANEL_BG_R, FORGE_UI_PANEL_BG_G,
@@ -1954,9 +2001,14 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
     ctx->has_clip = true;
 
     /* ── Push a vertical layout inside the content area ───────────────── */
-    forge_ui_ctx_layout_push(ctx, content,
-                              FORGE_UI_LAYOUT_VERTICAL,
-                              0.0f, 8.0f);
+    if (!forge_ui_ctx_layout_push(ctx, content,
+                                   FORGE_UI_LAYOUT_VERTICAL,
+                                   0.0f, 8.0f)) {
+        SDL_Log("forge_ui_ctx_panel_begin: layout_push failed (stack full?)");
+        ctx->has_clip = false;
+        ctx->_panel_active = false;
+        return false;
+    }
 
     /* Record the layout cursor start position so panel_end can compute
      * how far child widgets advanced (= content_height) */
@@ -1994,8 +2046,9 @@ static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx)
     if (max_scroll < 0.0f) max_scroll = 0.0f;
 
     float *scroll_y = ctx->_panel.scroll_y;
-    if (*scroll_y > max_scroll) *scroll_y = max_scroll;
-    if (*scroll_y < 0.0f) *scroll_y = 0.0f;
+    if (!scroll_y) return;  /* defensive: should not happen given panel_begin checks */
+    if (!(*scroll_y <= max_scroll)) *scroll_y = max_scroll;  /* catches NaN too */
+    if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;  /* catches NaN too */
 
     /* ── Draw scrollbar (only if content overflows) ───────────────────── */
     if (content_h <= visible_h) return;
@@ -2013,10 +2066,13 @@ static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx)
                         FORGE_UI_SB_TRACK_R, FORGE_UI_SB_TRACK_G,
                         FORGE_UI_SB_TRACK_B, FORGE_UI_SB_TRACK_A);
 
-    /* Thumb geometry */
+    /* Thumb geometry — proportional height, clamped to [MIN_THUMB, track_h]
+     * so the thumb never overflows the track even on very short panels. */
     float thumb_h = track_h * visible_h / content_h;
     if (thumb_h < FORGE_UI_SCROLLBAR_MIN_THUMB)
         thumb_h = FORGE_UI_SCROLLBAR_MIN_THUMB;
+    if (thumb_h > track_h)
+        thumb_h = track_h;
     float thumb_range = track_h - thumb_h;
     float t = (max_scroll > 0.0f) ? *scroll_y / max_scroll : 0.0f;
     float thumb_y = track_y + t * thumb_range;
