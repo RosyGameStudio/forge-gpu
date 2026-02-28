@@ -403,7 +403,7 @@ the texture format details — this lesson produces the CPU-side data.
 How do you validate that packing is correct? The demo program performs
 two verification steps:
 
-1. **Visual inspection**: write the atlas to `atlas.png` and open it.
+1. **Visual inspection**: write the atlas to `atlas.bmp` and open it.
    Check for overlapping glyphs (glyphs drawn on top of each other),
    cut-off glyphs (bitmaps extending past the atlas boundary), and
    correct padding (visible gaps between adjacent glyphs). The debug
