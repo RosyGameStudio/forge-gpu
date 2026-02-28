@@ -4112,8 +4112,16 @@ static void test_button_layout_null_atlas_no_advance(void)
  * Returns true on success; callers must check before using ctx. */
 static bool panel_test_setup(ForgeUiContext *ctx)
 {
-    if (!setup_atlas()) return false;
-    if (!forge_ui_ctx_init(ctx, &test_atlas)) return false;
+    if (!setup_atlas()) {
+        /* setup_atlas increments fail_count on its own */
+        return false;
+    }
+    if (!forge_ui_ctx_init(ctx, &test_atlas)) {
+        SDL_Log("    FAIL: panel_test_setup: forge_ui_ctx_init failed "
+                "(line %d)", __LINE__);
+        fail_count++;
+        return false;
+    }
     forge_ui_ctx_begin(ctx, 0.0f, 0.0f, false);
     return true;
 }

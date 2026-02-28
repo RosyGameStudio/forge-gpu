@@ -834,6 +834,10 @@ static inline void forge_ui__emit_rect(ForgeUiContext *ctx,
         rect.y = ry0;
         rect.w = rx1 - rx0;
         rect.h = ry1 - ry0;
+
+        /* Discard degenerate (zero-area) intersections that can arise
+         * from edge-touching rects or zero-size clip rects. */
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
     }
 
     if (!forge_ui__grow_vertices(ctx, 4)) return;
@@ -887,6 +891,10 @@ static inline void forge_ui__emit_quad_clipped(ForgeUiContext *ctx,
     float ny0 = (y0 < cy0) ? cy0 : y0;
     float nx1 = (x1 > cx1) ? cx1 : x1;
     float ny1 = (y1 > cy1) ? cy1 : y1;
+
+    /* Discard degenerate (zero-area) intersections that can arise
+     * from edge-touching quads or zero-size clip rects. */
+    if (nx1 <= nx0 || ny1 <= ny0) return;
 
     /* Proportional UV remapping */
     float u0 = src[0].uv_u, u1 = src[1].uv_u;
@@ -1935,18 +1943,22 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
         return false;
     }
 
-    /* Reject non-positive or non-finite rect dimensions.  Using !(x > 0)
-     * instead of (x <= 0) also catches NaN. */
-    if (!(rect.w > 0.0f) || !(rect.h > 0.0f)) {
-        SDL_Log("forge_ui_ctx_panel_begin: rect dimensions must be positive");
+    /* Reject non-positive or non-finite rect dimensions.  !(x > 0) catches
+     * NaN and ≤ 0; !isfinite catches ±Inf.  +Inf would produce infinite
+     * vertex positions, corrupting the draw data. */
+    if (!(rect.w > 0.0f) || !isfinite(rect.w) ||
+        !(rect.h > 0.0f) || !isfinite(rect.h)) {
+        SDL_Log("forge_ui_ctx_panel_begin: rect dimensions must be "
+                "positive and finite");
         return false;
     }
 
     /* Sanitize *scroll_y: a negative offset would shift content downward
-     * (exposing blank space above the first widget), and NaN would poison
-     * every layout_next position.  The !(x >= 0) form catches both cases
-     * in one comparison because NaN comparisons always return false. */
-    if (!(*scroll_y >= 0.0f)) *scroll_y = 0.0f;
+     * (exposing blank space above the first widget), NaN would poison
+     * every layout_next position, and +Inf would push all widgets to
+     * -Inf.  The !(x >= 0) form catches NaN and negatives; !isfinite
+     * catches ±Inf. */
+    if (!(*scroll_y >= 0.0f) || !isfinite(*scroll_y)) *scroll_y = 0.0f;
 
     /* ── Draw panel background ────────────────────────────────────────── */
     forge_ui__emit_rect(ctx, rect,

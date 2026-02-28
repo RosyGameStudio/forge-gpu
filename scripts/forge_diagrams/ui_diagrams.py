@@ -6679,7 +6679,7 @@ def diagram_scrollbar_proportions():
     # Formulas
     formulas = [
         "thumb_h = track_h * visible_h / content_h",
-        "thumb_y = track_y + (scroll_y / max_scroll) * (track_h - thumb_h)",
+        "thumb_y = track_y + (1 - scroll_y / max_scroll) * (track_h - thumb_h)",
         "max_scroll = content_h - visible_h",
     ]
     for i, formula in enumerate(formulas):
