@@ -17,6 +17,10 @@
  *   - wctx_free while redirected (use-after-free prevention)
  *   - layout_push failure cleanup
  *   - window_end without window_begin
+ *   - NaN/Inf mouse coord validation (clamped to zero)
+ *   - State cleanup (ctx_free panel zeroing, panel_end scroll_y NULL,
+ *     window_end guard path, wctx_free saved fields)
+ *   - Shared state isolation (window_begin rejects during active panel)
  *
  * Uses the bundled Liberation Mono Regular font for all tests.
  *
@@ -151,6 +155,29 @@ static int fail_count = 0;
 #define TEST_PREV_WIN_Z   5
 #define TEST_PREV_WIN_ID  42u
 #define TEST_NEAR_EPS     0.01f
+
+/* NaN/Inf mouse validation (task 3) */
+#define TEST_NAN_MOUSE_X  (0.0f / 0.0f)  /* produces NaN */
+#define TEST_NAN_MOUSE_Y  (0.0f / 0.0f)
+#define TEST_INF_MOUSE_X  (1.0f / 0.0f)  /* produces +Inf */
+#define TEST_INF_MOUSE_Y  (1.0f / 0.0f)
+
+/* Slider test geometry */
+#define TEST_SLIDER_X     20.0f
+#define TEST_SLIDER_Y     20.0f
+#define TEST_SLIDER_W     160.0f
+#define TEST_SLIDER_H     24.0f
+#define TEST_SLIDER_ID    300u
+#define TEST_SLIDER_MIN   0.0f
+#define TEST_SLIDER_MAX   100.0f
+#define TEST_SLIDER_INIT  50.0f
+
+/* Panel test geometry (tasks 4, 7) */
+#define TEST_PANEL_X      10.0f
+#define TEST_PANEL_Y      10.0f
+#define TEST_PANEL_W      200.0f
+#define TEST_PANEL_H      200.0f
+#define TEST_PANEL_ID     400u
 
 static ForgeUiFont      test_font;
 static ForgeUiFontAtlas  test_atlas;
@@ -1365,6 +1392,314 @@ static void test_prev_frame_data_saved(void)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ *  TASK 3: NaN/Inf MOUSE VALIDATION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void test_nan_mouse_clamped_to_zero(void)
+{
+    TEST("ctx_begin: NaN mouse coords are clamped to zero");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+
+    /* Pass NaN mouse coordinates */
+    forge_ui_ctx_begin(&ctx, TEST_NAN_MOUSE_X, TEST_NAN_MOUSE_Y, false);
+    ASSERT_TRUE(isfinite(ctx.mouse_x));
+    ASSERT_TRUE(isfinite(ctx.mouse_y));
+    ASSERT_NEAR(ctx.mouse_x, 0.0f, TEST_NEAR_EPS);
+    ASSERT_NEAR(ctx.mouse_y, 0.0f, TEST_NEAR_EPS);
+    forge_ui_ctx_end(&ctx);
+
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_inf_mouse_clamped_to_zero(void)
+{
+    TEST("ctx_begin: Inf mouse coords are clamped to zero");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+
+    /* Pass +Inf mouse coordinates */
+    forge_ui_ctx_begin(&ctx, TEST_INF_MOUSE_X, TEST_INF_MOUSE_Y, false);
+    ASSERT_TRUE(isfinite(ctx.mouse_x));
+    ASSERT_TRUE(isfinite(ctx.mouse_y));
+    ASSERT_NEAR(ctx.mouse_x, 0.0f, TEST_NEAR_EPS);
+    ASSERT_NEAR(ctx.mouse_y, 0.0f, TEST_NEAR_EPS);
+    forge_ui_ctx_end(&ctx);
+
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_nan_mouse_slider_safe(void)
+{
+    TEST("ctx_begin: NaN mouse does not corrupt active slider value");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiRect slider_rect = {
+        TEST_SLIDER_X, TEST_SLIDER_Y, TEST_SLIDER_W, TEST_SLIDER_H
+    };
+    float value = TEST_SLIDER_INIT;
+
+    /* Frame 0: press on the slider to make it active.
+     * slider() returns "changed" (not success/failure), so we don't
+     * assert the return value — we only care that value stays finite. */
+    float press_x = TEST_SLIDER_X + TEST_SLIDER_W * 0.5f;
+    float press_y = TEST_SLIDER_Y + TEST_SLIDER_H * 0.5f;
+    forge_ui_ctx_begin(&ctx, press_x, press_y, true);
+    forge_ui_ctx_slider(&ctx, TEST_SLIDER_ID, &value,
+                        TEST_SLIDER_MIN, TEST_SLIDER_MAX, slider_rect);
+    forge_ui_ctx_end(&ctx);
+
+    /* Frame 1: still held down, but mouse is NaN — value must stay finite */
+    forge_ui_ctx_begin(&ctx, TEST_NAN_MOUSE_X, TEST_NAN_MOUSE_Y, true);
+    forge_ui_ctx_slider(&ctx, TEST_SLIDER_ID, &value,
+                        TEST_SLIDER_MIN, TEST_SLIDER_MAX, slider_rect);
+    forge_ui_ctx_end(&ctx);
+
+    ASSERT_TRUE(isfinite(value));
+    ASSERT_TRUE(value >= TEST_SLIDER_MIN);
+    ASSERT_TRUE(value <= TEST_SLIDER_MAX);
+
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  TASK 4: STATE CLEANUP — ctx_free zeros panel
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void test_ctx_free_zeros_panel(void)
+{
+    TEST("ctx_free: panel fields are fully zeroed");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+
+    /* Open and close a panel to populate _panel fields */
+    float scroll = 0.0f;
+    ForgeUiRect panel_rect = {
+        TEST_PANEL_X, TEST_PANEL_Y, TEST_PANEL_W, TEST_PANEL_H
+    };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    bool panel_ok = forge_ui_ctx_panel_begin(
+        &ctx, TEST_PANEL_ID, "TestPanel", panel_rect, &scroll);
+    ASSERT_TRUE(panel_ok);
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Free the context — all panel fields should be zeroed */
+    forge_ui_ctx_free(&ctx);
+
+    ASSERT_TRUE(!ctx._panel_active);
+    ASSERT_TRUE(ctx._panel.scroll_y == NULL);
+    ASSERT_EQ_U32(ctx._panel.id, 0u);
+    ASSERT_NEAR(ctx._panel.rect.x, 0.0f, TEST_NEAR_EPS);
+    ASSERT_NEAR(ctx._panel.rect.y, 0.0f, TEST_NEAR_EPS);
+    ASSERT_NEAR(ctx._panel.rect.w, 0.0f, TEST_NEAR_EPS);
+    ASSERT_NEAR(ctx._panel.rect.h, 0.0f, TEST_NEAR_EPS);
+    ASSERT_NEAR(ctx._panel.content_height, 0.0f, TEST_NEAR_EPS);
+    ASSERT_NEAR(ctx._panel_content_start_y, 0.0f, TEST_NEAR_EPS);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  TASK 4: STATE CLEANUP — panel_end NULLs scroll_y
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void test_panel_end_nulls_scroll_y(void)
+{
+    TEST("panel_end: _panel.scroll_y is NULL after panel_end");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+
+    float scroll = 0.0f;
+    ForgeUiRect panel_rect = {
+        TEST_PANEL_X, TEST_PANEL_Y, TEST_PANEL_W, TEST_PANEL_H
+    };
+
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    bool panel_ok = forge_ui_ctx_panel_begin(
+        &ctx, TEST_PANEL_ID, "TestPanel", panel_rect, &scroll);
+    ASSERT_TRUE(panel_ok);
+
+    /* While the panel is active, scroll_y should point to our local */
+    ASSERT_TRUE(ctx._panel.scroll_y == &scroll);
+
+    forge_ui_ctx_panel_end(&ctx);
+
+    /* After panel_end, scroll_y must be NULL to prevent stale pointer use */
+    ASSERT_TRUE(ctx._panel.scroll_y == NULL);
+
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  TASK 4: STATE CLEANUP — window_end guard path
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void test_window_end_guard_decrements_count(void)
+{
+    TEST("window_end: !panel_active guard decrements window_count and clears entry");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+
+    ForgeUiWindowState ws = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H },
+        .z_order = 0
+    };
+
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_wctx_begin(&wctx);
+
+    /* Open a window normally */
+    bool opened = forge_ui_wctx_window_begin(
+        &wctx, TEST_WIN_ID_1, "Guard", &ws);
+    ASSERT_TRUE(opened);
+    ASSERT_EQ_INT(wctx.window_count, 1);
+
+    /* Simulate the panel being cleared externally (misuse scenario that
+     * the guard protects against).  This forces window_end down the
+     * !_panel_active error path. */
+    ctx._panel_active = false;
+
+    forge_ui_wctx_window_end(&wctx);
+
+    /* The guard path should have decremented window_count */
+    ASSERT_EQ_INT(wctx.window_count, 0);
+
+    /* has_clip should be cleared */
+    ASSERT_TRUE(!ctx.has_clip);
+
+    /* The window entry should be zeroed out */
+    ASSERT_EQ_U32(wctx.window_entries[0].id, FORGE_UI_ID_NONE);
+    ASSERT_TRUE(wctx.window_entries[0].state == NULL);
+    ASSERT_EQ_INT(wctx.window_entries[0].vertex_count, 0);
+    ASSERT_EQ_INT(wctx.window_entries[0].index_count, 0);
+
+    /* active_window_idx should be restored to -1 */
+    ASSERT_EQ_INT(wctx.active_window_idx, -1);
+
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    forge_ui_wctx_free(&wctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  TASK 4: STATE CLEANUP — wctx_free zeros saved fields
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void test_wctx_free_zeros_saved_fields(void)
+{
+    TEST("wctx_free: all saved fields and bookkeeping are zeroed");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+
+    ForgeUiWindowState ws = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H },
+        .z_order = 0
+    };
+
+    /* Run a full frame so saved fields get populated */
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_wctx_begin(&wctx);
+    bool opened = forge_ui_wctx_window_begin(
+        &wctx, TEST_WIN_ID_1, "Test", &ws);
+    ASSERT_TRUE(opened);
+    forge_ui_wctx_window_end(&wctx);
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Free the window context */
+    forge_ui_wctx_free(&wctx);
+
+    /* All bookkeeping fields should be zeroed */
+    ASSERT_EQ_INT(wctx.window_count, 0);
+    ASSERT_EQ_INT(wctx.active_window_idx, -1);
+    ASSERT_EQ_U32(wctx.hovered_window_id, FORGE_UI_ID_NONE);
+    ASSERT_EQ_INT(wctx.prev_window_count, 0);
+
+    /* Saved buffer pointers should be NULL */
+    ASSERT_TRUE(wctx.saved_vertices == NULL);
+    ASSERT_TRUE(wctx.saved_indices == NULL);
+    ASSERT_EQ_INT(wctx.saved_vertex_count, 0);
+    ASSERT_EQ_INT(wctx.saved_vertex_capacity, 0);
+    ASSERT_EQ_INT(wctx.saved_index_count, 0);
+    ASSERT_EQ_INT(wctx.saved_index_capacity, 0);
+
+    /* ctx pointer should be cleared */
+    ASSERT_TRUE(wctx.ctx == NULL);
+
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  TASK 7: SHARED STATE — window_begin rejects during active panel
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void test_window_begin_rejects_during_panel(void)
+{
+    TEST("window_begin: rejects when standalone panel is active");
+    if (!setup_atlas()) return;
+
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+
+    float scroll = 0.0f;
+    ForgeUiRect panel_rect = {
+        TEST_PANEL_X, TEST_PANEL_Y, TEST_PANEL_W, TEST_PANEL_H
+    };
+    ForgeUiWindowState ws = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H },
+        .z_order = 0
+    };
+
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+
+    /* Open a standalone panel */
+    bool panel_ok = forge_ui_ctx_panel_begin(
+        &ctx, TEST_PANEL_ID, "Blocker", panel_rect, &scroll);
+    ASSERT_TRUE(panel_ok);
+    ASSERT_TRUE(ctx._panel_active);
+
+    /* Attempt to open a window while the panel is active — should fail */
+    forge_ui_wctx_begin(&wctx);
+    bool win_ok = forge_ui_wctx_window_begin(
+        &wctx, TEST_WIN_ID_1, "Blocked", &ws);
+    ASSERT_TRUE(!win_ok);
+
+    /* Window count should remain at 0 */
+    ASSERT_EQ_INT(wctx.window_count, 0);
+
+    forge_ui_wctx_end(&wctx);
+
+    /* Close the panel and end the frame normally */
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    forge_ui_wctx_free(&wctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1455,6 +1790,23 @@ int main(int argc, char *argv[])
     /* Previous frame data */
     SDL_Log("--- Prev Frame Data ---");
     test_prev_frame_data_saved();
+
+    /* Task 3: NaN/Inf mouse validation */
+    SDL_Log("--- NaN/Inf Mouse Validation ---");
+    test_nan_mouse_clamped_to_zero();
+    test_inf_mouse_clamped_to_zero();
+    test_nan_mouse_slider_safe();
+
+    /* Task 4: State cleanup */
+    SDL_Log("--- State Cleanup ---");
+    test_ctx_free_zeros_panel();
+    test_panel_end_nulls_scroll_y();
+    test_window_end_guard_decrements_count();
+    test_wctx_free_zeros_saved_fields();
+
+    /* Task 7: Shared state isolation */
+    SDL_Log("--- Shared State Isolation ---");
+    test_window_begin_rejects_during_panel();
 
     SDL_Log("");
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",

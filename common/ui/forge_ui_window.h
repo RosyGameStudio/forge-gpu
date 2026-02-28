@@ -908,7 +908,17 @@ static inline void forge_ui_wctx_window_end(ForgeUiWindowContext *wctx)
         wctx->window_entries[widx].id = FORGE_UI_ID_NONE;
         wctx->window_entries[widx].state = NULL;
         wctx->window_count--;
-        forge_ui_win__restore_from_window(wctx);
+        /* Restore main context buffers directly instead of calling
+         * restore_from_window, which would (a) fail its idx >= window_count
+         * guard now that window_count has been decremented, and (b) overwrite
+         * the zeroed entry counts with stale ctx draw-list sizes. */
+        ctx->vertices = wctx->saved_vertices;
+        ctx->vertex_count = wctx->saved_vertex_count;
+        ctx->vertex_capacity = wctx->saved_vertex_capacity;
+        ctx->indices = wctx->saved_indices;
+        ctx->index_count = wctx->saved_index_count;
+        ctx->index_capacity = wctx->saved_index_capacity;
+        wctx->active_window_idx = -1;
         return;
     }
 
