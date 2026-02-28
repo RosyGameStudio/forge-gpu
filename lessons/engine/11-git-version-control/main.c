@@ -78,6 +78,9 @@ static void area_add(GitArea *area, FileVersion v)
 {
     if (area->count < MAX_FILES) {
         area->files[area->count++] = v;
+    } else {
+        SDL_Log("area_add: '%s' is full (%d/%d), '%s' not added",
+                area->name, area->count, MAX_FILES, v.name);
     }
 }
 
