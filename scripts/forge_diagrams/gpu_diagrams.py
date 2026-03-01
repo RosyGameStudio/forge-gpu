@@ -10027,10 +10027,14 @@ def diagram_ssr_ray_march():
 
     hit_index = None
     thickness = 0.25
+    source_depth = _ssr_depth_profile(np.array([p_point[0]]))[0]
     for i, sp in enumerate(step_positions):
         if sp[0] < -1.5 or sp[0] > 12.5:
             continue
         depth_val = _ssr_depth_profile(np.array([sp[0]]))[0]
+        # Skip self-intersection with the originating reflective surface.
+        if abs(depth_val - source_depth) < 1e-4:
+            continue
         if abs(sp[1] - depth_val) <= thickness and hit_index is None:
             hit_index = i
             break

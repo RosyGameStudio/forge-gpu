@@ -21,7 +21,7 @@ depth and normal data to compute accurate reflection rays.
 
 ## G-buffer texture creation
 
-Create four main textures for deferred rendering:
+Create the main textures for deferred rendering:
 
 ```c
 /* 1. Color + reflectivity (R8G8B8A8) */
@@ -422,7 +422,7 @@ float4 main(float4 clip_pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
     float3 reflection = float3(0.0, 0.0, 0.0);
     float hit_count = 0.0;
 
-    for (float step = 0.0; step < max_steps; step += 1.0) {
+    for (float step = 1.0; step < max_steps; step += 1.0) {
         float2 screen_sample = screen_origin + ray_dir * step;
 
         /* Clamp to screen bounds with fade */
@@ -436,18 +436,19 @@ float4 main(float4 clip_pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 
         if (edge_fade_factor < 0.01) break;
 
-        float sampled_depth = depth_tex.Sample(smp, screen_sample).r;
+        /* Reconstruct where the ray is at this step in world space */
+        float3 ray_world = world_pos + R * (step * step_size);
         float3 sampled_pos = pos_tex.Sample(smp, screen_sample).rgb;
 
-        /* Check if we hit something */
-        float distance_to_surface = length(sampled_pos - world_pos);
-        if (distance_to_surface < thickness && distance_to_surface > 0.01) {
+        /* Compare sampled surface against current ray position */
+        float distance_to_surface = length(sampled_pos - ray_world);
+        if (distance_to_surface < thickness) {
             reflection = color_tex.Sample(smp, screen_sample).rgb;
             hit_count = 1.0;
             break;
         }
 
-        if (distance_to_surface > fade_distance) break;
+        if (length(ray_world - world_pos) > fade_distance) break;
     }
 
     return float4(reflection * hit_count, hit_count);
@@ -486,8 +487,10 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
    unwanted reflections.
 
 4. **Mismatched uniform struct layout** — The C struct field order must match
-   the HLSL `cbuffer` layout exactly. Use `#pragma pack(16)` in C to ensure
-   16-byte alignment for float3 and float4 fields.
+   the HLSL `cbuffer` layout exactly. Add explicit `float _pad[N]` fields to
+   align `float3` members to 16-byte boundaries, and use
+   `static_assert(sizeof(MyUniforms) == EXPECTED)` to catch layout mismatches
+   at compile time.
 
 5. **No edge fadeout** — Reflections at screen borders sample invalid data.
    Always apply a fade factor based on distance from screen edges.
