@@ -288,15 +288,20 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
    are found, refuse to proceed:
 
    ```bash
+   # Block .env files
    git diff --cached --name-only \
      | grep -E '(^|/)\.env(\.|$)' && {
        echo "Refusing to commit .env files. Unstage them first."
        exit 1
      }
-   ```
 
-   Also check for common secret file patterns (`credentials.json`,
-   `*.pem`, `*.key`). If detected, warn and unstage before continuing.
+   # Block credential and key files
+   if git diff --cached --name-only \
+     | grep -Eq '(^|/)(credentials\.json|[^/]+\.pem|[^/]+\.key)$'; then
+     echo "Refusing to commit credential/key files. Unstage them first."
+     exit 1
+   fi
+   ```
 
 1. **Commit:**
 
