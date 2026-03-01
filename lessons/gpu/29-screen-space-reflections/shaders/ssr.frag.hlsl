@@ -43,16 +43,18 @@
  * is within this fraction of the screen border. */
 #define SSR_EDGE_FADE_START 0.8
 
-/* Back-face fade range — when the hit surface's normal faces the same
- * direction as the reflected ray (dot > 0), the camera sees the FRONT
- * of that surface but the reflection should see the BACK.  Since SSR
- * can only sample screen-visible colors, these hits produce incorrect
- * reflections.  Instead of a hard cutoff (which creates holes), we
- * fade the reflection to zero over the range [FADE_START, FADE_END].
- * This gives a smooth transition that hides the inherent SSR limitation
- * without removing valid reflections of surfaces like rooftops. */
-#define SSR_BACKFACE_FADE_START 0.25
-#define SSR_BACKFACE_FADE_END   0.75
+/* Back-face fade range — a surface can only appear in a reflection if
+ * its normal faces *toward* the reflecting surface.  When
+ * dot(reflect_dir, hit_normal) > 0, the hit surface faces the same way
+ * as the reflected ray, so it's physically impossible to see it in the
+ * reflection (e.g. a truck's roof cannot appear in a floor reflection
+ * because both normals point upward).
+ *
+ * We fade from full to zero over the range [FADE_START, FADE_END].
+ * Starting at 0.0 (the exact geometric boundary) with a small ramp
+ * avoids hard cutoffs while rejecting impossible reflections. */
+#define SSR_BACKFACE_FADE_START 0.0
+#define SSR_BACKFACE_FADE_END   0.25
 
 /* ── Texture bindings ──────────────────────────────────────────────── */
 

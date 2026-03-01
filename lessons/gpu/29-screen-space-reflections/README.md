@@ -355,6 +355,63 @@ but no hit test runs until it has cleared the originating surface. This
 eliminates self-reflection noise without affecting legitimate nearby
 reflections.
 
+### Binary search refinement
+
+The linear ray march advances in fixed 0.15-unit steps. When it detects a
+hit (the ray passes behind a surface), the true intersection lies somewhere
+within the last step — up to 0.15 units of error. For curved surfaces like a
+headlight, this coarse snap distorts the reflected shape.
+
+Binary search refinement narrows the interval between the last "in front"
+position and the first "behind" position. Each iteration halves the error, so
+8 steps give approximately 256 times the precision of the linear step alone
+(0.15 / 256 = 0.0006 view-space units):
+
+```hlsl
+float3 refine_lo = prev_pos;   /* last position in front of surface */
+float3 refine_hi = ray_pos;    /* first position behind surface     */
+
+for (int j = 0; j < SSR_REFINE_STEPS; j++)
+{
+    float3 mid = (refine_lo + refine_hi) * 0.5;
+    float  mid_diff = /* depth comparison at mid */;
+
+    if (mid_diff < 0.0)
+        refine_hi = mid;   /* still behind — narrow upper bound */
+    else
+        refine_lo = mid;   /* in front — narrow lower bound     */
+}
+```
+
+This is the same binary search principle used in root-finding algorithms
+(bisection method). The linear march provides a coarse bracket; the binary
+search refines it to sub-pixel accuracy without increasing the step count.
+
+### Back-face fade
+
+A surface can only appear in a reflection if its normal faces *toward* the
+reflecting surface. Consider a truck on a reflective floor: the floor's
+reflected ray goes upward, and the truck's roof normal also points upward.
+Since both face the same direction, the roof is physically impossible to see
+in the floor's reflection — only the truck's underside (normal pointing down)
+could appear.
+
+SSR can only sample what the camera sees, so the ray's depth-buffer hit may
+land on a surface whose normal faces the wrong way. The back-face fade
+detects this by checking `dot(reflect_dir, hit_normal)`:
+
+- **dot < 0** — the hit surface faces toward the reflection (valid)
+- **dot > 0** — the hit surface faces away from the reflection (impossible)
+
+```hlsl
+float facing = dot(reflect_dir, hit_normal);
+float backface_fade = 1.0 - smoothstep(0.0, 0.25, facing);
+```
+
+Rather than a hard cutoff (which creates visible holes at certain viewing
+angles), the `smoothstep` provides a gentle ramp from full reflection at
+`dot = 0` to fully rejected at `dot = 0.25`.
+
 ### Tuning parameters
 
 | Parameter | Default | Effect |
