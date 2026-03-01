@@ -54,11 +54,10 @@
 #define WINDOW_WIDTH  1280
 #define WINDOW_HEIGHT 720
 
-/* Clear color — very dark navy, darker than the window so the UI pops.
- * G slightly above R shifts the hue from purple toward blue. */
-#define CLEAR_R 0.059f
-#define CLEAR_G 0.071f
-#define CLEAR_B 0.141f
+/* Clear color — matches lesson 01 (near-black). */
+#define CLEAR_R 0.02f
+#define CLEAR_G 0.02f
+#define CLEAR_B 0.03f
 #define CLEAR_A 1.0f
 
 /* Font asset path (relative to executable, same as all UI lessons). */
