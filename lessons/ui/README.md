@@ -92,8 +92,8 @@ This separation keeps the UI logic testable and renderer-agnostic.
   rectangles, interpolation
 - **[Engine lessons](../engine/)** — Memory layout (structs, offsets), C
   fundamentals, header-only libraries
-- **GPU lessons** — A future GPU lesson will render UI data using the
-  techniques from the GPU track
+- **[GPU Lesson 28 — UI Rendering](../gpu/28-ui-rendering/)** — renders the
+  UI data produced by this track using SDL's GPU API
 
 ## Adding new lessons
 

@@ -53,6 +53,10 @@ glyphs are anti-aliased via alpha blending against the font atlas.
   drawn with one `DrawIndexedPrimitives` call because the UI context sorts
   and flattens all widget geometry into a single vertex/index stream
   ([The immediate-mode render loop](#the-immediate-mode-render-loop))
+- **Widget ID system** — string labels double as widget identifiers via
+  FNV-1a hashing; the `##` separator lets widgets share display text while
+  keeping unique IDs, and hierarchical scoping prevents collisions across
+  windows ([Widget IDs and the `##` separator](#widget-ids-and-the--separator))
 
 ## Prerequisites
 
@@ -63,12 +67,12 @@ glyphs are anti-aliased via alpha blending against the font atlas.
 - [Lesson 16 — Blending](../16-blending/) (alpha blend state configuration,
   the blend equation, painter's algorithm)
 - [UI Lesson 01 — TTF Parsing](../../ui/01-ttf-parsing/) through
-  [UI Lesson 10 — Windows](../../ui/10-windows/) (the full immediate-mode UI
-  stack that this lesson renders)
+  [UI Lesson 11 — Widget ID System](../../ui/11-widget-id-system/) (the full
+  immediate-mode UI stack that this lesson renders)
 
 ## The UI data contract
 
-The forge-gpu UI library (built across UI Lessons 01–10) is entirely
+The forge-gpu UI library (built across UI Lessons 01–11) is entirely
 CPU-side. It parses fonts, rasterizes glyphs into an atlas, and generates
 draw data every frame — but never touches the GPU. This lesson is where that
 data reaches the screen.
@@ -335,6 +339,33 @@ After `forge_ui_ctx_end`, the context holds the finalized vertex and index
 arrays. The window context has sorted windows by `z_order` and appended
 each window's draw list to the main buffers.
 
+#### Widget IDs and the `##` separator
+
+Every interactive widget needs a unique identity so the UI context can track
+which widget is hot (hovered) and which is active (being interacted with)
+across frames. The library derives this identity by hashing the label string
+with the FNV-1a algorithm — a fast, well-distributed hash that maps
+arbitrary-length strings to 32-bit IDs.
+
+Labels like `"Click me"` and `"Toggle option"` are unique enough to serve as
+both display text and identifier. But sliders and text inputs often have no
+visible label — repeating the same empty string would produce identical IDs,
+breaking hot/active tracking. The `##` separator solves this: everything
+after `##` is included in the hash but excluded from the rendered text.
+`"##slider"` and `"##text_input"` display nothing, yet each hashes to a
+distinct ID.
+
+Windows add another layer of protection. When you call
+`forge_ui_wctx_window_begin`, the window context pushes the window's own ID
+onto a scope stack. All widget IDs declared inside that window are combined
+with the window scope, so two windows can both contain a widget labeled
+`"OK"` without colliding — their final IDs differ because their window
+scopes differ.
+
+For the full implementation — FNV-1a hashing, the `##` parse rule, and
+hierarchical scope stacking — see
+[UI Lesson 11 — Widget ID System](../../ui/11-widget-id-system/).
+
 ### 2. Upload geometry
 
 A copy pass transfers the vertex and index data from the CPU to the
@@ -490,6 +521,8 @@ a piece of the system that produces the vertex and index data drawn here:
   — fixed containers with clipping and scroll
 - [UI Lesson 10 — Windows](../../ui/10-windows/) — draggable windows with
   z-ordering, collapse, and the `ForgeUiWindowContext` used here
+- [UI Lesson 11 — Widget ID System](../../ui/11-widget-id-system/) — FNV-1a
+  hashed string IDs, the `##` separator, and hierarchical scope stacking
 
 ### GPU lessons
 
