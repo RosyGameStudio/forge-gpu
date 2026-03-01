@@ -8783,9 +8783,14 @@ def diagram_scale_factor_effect():
     scales = [0.75, 1.0, 1.5, 2.0]
     colors = [STYLE["accent4"], STYLE["accent1"], STYLE["accent2"], STYLE["accent3"]]
 
-    # Render each button proportionally
-    vis_scale = 0.018  # scale pixels to axes units
-    x_cursor = 0.3
+    # Compute vis_scale dynamically so all four buttons fit within the axes
+    x_start = 0.3
+    x_end = 16.0  # leave 0.5 margin from xlim=16.5
+    gap = 0.8
+    total_pixel_w = sum(base_w * s for s in scales)
+    gap_total = (len(scales) - 1) * gap
+    vis_scale = (x_end - x_start - gap_total) / total_pixel_w
+    x_cursor = x_start
 
     for _i, (s, col) in enumerate(zip(scales, colors)):
         w = base_w * s * vis_scale
@@ -8810,13 +8815,13 @@ def diagram_scale_factor_effect():
         )
         ax.add_patch(btn)
 
-        # Button label
+        # Button label — scale proportionally, floor at 8pt
         ax.text(
             x_cursor + w / 2,
             y_bot + h / 2,
             "OK",
             color=col,
-            fontsize=max(8, min(16, font_px * 0.7)),
+            fontsize=max(8, font_px * 0.7),
             fontweight="bold",
             ha="center",
             va="center",
@@ -9353,12 +9358,12 @@ def diagram_spacing_struct_overview():
         path_effects=stroke,
     )
 
-    # 2. panel_padding — left side of panel
+    # 2. panel_padding — bottom-left side of panel (shows exact pp distance)
     ppd_x = mock_x - 0.3
     ax.annotate(
         "",
-        xy=(ppd_x, mock_y + mock_h),
-        xytext=(ppd_x, content_top),
+        xy=(ppd_x, mock_y),
+        xytext=(ppd_x, content_y),
         arrowprops={
             "arrowstyle": "<->,head_width=0.15,head_length=0.08",
             "color": STYLE["accent4"],
@@ -9367,7 +9372,7 @@ def diagram_spacing_struct_overview():
     )
     ax.text(
         ppd_x - 0.3,
-        (mock_y + mock_h + content_top) / 2,
+        (mock_y + content_y) / 2,
         "panel_padding",
         color=STYLE["accent4"],
         fontsize=9,

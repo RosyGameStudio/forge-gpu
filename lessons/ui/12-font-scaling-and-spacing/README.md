@@ -119,8 +119,8 @@ For example, the checkbox function computes its box size as:
 float cb_size = FORGE_UI_SCALED(ctx, ctx->spacing.checkbox_box_size);
 ```
 
-At scale 1.0 this returns 18.0 (the default).  At scale 1.5 it returns 27.0.
-At scale 0.75 it returns 13.5.
+At scale 1.0 this returns 18.0 (the default).  Increasing scale to 1.5 yields
+27.0, while 0.75 produces 13.5.
 
 ### The ForgeUiSpacing struct
 
