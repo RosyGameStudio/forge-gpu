@@ -10523,7 +10523,9 @@ def diagram_ssr_self_intersection():
 
     # Draw ray steps — first one is very close to surface and false-hits
     step_size = 0.6
-    n_steps = 8
+    wall_x = 7.0
+    travel_to_wall = (wall_x - origin[0]) / r_dir[0]
+    n_steps = int(np.ceil(travel_to_wall / step_size)) + 1
     steps = [origin + r_dir * step_size * (i + 1) for i in range(n_steps)]
 
     # Step 1 is close to floor — false hit
@@ -10606,7 +10608,6 @@ def diagram_ssr_self_intersection():
                       ":", color=STYLE["text_dim"], lw=1.0, alpha=0.3, zorder=4)
 
     # Draw ray line up to hit point (only show wall hit if a step reached it)
-    wall_x = 7.0
     if hit_step is not None:
         t_wall = (wall_x - origin[0]) / r_dir[0]
         hit_on_wall = origin + r_dir * t_wall
