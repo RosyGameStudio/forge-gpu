@@ -83,34 +83,36 @@
 #define FORGE_UI_WIN_TOGGLE_SIZE     10.0f  /* triangle side length */
 #define FORGE_UI_WIN_TOGGLE_PAD       8.0f  /* padding from left edge */
 
-/* Window background RGBA — based on theme surface, matches panel */
-#define FORGE_UI_WIN_BG_R     0.12f
-#define FORGE_UI_WIN_BG_G     0.12f
-#define FORGE_UI_WIN_BG_B     0.22f
+/* Window background RGBA — theme surface (#252545), notably lighter/bluer
+ * than the application clear color (#1a1a2e) so windows stand out. */
+#define FORGE_UI_WIN_BG_R     0.145f
+#define FORGE_UI_WIN_BG_G     0.145f
+#define FORGE_UI_WIN_BG_B     0.271f
 #define FORGE_UI_WIN_BG_A     1.00f
 
-/* Title bar background RGBA — based on theme grid, matches panel */
-#define FORGE_UI_WIN_TITLE_BG_R   0.16f
-#define FORGE_UI_WIN_TITLE_BG_G   0.16f
-#define FORGE_UI_WIN_TITLE_BG_B   0.28f
+/* Title bar background RGBA — theme grid (#2a2a4a), darker than content
+ * area to visually anchor the title bar. */
+#define FORGE_UI_WIN_TITLE_BG_R   0.165f
+#define FORGE_UI_WIN_TITLE_BG_G   0.165f
+#define FORGE_UI_WIN_TITLE_BG_B   0.290f
 #define FORGE_UI_WIN_TITLE_BG_A   1.00f
 
-/* Title bar text color — matches theme text #e0e0f0 */
-#define FORGE_UI_WIN_TITLE_TEXT_R  0.88f
-#define FORGE_UI_WIN_TITLE_TEXT_G  0.88f
-#define FORGE_UI_WIN_TITLE_TEXT_B  0.94f
+/* Title bar text color — theme text (#e0e0f0) */
+#define FORGE_UI_WIN_TITLE_TEXT_R  0.878f
+#define FORGE_UI_WIN_TITLE_TEXT_G  0.878f
+#define FORGE_UI_WIN_TITLE_TEXT_B  0.941f
 #define FORGE_UI_WIN_TITLE_TEXT_A  1.00f
 
-/* Collapse toggle color — matches theme dim text #8888aa */
-#define FORGE_UI_WIN_TOGGLE_R      0.53f
-#define FORGE_UI_WIN_TOGGLE_G      0.53f
-#define FORGE_UI_WIN_TOGGLE_B      0.67f
+/* Collapse toggle color — theme dim text (#8888aa) */
+#define FORGE_UI_WIN_TOGGLE_R      0.533f
+#define FORGE_UI_WIN_TOGGLE_G      0.533f
+#define FORGE_UI_WIN_TOGGLE_B      0.667f
 #define FORGE_UI_WIN_TOGGLE_A      1.00f
 
-/* Collapse toggle hover color (brighter when the title bar is hot) */
-#define FORGE_UI_WIN_TOGGLE_HOT_R  0.75f
-#define FORGE_UI_WIN_TOGGLE_HOT_G  0.75f
-#define FORGE_UI_WIN_TOGGLE_HOT_B  0.88f
+/* Collapse toggle hover color — theme accent cyan (#4fc3f7) */
+#define FORGE_UI_WIN_TOGGLE_HOT_R  0.310f
+#define FORGE_UI_WIN_TOGGLE_HOT_G  0.765f
+#define FORGE_UI_WIN_TOGGLE_HOT_B  0.969f
 #define FORGE_UI_WIN_TOGGLE_HOT_A  1.00f
 
 /* Extra padding around the collapse toggle triangle to make the click

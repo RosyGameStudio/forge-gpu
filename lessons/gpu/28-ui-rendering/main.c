@@ -121,14 +121,15 @@
 /* Text input backing buffer size. */
 #define TEXT_INPUT_BUF_SIZE 128
 
-/* Label colors — theme text (#e0e0f0) and dim text (#8888aa). */
-#define TITLE_LABEL_R  0.88f
-#define TITLE_LABEL_G  0.88f
-#define TITLE_LABEL_B  0.94f
+/* Label colors — title uses accent cyan (#4fc3f7) for emphasis,
+ * info uses theme dim text (#8888aa) for secondary content. */
+#define TITLE_LABEL_R  0.310f
+#define TITLE_LABEL_G  0.765f
+#define TITLE_LABEL_B  0.969f
 #define TITLE_LABEL_A  1.00f
-#define INFO_LABEL_R   0.60f
-#define INFO_LABEL_G   0.60f
-#define INFO_LABEL_B   0.72f
+#define INFO_LABEL_R   0.533f
+#define INFO_LABEL_G   0.533f
+#define INFO_LABEL_B   0.667f
 #define INFO_LABEL_A   1.00f
 
 /* Cursor blink timing (in milliseconds). */
