@@ -224,8 +224,8 @@ full topic list. See [PLAN.md](PLAN.md) for the roadmap.
 
 Build an immediate-mode UI system from scratch — font parsing, text rendering,
 layout, and interactive controls. UI lessons produce CPU-side data (textures,
-vertices, indices, UVs) with no GPU dependency. A separate GPU lesson renders
-the output.
+vertices, indices, UVs) with no GPU dependency.
+[GPU Lesson 28](lessons/gpu/28-ui-rendering/) renders the output.
 
 | # | Topic | What you'll learn |
 |---|-------|-------------------|
