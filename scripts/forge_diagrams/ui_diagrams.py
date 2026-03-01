@@ -8385,13 +8385,13 @@ def diagram_id_collision():
     collision_rect = mpatches.FancyBboxPatch(
         (5.5, 5.2), 4.0, 0.8,
         boxstyle="round,pad=0.1",
-        facecolor="#4a1a1a", edgecolor="#ff4444",
+        facecolor=STYLE["surface"], edgecolor=STYLE["accent2"],
         linewidth=2,
     )
     ax1.add_patch(collision_rect)
     ax1.text(
         7.5, 5.6, 'Checkbox (id=102)',
-        color="#ff6666", fontsize=10, fontweight="bold",
+        color=STYLE["accent2"], fontsize=10, fontweight="bold",
         ha="center", path_effects=stroke,
     )
 
@@ -8399,11 +8399,11 @@ def diagram_id_collision():
     ax1.annotate(
         "COLLISION!",
         xy=(4.5, 5.5), xytext=(5.5, 4.2),
-        color="#ff4444", fontsize=11, fontweight="bold",
+        color=STYLE["accent2"], fontsize=11, fontweight="bold",
         ha="center",
         arrowprops={
             "arrowstyle": "->,head_width=0.25",
-            "color": "#ff4444", "lw": 2,
+            "color": STYLE["accent2"], "lw": 2,
         },
         path_effects=stroke,
     )
