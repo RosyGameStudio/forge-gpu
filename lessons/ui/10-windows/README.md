@@ -340,9 +340,8 @@ build\lessons\ui\10-windows\Debug\10-windows.exe
 
 ## What's next
 
-- **[UI Lesson 11 -- Game UI](../11-game-ui/)** (planned) -- applying windows
-  and panels to game-specific UI patterns such as inventory screens, dialogue
-  boxes, and HUDs
+- **[UI Lesson 12 -- Font Scaling and Spacing](../12-font-scaling-and-spacing/)** --
+  global scale factor and `ForgeUiSpacing` struct for DPI-aware proportional UI
 
 ## Exercises
 

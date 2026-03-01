@@ -150,7 +150,9 @@ from .math_diagrams import (
 )
 from .ui_diagrams import (
     diagram_antialiasing_comparison,
+    diagram_atlas_rebuild_at_scale,
     diagram_baseline_metrics,
+    diagram_before_after_spacing,
     diagram_button_draw_data,
     diagram_character_deletion,
     diagram_character_insertion,
@@ -184,6 +186,8 @@ from .ui_diagrams import (
     diagram_panel_with_scroll_sequence,
     diagram_pen_advance,
     diagram_quad_vertex_layout,
+    diagram_scale_factor_effect,
+    diagram_scaled_dimensions_formula,
     diagram_scanline_crossings,
     diagram_scroll_offset_model,
     diagram_scrollbar_proportions,
@@ -191,6 +195,8 @@ from .ui_diagrams import (
     diagram_slider_anatomy,
     diagram_slider_state_colors,
     diagram_slider_value_mapping,
+    diagram_spacing_anatomy,
+    diagram_spacing_struct_overview,
     diagram_text_input_anatomy,
     diagram_ttf_file_structure,
     diagram_uv_coordinates,
@@ -468,6 +474,14 @@ DIAGRAMS = {
         ("window_state_persistence.png", diagram_window_state_persistence),
         ("window_vs_panel_comparison.png", diagram_window_vs_panel_comparison),
     ],
+    "ui/12": [
+        ("scale_factor_effect.png", diagram_scale_factor_effect),
+        ("spacing_anatomy.png", diagram_spacing_anatomy),
+        ("spacing_struct_overview.png", diagram_spacing_struct_overview),
+        ("atlas_rebuild_at_scale.png", diagram_atlas_rebuild_at_scale),
+        ("before_after_spacing.png", diagram_before_after_spacing),
+        ("scaled_dimensions_formula.png", diagram_scaled_dimensions_formula),
+    ],
 }
 
 # Full lesson directory names for display
@@ -515,6 +529,7 @@ LESSON_NAMES = {
     "ui/08": "ui/08-layout",
     "ui/09": "ui/09-panels-and-scrolling",
     "ui/10": "ui/10-windows",
+    "ui/12": "ui/12-font-scaling-and-spacing",
 }
 
 

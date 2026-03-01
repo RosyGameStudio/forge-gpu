@@ -239,6 +239,7 @@ the output.
 | 08 | [Layout](lessons/ui/08-layout/) | ForgeUiLayout cursor model, vertical and horizontal directions, padding and spacing, layout stack with push/pop nesting, layout_next() for automatic widget positioning, layout-aware widget variants |
 | 09 | [Panels and Scrolling](lessons/ui/09-panels-and-scrolling/) | ForgeUiPanel containers, axis-aligned rect clipping with UV remapping, scroll offset in layout, interactive scrollbar with proportional thumb, mouse wheel input |
 | 10 | [Windows](lessons/ui/10-windows/) | ForgeUiWindowState (rect, scroll_y, collapsed, z_order), title bar dragging with grab offset, click-to-front z-ordering, collapse/expand toggle, deferred per-window draw lists, z-aware input routing |
+| 12 | [Font Scaling and Spacing](lessons/ui/12-font-scaling-and-spacing/) | ForgeUiSpacing struct, float scale factor, FORGE_UI_SCALED macro, atlas rebuild at scale, layout defaults, per-field spacing override, DPI-aware UI |
 
 See [lessons/ui/README.md](lessons/ui/README.md) for details and
 [PLAN.md](PLAN.md) for the roadmap.

@@ -62,9 +62,14 @@ if (forge_ui_ttf_load("font.ttf", &font)) {
   cursor position, remaining space
 - **`ForgeUiPanel`** -- Panel container: outer rect, content rect, scroll
   offset pointer, computed content height, and widget ID
+- **`ForgeUiSpacing`** -- Centralized spacing constants (widget_padding,
+  item_spacing, panel_padding, title_bar_height, checkbox/slider/text
+  input/scrollbar/window dimensions, scroll_speed). Base (unscaled) values
+  multiplied by `ctx->scale` via `FORGE_UI_SCALED(ctx, value)`
 - **`ForgeUiContext`** -- Immediate-mode UI context: holds mouse input, the
   hot/active widget IDs, font atlas reference, layout stack, clip rect,
-  panel state, and dynamic vertex/index buffers
+  panel state, scale factor, spacing struct, base pixel height, and dynamic
+  vertex/index buffers
 
 ### Types -- Windows (forge_ui_window.h)
 
@@ -118,8 +123,11 @@ if (forge_ui_ttf_load("font.ttf", &font)) {
 
 ### Functions -- Immediate-Mode UI (forge_ui_ctx.h)
 
+- **`FORGE_UI_SCALED(ctx, value)`** -- Macro returning `value * ctx->scale`;
+  use for all spacing lookups at draw time
 - **`forge_ui_ctx_init(ctx, atlas)`** -- Initialize a UI context with a font
-  atlas. Allocates vertex/index buffers. Returns `true` on success
+  atlas. Sets `scale = 1.0`, populates `spacing` defaults from built-in
+  constants, and allocates vertex/index buffers. Returns `true` on success
 - **`forge_ui_ctx_free(ctx)`** -- Free context buffers
 - **`forge_ui_ctx_begin(ctx, mouse_x, mouse_y, mouse_down)`** -- Begin a
   frame: reset draw data, update input state
@@ -218,6 +226,9 @@ if (forge_ui_ttf_load("font.ttf", &font)) {
 - Deferred draw ordering: per-window draw lists assembled back-to-front
 - Z-aware input routing: only the topmost window receives mouse interaction
 - Dynamic vertex/index buffer accumulation per frame
+- Global scale factor for DPI-aware proportional widget sizing
+- Centralized spacing constants via `ForgeUiSpacing` struct
+- Layout default substitution (zero padding/spacing replaced with themed values)
 
 ## Limitations
 
@@ -259,6 +270,8 @@ These are intentional simplifications for a learning library:
   Panels with clipping, scrolling, and interactive scrollbar
 - [`lessons/ui/10-windows/`](../../lessons/ui/10-windows/) -- Draggable windows
   with z-ordering, collapse toggle, and deferred draw ordering
+- [`lessons/ui/12-font-scaling-and-spacing/`](../../lessons/ui/12-font-scaling-and-spacing/) --
+  Global scale factor and ForgeUiSpacing struct for DPI-aware proportional UI
 - [`tests/ui/`](../../tests/ui/) -- Unit tests for the UI library
 
 ## Design Philosophy

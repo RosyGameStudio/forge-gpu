@@ -38,7 +38,20 @@ ID collided with the window's collapse toggle).
 - Migrate all existing widgets to the new system
 - Show before/after: old code with manual IDs vs new code with labels
 
-## Lesson 12: Theming and Color System
+## Lesson 12: Font Scaling and Spacing (DONE)
+
+Global scale factor and consistent spacing — make the UI readable at any DPI
+and eliminate hardcoded padding gaps.
+
+- `float scale` on `ForgeUiContext` (default 1.0) multiplies all dimensions
+- `ForgeUiSpacing` struct centralizes base spacing constants
+- `FORGE_UI_SCALED(ctx, value)` macro for scaled lookups
+- Atlas rebuilt at `base_pixel_height * scale` for crisp text at any size
+- Layout defaults: `layout_push` substitutes themed spacing when caller
+  passes 0; pass -1.0f for true zero padding
+- All widgets refactored to use scaled spacing instead of hardcoded defines
+
+## Lesson 13: Theming and Color System
 
 **Problem:** Every widget call requires explicit RGBA color parameters, making
 it tedious to build a consistent UI and impossible to swap themes at runtime.
