@@ -98,9 +98,12 @@ The scope for each check is specified in its description.
 
 **Scope:** all test files in `tests/ui/`
 
-Wrap any `forge_ui_*` or `forge_ui_ctx_*` function call that returns `false` on
-failure with `ASSERT_TRUE(...)` so tests fail immediately on error rather than
-continuing with invalid state.
+For setup and success-path code, wrap `forge_ui_*` / `forge_ui_ctx_*` calls that
+return `false` on failure with `ASSERT_TRUE(...)` so tests fail immediately on
+unexpected errors.
+
+For negative-path tests that intentionally trigger failures, assert the expected
+failure explicitly with `ASSERT_FALSE(...)` (or equivalent).
 
 **What to look for:**
 
@@ -112,10 +115,12 @@ continuing with invalid state.
 
 **Scope:** all test files in `tests/ui/`
 
-Every numeric literal that represents a tuning parameter, buffer size, dimension,
-threshold, or domain constant must be a `#define` or `enum` at the top of the
-relevant test section. Other test sections in the same file already follow this
-convention — new code must match.
+Numeric literals representing reusable or semantically meaningful tuning
+parameters (buffer sizes, dimensions, thresholds, domain constants) should be
+defined as `#define` or `enum` at the top of the relevant test section. Other
+test sections in the same file already follow this convention — new code must
+match. One-off literals in a single tightly scoped assertion are acceptable
+when they remain clear and do not obscure intent.
 
 **Acceptable bare numbers:**
 
@@ -299,7 +304,7 @@ the library headers. Check for:
 ### Doc check 5: README currency
 
 **Scope:** `README.md` (root), `lessons/ui/README.md`, `common/ui/README.md`,
-`CLAUDE.md`
+`CLAUDE.md`, previous lesson's `README.md`
 
 Verify all index files are up to date with the changes from this lesson:
 
