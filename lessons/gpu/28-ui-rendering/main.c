@@ -54,10 +54,11 @@
 #define WINDOW_WIDTH  1280
 #define WINDOW_HEIGHT 720
 
-/* Clear color -- matches the project theme background (#1a1a2e). */
-#define CLEAR_R 0.10f
-#define CLEAR_G 0.10f
-#define CLEAR_B 0.18f
+/* Clear color — very dark navy, darker than the window so the UI pops.
+ * G slightly above R shifts the hue from purple toward blue. */
+#define CLEAR_R 0.059f
+#define CLEAR_G 0.071f
+#define CLEAR_B 0.141f
 #define CLEAR_A 1.0f
 
 /* Font asset path (relative to executable, same as all UI lessons). */

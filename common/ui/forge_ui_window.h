@@ -83,18 +83,19 @@
 #define FORGE_UI_WIN_TOGGLE_SIZE     10.0f  /* triangle side length */
 #define FORGE_UI_WIN_TOGGLE_PAD       8.0f  /* padding from left edge */
 
-/* Window background RGBA — theme surface (#252545), notably lighter/bluer
- * than the application clear color (#1a1a2e) so windows stand out. */
-#define FORGE_UI_WIN_BG_R     0.145f
-#define FORGE_UI_WIN_BG_G     0.145f
-#define FORGE_UI_WIN_BG_B     0.271f
+/* Window background RGBA — notably lighter and bluer than the application
+ * clear color so windows visually pop.  G > R shifts hue from purple
+ * toward blue. */
+#define FORGE_UI_WIN_BG_R     0.125f
+#define FORGE_UI_WIN_BG_G     0.157f
+#define FORGE_UI_WIN_BG_B     0.298f
 #define FORGE_UI_WIN_BG_A     1.00f
 
-/* Title bar background RGBA — theme grid (#2a2a4a), darker than content
- * area to visually anchor the title bar. */
-#define FORGE_UI_WIN_TITLE_BG_R   0.165f
-#define FORGE_UI_WIN_TITLE_BG_G   0.165f
-#define FORGE_UI_WIN_TITLE_BG_B   0.290f
+/* Title bar background RGBA — slightly lighter than window body with
+ * a blue-dominant tint to anchor the title bar. */
+#define FORGE_UI_WIN_TITLE_BG_R   0.098f
+#define FORGE_UI_WIN_TITLE_BG_G   0.125f
+#define FORGE_UI_WIN_TITLE_BG_B   0.251f
 #define FORGE_UI_WIN_TITLE_BG_A   1.00f
 
 /* Title bar text color — theme text (#e0e0f0) */
