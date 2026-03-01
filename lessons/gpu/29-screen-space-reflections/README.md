@@ -34,7 +34,7 @@ reflections match the scene exactly — moving the camera or the objects updates
 the reflections in real time. Near the screen edges, reflections fade
 gracefully to avoid hard cutoffs where ray marching runs out of data.
 
-## Overview
+## Key concepts
 
 Environment mapping (Lesson 14) approximates reflections by sampling a
 pre-rendered cubemap. This works well for distant surroundings (sky, mountains)
@@ -176,9 +176,11 @@ SDL_BeginGPURenderPass(cmd, color_targets, 3, &depth_target);
 ### Pass 3 — SSR ray march
 
 A fullscreen quad pass reads the G-buffer textures (scene color, view normals,
-depth) and performs the screen-space ray march for each pixel. The output is an
-SSR color texture that contains the reflected color at pixels where a hit was
-found, and black (or transparent) where no hit occurred.
+depth, and world-space position) and performs the screen-space ray march for
+each pixel. The world-position alpha channel carries per-pixel reflectivity —
+the shader skips non-reflective pixels early. The output is an SSR color texture
+that contains the reflected color at pixels where a hit was found, and
+transparent black where no hit occurred or the surface is non-reflective.
 
 The ray march shader is the core of this lesson and is described in detail in
 [The SSR ray march shader](#the-ssr-ray-march-shader) below.
@@ -406,12 +408,12 @@ Press the corresponding number key to switch views:
 | Key | Mode | Description |
 |-----|------|-------------|
 | **1** | Final composite | Scene color blended with SSR reflections (default) |
-| **2** | Scene only | Lit scene without reflections — comparison baseline |
-| **3** | SSR only | Reflected colors on black background — shows where hits occur |
-| **4** | View normals | View-space normals visualized as RGB — verifies G-buffer |
-| **5** | Depth buffer | Linearized depth as grayscale — verifies depth reconstruction |
+| **2** | SSR only | Reflected colors on black background — shows where hits occur |
+| **3** | View normals | View-space normals visualized as RGB — verifies G-buffer |
+| **4** | Depth buffer | Linearized depth as grayscale — verifies depth reconstruction |
+| **5** | World position | World-space position visualized as RGB — verifies G-buffer |
 
-The SSR-only view (key 3) is particularly useful for tuning parameters. Black
+The SSR-only view (key 2) is particularly useful for tuning parameters. Black
 pixels are misses (no intersection found), while colored pixels show the
 reflected scene color. Gaps or noise in the reflection indicate that
 `max_steps` or `thickness` need adjustment.
@@ -424,10 +426,10 @@ reflected scene color. Gaps or noise in the reflection indicate that
 | **Space / LShift** | Move up / down |
 | **Mouse** | Look around |
 | **1** | Final composite (default) |
-| **2** | Scene only |
-| **3** | SSR only |
-| **4** | View normals |
-| **5** | Depth buffer |
+| **2** | SSR only |
+| **3** | View normals |
+| **4** | Depth buffer |
+| **5** | World position |
 | **Escape** | Release mouse / quit |
 
 ## Code structure
@@ -497,6 +499,12 @@ cmake --build build --config Debug --target 29-screen-space-reflections
   that serves as the primary reflective surface
 - [Lesson 10 — Basic Lighting](../10-basic-lighting/) — Blinn-Phong shading
   model used in the scene pass
+- [Math 02 — Coordinate Spaces](../../math/02-coordinate-spaces/) — world,
+  view, and clip spaces used throughout the SSR pipeline
+- [Math 06 — Projections](../../math/06-projections/) — projection and
+  inverse projection matrices used for depth reconstruction
+- [Math 09 — View Matrix](../../math/09-view-matrix/) — the view transform
+  that converts world-space normals and positions to view space
 
 ## AI skill
 

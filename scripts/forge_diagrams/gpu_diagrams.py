@@ -10026,11 +10026,12 @@ def diagram_ssr_ray_march():
     step_positions = [p_point + r_dir * step_size * (i + 1) for i in range(num_steps)]
 
     hit_index = None
+    thickness = 0.25
     for i, sp in enumerate(step_positions):
         if sp[0] < -1.5 or sp[0] > 12.5:
             continue
         depth_val = _ssr_depth_profile(np.array([sp[0]]))[0]
-        if sp[1] <= depth_val and hit_index is None:
+        if abs(sp[1] - depth_val) <= thickness and hit_index is None:
             hit_index = i
             break
 
@@ -10158,7 +10159,6 @@ def diagram_ssr_ray_march():
         # -----------------------------------------------------------------
         # 9. Thickness threshold bracket
         # -----------------------------------------------------------------
-        thickness = 0.25
         bracket_x = hp[0] + 0.65
         bracket_top = depth_at_hit + thickness
         bracket_bot = depth_at_hit - thickness

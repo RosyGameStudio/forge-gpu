@@ -91,7 +91,7 @@ SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(
     NULL,  /* No color targets for this example, using targets array */
     0,
     depth_tex,
-    &(SDL_GPUColorRenderTarget) {
+    &(SDL_GPUColorTargetInfo) {
         .texture = color_tex,
         .load_op = SDL_GPU_LOADOP_CLEAR,
         .store_op = SDL_GPU_STOREOP_STORE,
@@ -100,7 +100,7 @@ SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(
 );
 
 /* Bind normal, position, color targets */
-SDL_GPUColorRenderTarget targets[3] = {
+SDL_GPUColorTargetInfo targets[3] = {
     {
         .texture = color_tex,
         .load_op = SDL_GPU_LOADOP_CLEAR,
@@ -169,7 +169,7 @@ SSRUniforms ssr_uniforms = {
 
 SDL_GPURenderPass *ssr_pass = SDL_BeginGPURenderPass(
     cmd_buf,
-    &(SDL_GPUColorRenderTarget) {
+    &(SDL_GPUColorTargetInfo) {
         .texture = ssr_tex,
         .load_op = SDL_GPU_LOADOP_CLEAR,
         .store_op = SDL_GPU_STOREOP_STORE,
@@ -233,7 +233,7 @@ SDL_EndGPURenderPass(ssr_pass);
 ```c
 SDL_GPURenderPass *composite_pass = SDL_BeginGPURenderPass(
     cmd_buf,
-    &(SDL_GPUColorRenderTarget) {
+    &(SDL_GPUColorTargetInfo) {
         .texture = backbuffer,
         .load_op = SDL_GPU_LOADOP_CLEAR,
         .store_op = SDL_GPU_STOREOP_STORE,
