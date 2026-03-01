@@ -650,7 +650,17 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
     forge_ui_win__redirect_to_window(wctx, widx);
 
     /* ── Push ID scope so child widget IDs are scoped under this window ── */
-    forge_ui_push_id(ctx, title);
+    if (!forge_ui_push_id(ctx, title)) {
+        SDL_Log("forge_ui_wctx_window_begin: id scope push failed");
+        ctx->_keyboard_input_suppressed = false;
+        forge_ui_win__restore_from_window(wctx);
+        entry->vertex_count = 0;
+        entry->index_count = 0;
+        entry->id = FORGE_UI_ID_NONE;
+        entry->state = NULL;
+        wctx->window_count--;
+        return false;
+    }
 
     /* ── Determine if this window can receive input ────────────────────── */
     /* A window receives input only if it is the hovered window (topmost

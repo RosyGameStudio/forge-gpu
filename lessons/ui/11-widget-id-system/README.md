@@ -161,8 +161,8 @@ Uint32 toggle_id = forge_ui_hash_id(ctx, "\xff__toggle");
 Uint32 sb_id     = forge_ui_hash_id(ctx, "\xff__scrollbar");
 ```
 
-These names use a `\xff` byte prefix that cannot appear in user-typed
-strings, preventing collisions with user-chosen labels.
+These names use a reserved `\xff` byte prefix that normal user-authored
+labels do not contain, avoiding practical collisions with user-chosen labels.
 
 ## Diagrams
 

@@ -797,13 +797,13 @@ static void test_same_title_panels_preclamp_contamination(void)
     float scroll_b_before_panel = scroll_b;
     ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, "Info", rect_b, &scroll_b));
 
-    /* Document the pre-clamp behavior:
-     * If _panel.id matches (which it does -- both are "Info"), the
-     * pre-clamp uses Panel A's content_height.  This may NOT clamp
-     * scroll_b correctly for Panel B.
-     *
-     * After panel_end, scroll_b WILL be clamped correctly using
-     * Panel B's actual measured content_height. */
+    /* Validate pre-clamp immediately: because _panel.id matches (both
+     * panels are "Info"), the pre-clamp used Panel A's content_height
+     * (~300px).  Panel A's max_scroll = 300 - 150 = 150, so scroll_b
+     * (100.0) was within range and was NOT clamped.  This proves the
+     * contamination — Panel B's own max_scroll would be 0. */
+    ASSERT_NEAR(scroll_b, scroll_b_before_panel, 0.01f);
+
     forge_ui_ctx_layout_next(&ctx, TEST_WIDGET_H);
     forge_ui_ctx_panel_end(&ctx);
 

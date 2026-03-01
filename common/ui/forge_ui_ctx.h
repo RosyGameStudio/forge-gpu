@@ -822,13 +822,13 @@ static inline const char *forge_ui__display_end(const char *label)
  *
  * Panels and windows call this automatically; callers use it to
  * disambiguate repeated widget groups (e.g. list items). */
-static inline void forge_ui_push_id(ForgeUiContext *ctx, const char *name)
+static inline bool forge_ui_push_id(ForgeUiContext *ctx, const char *name)
 {
-    if (!ctx) return;
+    if (!ctx) return false;
     if (ctx->id_stack_depth >= FORGE_UI_ID_STACK_MAX_DEPTH) {
         SDL_Log("forge_ui_push_id: stack overflow (depth=%d, max=%d)",
                 ctx->id_stack_depth, FORGE_UI_ID_STACK_MAX_DEPTH);
-        return;
+        return false;
     }
 
     /* Hash the scope name with the current seed to produce the new seed */
@@ -844,6 +844,7 @@ static inline void forge_ui_push_id(ForgeUiContext *ctx, const char *name)
     ctx->id_seed_stack[ctx->id_stack_depth] =
         forge_ui__fnv1a(scope_name, parent_seed);
     ctx->id_stack_depth++;
+    return true;
 }
 
 /* Pop the current scope from the ID seed stack. */
@@ -2243,7 +2244,14 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
      * overwrite it with this frame's measured height. */
 
     /* ── Push ID scope so child widgets are scoped under this panel ──── */
-    forge_ui_push_id(ctx, title);
+    if (!forge_ui_push_id(ctx, title)) {
+        SDL_Log("forge_ui_ctx_panel_begin: id scope push failed");
+        ctx->has_clip = false;
+        ctx->_panel_active = false;
+        ctx->_panel.id = FORGE_UI_ID_NONE;
+        ctx->_panel.scroll_y = NULL;
+        return false;
+    }
 
     /* ── Apply mouse wheel scrolling ──────────────────────────────────── */
     /* Validate scroll_delta: a NaN or ±Inf delta (from a corrupt input

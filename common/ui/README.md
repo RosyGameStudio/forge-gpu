@@ -128,6 +128,7 @@ if (forge_ui_ttf_load("font.ttf", &font)) {
 - **`forge_ui_hash_id(ctx, label)`** -- Hash a string label with the current
   scope seed (FNV-1a). Returns a `Uint32` widget ID
 - **`forge_ui_push_id(ctx, name)`** -- Push a named scope onto the ID stack.
+  Returns `true` on success, `false` if the stack is full (max 8 levels).
   Subsequent `hash_id` calls use the new scope as their seed
 - **`forge_ui_pop_id(ctx)`** -- Pop the current scope from the ID stack
 - **`forge_ui_ctx_button(ctx, text, rect)`** -- Draw a button. Returns
