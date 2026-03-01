@@ -10605,27 +10605,32 @@ def diagram_ssr_self_intersection():
             ax_b.plot([sp[0], sp[0]], [sp[1], 0.0],
                       ":", color=STYLE["text_dim"], lw=1.0, alpha=0.3, zorder=4)
 
-    # Draw ray line up to hit point
-    if hit_step is None:
-        hit_step = len(steps) - 1
-
-    # Clamp hit to wall
+    # Draw ray line up to hit point (only show wall hit if a step reached it)
     wall_x = 7.0
-    t_wall = (wall_x - origin[0]) / r_dir[0]
-    hit_on_wall = origin + r_dir * t_wall
+    if hit_step is not None:
+        t_wall = (wall_x - origin[0]) / r_dir[0]
+        hit_on_wall = origin + r_dir * t_wall
 
-    ax_b.plot([origin[0], hit_on_wall[0]], [origin[1], hit_on_wall[1]],
-              "--", color=STYLE["accent1"], lw=1.2, alpha=0.5, zorder=4)
+        ax_b.plot([origin[0], hit_on_wall[0]], [origin[1], hit_on_wall[1]],
+                  "--", color=STYLE["accent1"], lw=1.2, alpha=0.5, zorder=4)
 
-    # Hit marker on wall
-    ax_b.plot(hit_on_wall[0], hit_on_wall[1], "o",
-              color=STYLE["accent2"], markersize=10, zorder=8)
-    ax_b.plot(hit_on_wall[0], hit_on_wall[1], "o",
-              color=STYLE["accent2"], markersize=16, markerfacecolor="none",
-              markeredgewidth=2.5, zorder=9)
-    ax_b.text(hit_on_wall[0] - 0.4, hit_on_wall[1] + 0.4, "Correct hit!",
-              color=STYLE["accent2"], fontsize=11, fontweight="bold",
-              ha="right", path_effects=stroke, zorder=10)
+        # Hit marker on wall
+        ax_b.plot(hit_on_wall[0], hit_on_wall[1], "o",
+                  color=STYLE["accent2"], markersize=10, zorder=8)
+        ax_b.plot(hit_on_wall[0], hit_on_wall[1], "o",
+                  color=STYLE["accent2"], markersize=16, markerfacecolor="none",
+                  markeredgewidth=2.5, zorder=9)
+        ax_b.text(hit_on_wall[0] - 0.4, hit_on_wall[1] + 0.4, "Correct hit!",
+                  color=STYLE["accent2"], fontsize=11, fontweight="bold",
+                  ha="right", path_effects=stroke, zorder=10)
+    else:
+        # No step reached the wall — draw the full ray with a "miss" label
+        last = steps[-1]
+        ax_b.plot([origin[0], last[0]], [origin[1], last[1]],
+                  "--", color=STYLE["accent1"], lw=1.2, alpha=0.5, zorder=4)
+        ax_b.text(last[0] + 0.3, last[1], "No hit",
+                  color=STYLE["text_dim"], fontsize=9, style="italic",
+                  path_effects=stroke, zorder=10)
 
     # Guard zone bracket
     guard_end = origin + r_dir * step_size * guard_steps

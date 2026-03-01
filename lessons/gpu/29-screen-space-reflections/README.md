@@ -387,7 +387,7 @@ for (int j = 0; j < SSR_REFINE_STEPS; j++)
     float3 mid = (refine_lo + refine_hi) * 0.5;
     float  mid_diff = /* depth comparison at mid */;
 
-    if (mid_diff < 0.0)
+    if (mid_diff > 0.0)
         refine_hi = mid;   /* still behind — narrow upper bound */
     else
         refine_lo = mid;   /* in front — narrow lower bound     */
@@ -478,8 +478,8 @@ blue-noise-like spectral properties — the same function used for dithering in
 | Parameter | Default | Effect |
 |-----------|---------|--------|
 | `max_steps` | 128 | Number of ray march steps. More steps = longer reach and finer detail. |
-| `step_size` | 0.15 | View-space distance per step. 128 steps * 0.15 = 19.2 units of reach. |
-| `max_distance` | 20.0 | Maximum view-space distance the ray can travel before being abandoned. |
+| `step_size` | 0.15 | View-space distance per step. Effective reach is `min(max_steps * step_size, max_distance)` — currently min(19.2, 20.0) = 19.2 units. |
+| `max_distance` | 20.0 | Hard cap on view-space ray travel. The ray stops when it exceeds this distance even if steps remain. |
 | `thickness` | 0.15 | Depth slab tolerance for hit acceptance. Smaller = tighter hits, less stretching. |
 
 ## Edge fadeout
@@ -681,11 +681,10 @@ approach with diffuse bounces instead of specular reflections.
 
 ## Exercises
 
-1. **Binary search refinement.** After the linear ray march finds an
-   approximate hit, add a binary search phase: bisect the interval between the
-   last non-intersecting step and the first intersecting step 4-8 times to
-   pinpoint the exact intersection. Compare the reflection quality before and
-   after — binary refinement reduces stair-step artifacts on angled surfaces.
+1. **Refinement step count.** The lesson uses 8 binary search iterations after
+   the linear hit. Try reducing to 2 or 4 and increasing to 12 or 16 — observe
+   how reflection quality changes on curved surfaces (tires, headlights).
+   At what point do additional iterations stop producing visible improvement?
 
 2. **Hierarchical ray marching.** Instead of uniform step sizes, start with
    large steps and halve the step size when the ray gets close to a surface
