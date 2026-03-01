@@ -390,7 +390,7 @@ gh pr merge <pr-number> --squash --delete-branch
 ## Example interaction
 
 ```text
-Running review-pr for PR #1...
+Running dev-review-pr for PR #1...
 
 ✓ All GitHub Actions checks passed
 ✓ Found 2 pending conversations
