@@ -367,8 +367,8 @@ build\lessons\ui\10-windows\Debug\10-windows.exe
 
 - [UI Lesson 09 — Panels and Scrolling](../09-panels-and-scrolling/) — the
   panel infrastructure that windows extend
-- [UI Lesson 11 — Game UI](../11-game-ui/) — applying windows and panels to
-  game-specific UI patterns (planned)
+- [UI Lesson 11 — Widget ID System](../11-widget-id-system/) — FNV-1a hashed
+  string IDs, the `##` separator, and hierarchical scope stacking
 - [Casey Muratori — Immediate-Mode Graphical User Interfaces (2005)](https://caseymuratori.com/blog_0001) —
   the foundational talk on immediate-mode UI
 - [Dear ImGui](https://github.com/ocornut/imgui) — a production

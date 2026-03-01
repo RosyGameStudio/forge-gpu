@@ -434,7 +434,8 @@ int main(int argc, char *argv[])
         /* Status label */
         const char *status = "Click a field to start typing";
         static char status_buf[128];
-        if (ctx.focused != 0) {
+        Uint32 username_id = forge_ui_hash_id(&ctx, "##username");
+        if (ctx.focused == username_id) {
             SDL_snprintf(status_buf, sizeof(status_buf),
                          "Username: \"%s\"  cursor=%d  len=%d",
                          username_state.buffer,

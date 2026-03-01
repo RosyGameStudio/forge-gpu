@@ -462,7 +462,7 @@ static void test_second_window_scope_starts_from_root(void)
     forge_ui_wctx_begin(&wctx);
 
     /* Compute expected ID seeds manually */
-    Uint32 root_seed = 0x811c9dc5u;  /* FNV offset basis */
+    Uint32 root_seed = FORGE_UI_FNV_OFFSET_BASIS;
     Uint32 expected_seed_a = forge_ui__fnv1a("WinA", root_seed);
     Uint32 expected_seed_b = forge_ui__fnv1a("WinB", root_seed);
 

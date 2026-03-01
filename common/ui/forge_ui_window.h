@@ -709,7 +709,9 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
     }
 
     /* ── Collapse toggle button ───────────────────────────────────────── */
-    Uint32 toggle_id = forge_ui_hash_id(ctx, "__toggle");
+    /* The \xff prefix is a non-printable byte that cannot appear in
+     * user label strings, preventing collisions with user widget names. */
+    Uint32 toggle_id = forge_ui_hash_id(ctx, "\xff__toggle");
     float toggle_cx = state->rect.x + FORGE_UI_WIN_TOGGLE_PAD
                       + FORGE_UI_WIN_TOGGLE_SIZE * 0.5f;
     float toggle_cy = state->rect.y + FORGE_UI_WIN_TITLE_HEIGHT * 0.5f;

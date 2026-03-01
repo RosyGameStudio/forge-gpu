@@ -3,6 +3,15 @@
 FNV-1a hashed string IDs with hierarchical scope stacking — eliminating
 manual ID assignment and the hidden collision problem.
 
+## Result
+
+![Widget ID System](assets/screenshot.png)
+
+Two windows ("Audio" and "Video") each contain identically-labeled "Enable"
+and "Verbose" checkboxes plus a "Delete" button. Scoped string IDs keep every
+widget independent — toggling Audio/Enable has no effect on Video/Enable, and
+pressing Delete##audio leaves Delete##video idle.
+
 ## What you'll learn
 
 - **FNV-1a hashing** — the non-cryptographic hash function that converts
@@ -13,9 +22,24 @@ manual ID assignment and the hidden collision problem.
   hierarchical scopes so identical labels in different containers produce
   different hash values
 - **Automatic scoping** — panels and windows push their own scope
-  automatically, making collisions impossible without caller effort
+  automatically, making accidental collisions unlikely in practice
 - **Zero guard** — the hash function guarantees non-zero results, preserving
   `FORGE_UI_ID_NONE == 0` as the null sentinel
+
+## Key concepts
+
+- **FNV-1a hashing** — converts string labels to `Uint32` IDs with two
+  operations per byte (XOR + multiply)
+  ([The solution: hashed string IDs](#the-solution-hashed-string-ids))
+- **`##` separator** — hides display text from the hash so widgets can share
+  visible labels while keeping unique identities
+  ([The `##` separator](#the--separator))
+- **Scope stack** — `push_id`/`pop_id` chain parent seeds through nested
+  containers, making identical labels in different scopes produce different IDs
+  ([Hierarchical scope stacking](#hierarchical-scope-stacking))
+- **Duplicate ID behavior** — when IDs collide, all widgets sharing that ID
+  respond to hover, activation, and events simultaneously
+  ([What happens when IDs collide](#what-happens-when-ids-collide))
 
 ## The problem with integer IDs
 
@@ -105,19 +129,40 @@ parent scopes differ.  No manual ID management is needed.
 The scope stack supports up to 8 levels of nesting (window > panel > row >
 widget), covering all practical UI hierarchies.
 
+### What happens when IDs collide
+
+If two widgets end up with the same `Uint32` ID — whether from identical
+labels without scoping, a missing `##` suffix, or (rarely) an FNV-1a hash
+collision — the hot/active state machine cannot distinguish them:
+
+- **Both widgets highlight on hover.** The last widget drawn with the shared
+  ID wins `next_hot`, but both compare `ctx->hot == id` as true, so both
+  render in the hover style even though the cursor is only over one.
+- **Both widgets activate on click.** When the user clicks one, `ctx->active`
+  is set to the shared ID.  Every widget that checks `ctx->active == id`
+  sees a match — a second button with the same ID also reports "pressed", a
+  second slider also starts dragging, a second checkbox also toggles.
+- **Both widgets fire events.** A button click returns `true` for every
+  button sharing that ID, not just the one the user interacted with.
+
+The result is **coupled widgets** — interacting with one silently drives all
+others with the same ID.  The `##` separator and scope stacking exist to
+prevent this.  If you see two widgets responding to a single click, a
+duplicate ID is almost certainly the cause.
+
 ### Internal widget IDs
 
 Panels and windows no longer reserve `id+1` or `id+2`.  Instead, they hash
 descriptive internal names within their own scope:
 
 ```c
-/* Inside window scope */
-Uint32 toggle_id = forge_ui_hash_id(ctx, "__toggle");
-Uint32 sb_id     = forge_ui_hash_id(ctx, "__scrollbar");
+/* Inside window scope — \xff prefix prevents user-label collisions */
+Uint32 toggle_id = forge_ui_hash_id(ctx, "\xff__toggle");
+Uint32 sb_id     = forge_ui_hash_id(ctx, "\xff__scrollbar");
 ```
 
-These names cannot collide with user-chosen labels because they use the `__`
-prefix convention and live inside the container's scope.
+These names use a `\xff` byte prefix that cannot appear in user-typed
+strings, preventing collisions with user-chosen labels.
 
 ## Diagrams
 
@@ -126,7 +171,9 @@ prefix convention and live inside the container's scope.
 ![ID Collision](assets/id_collision.png)
 
 The old integer system created hidden collision zones with reserved offsets.
-The new hashed system uses scoped string IDs that cannot collide.
+The new hashed system uses scoped string IDs that eliminate manual-ID and
+reserved-offset collisions.  Hash collisions remain theoretically possible
+for a 32-bit hash but are unlikely in practice for typical UI label sets.
 
 ### ID scope stack — hierarchical hashing
 

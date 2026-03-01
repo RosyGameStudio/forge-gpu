@@ -757,17 +757,20 @@ static inline bool forge_ui__widget_mouse_over(const ForgeUiContext *ctx,
 
 /* ── ID hashing helpers ─────────────────────────────────────────────────── */
 
+#define FORGE_UI_FNV_OFFSET_BASIS 0x811c9dc5u  /* FNV-1a 32-bit offset basis */
+#define FORGE_UI_FNV_PRIME        0x01000193u  /* FNV-1a 32-bit prime        */
+
 /* FNV-1a hash of a null-terminated string, seeded with `seed`.
  * FNV-1a is a fast, non-cryptographic hash with good avalanche properties.
- * The standard FNV offset basis is 0x811c9dc5; when scoping is active,
- * the caller passes the parent scope's hash as the seed instead. */
+ * The standard FNV offset basis is FORGE_UI_FNV_OFFSET_BASIS; when scoping
+ * is active, the caller passes the parent scope's hash as the seed instead. */
 static inline Uint32 forge_ui__fnv1a(const char *str, Uint32 seed)
 {
     if (!str) return seed;
     Uint32 hash = seed;
     for (const char *p = str; *p != '\0'; p++) {
         hash ^= (Uint32)(unsigned char)*p;
-        hash *= 0x01000193u;  /* FNV prime */
+        hash *= FORGE_UI_FNV_PRIME;
     }
     return hash;
 }
@@ -788,11 +791,11 @@ static inline Uint32 forge_ui_hash_id(const ForgeUiContext *ctx,
     if (!label || label[0] == '\0') return 1;
 
     /* Find ## separator — hash the ## portion if present */
-    const char *sep = strstr(label, "##");
+    const char *sep = SDL_strstr(label, "##");
     const char *id_str = sep ? sep : label;
 
     /* Use top-of-stack seed, or FNV offset basis if stack is empty */
-    Uint32 seed = 0x811c9dc5u;
+    Uint32 seed = FORGE_UI_FNV_OFFSET_BASIS;
     if (ctx && ctx->id_stack_depth > 0) {
         seed = ctx->id_seed_stack[ctx->id_stack_depth - 1];
     }
@@ -809,8 +812,8 @@ static inline Uint32 forge_ui_hash_id(const ForgeUiContext *ctx,
 static inline const char *forge_ui__display_end(const char *label)
 {
     if (!label) return label;
-    const char *sep = strstr(label, "##");
-    return sep ? sep : (label + strlen(label));
+    const char *sep = SDL_strstr(label, "##");
+    return sep ? sep : (label + SDL_strlen(label));
 }
 
 /* Push a named scope onto the ID seed stack.  All subsequent hash_id
@@ -829,7 +832,7 @@ static inline void forge_ui_push_id(ForgeUiContext *ctx, const char *name)
     }
 
     /* Hash the scope name with the current seed to produce the new seed */
-    Uint32 parent_seed = 0x811c9dc5u;
+    Uint32 parent_seed = FORGE_UI_FNV_OFFSET_BASIS;
     if (ctx->id_stack_depth > 0) {
         parent_seed = ctx->id_seed_stack[ctx->id_stack_depth - 1];
     }
@@ -1555,7 +1558,7 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
         !isfinite(rect.w) || !isfinite(rect.h)) return false;
     /* Sanitize *value: NaN/Inf would poison the thumb position and
      * propagate into vertex data.  Clamp to min_val as a safe default. */
-    if (!isfinite(*value)) *value = 0.0f;
+    if (!isfinite(*value)) *value = min_val;
     Uint32 id = forge_ui_hash_id(ctx, label);
     if (!(max_val > min_val)) return false;  /* also rejects NaN */
 
@@ -2358,8 +2361,10 @@ static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx)
     float thumb_y = track_y + t * thumb_range;
 
     ForgeUiRect thumb_rect = { track_x, thumb_y, track_w, thumb_h };
-    /* Compute scrollbar ID within the panel's scope */
-    Uint32 sb_id = forge_ui_hash_id(ctx, "__scrollbar");
+    /* Compute scrollbar ID within the panel's scope.  The \xff prefix
+     * is a non-printable byte that cannot appear in user label strings,
+     * preventing collisions with user-chosen widget names. */
+    Uint32 sb_id = forge_ui_hash_id(ctx, "\xff__scrollbar");
 
     /* ── Scrollbar thumb interaction (same drag pattern as slider) ────── */
     bool thumb_over = forge_ui__rect_contains(thumb_rect,
