@@ -329,14 +329,40 @@ The intersection test has two conditions:
   falsely "hit" a distant surface on the other side. The thickness parameter
   defines the maximum acceptable depth difference for a valid hit.
 
+### Self-intersection guard
+
+A reflected ray starts at the surface it bounced from. At shallow viewing
+angles the first few march steps stay very close to that surface — close enough
+that the depth comparison registers a false hit against the originating geometry
+itself. This produces speckled, noisy reflections where the floor "reflects
+itself."
+
+![Self-intersection guard](assets/self_intersection.png)
+
+The fix is to skip depth comparisons until the ray has traveled a minimum
+distance from its origin. In this lesson the guard distance is 0.3 view-space
+units (two steps at the default 0.15 step size):
+
+```hlsl
+/* Skip early steps to avoid self-intersection — the ray can
+ * false-hit the surface it started from at shallow angles. */
+if (traveled < SSR_MIN_TRAVEL)
+    continue;
+```
+
+The ray still advances during skipped steps (maintaining consistent spacing),
+but no hit test runs until it has cleared the originating surface. This
+eliminates self-reflection noise without affecting legitimate nearby
+reflections.
+
 ### Tuning parameters
 
-| Parameter | Typical value | Effect |
-|-----------|---------------|--------|
-| `max_steps` | 64 | Number of ray march steps. More steps = higher quality but slower. |
-| `max_distance` | 50.0 | Maximum world-space distance the ray can travel. |
-| `thickness` | 0.5 | Depth slab thickness for hit acceptance. |
-| `step_size` | max_distance / max_steps | Distance between consecutive samples. |
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `max_steps` | 128 | Number of ray march steps. More steps = longer reach and finer detail. |
+| `step_size` | 0.15 | View-space distance per step. 128 steps * 0.15 = 19.2 units of reach. |
+| `max_distance` | 20.0 | Maximum view-space distance the ray can travel before being abandoned. |
+| `thickness` | 0.15 | Depth slab tolerance for hit acceptance. Smaller = tighter hits, less stretching. |
 
 ## Edge fadeout
 

@@ -20,18 +20,15 @@
 
 /* ── SSR configuration ─────────────────────────────────────────────── */
 
-/* Maximum number of ray march steps per pixel. */
-#define SSR_MAX_STEPS 64
+/* Fallback values used when the cbuffer override is zero or absent. */
+#define SSR_DEFAULT_MAX_STEPS    128
+#define SSR_DEFAULT_STEP_SIZE    0.15
+#define SSR_DEFAULT_THICKNESS    0.15
+#define SSR_DEFAULT_MAX_DISTANCE 20.0
 
-/* View-space distance per step along the reflected ray. */
-#define SSR_STEP_SIZE 0.05
-
-/* Depth tolerance for hit detection — how far behind a surface the ray
- * can be and still count as intersecting it. */
-#define SSR_THICKNESS 0.5
-
-/* Maximum view-space travel distance before the ray is abandoned. */
-#define SSR_MAX_DISTANCE 50.0
+/* Minimum view-space travel before accepting a hit — prevents the ray
+ * from immediately intersecting the surface it originated from. */
+#define SSR_MIN_TRAVEL 0.3
 
 /* Screen-edge fade margin — reflections fade when the sample point
  * is within this fraction of the screen border. */
@@ -66,6 +63,9 @@ cbuffer SSRParams : register(b0, space3)
     float2 screen_size;                   /* viewport width and height (px)    */
     float  ssr_step_size;                 /* per-step distance override        */
     float  ssr_max_distance;              /* max ray travel distance override  */
+    int    ssr_max_steps;                 /* max iterations override           */
+    float  ssr_thickness;                 /* depth hit tolerance override      */
+    float2 _pad;                          /* align to 16 bytes                 */
 };
 
 /* ── Helper: project a view-space position to screen UV ────────────── */
@@ -133,15 +133,17 @@ float4 main(float4 clip_pos : SV_Position,
     float3 view_dir    = normalize(view_pos);
     float3 reflect_dir = reflect(view_dir, view_nrm);
 
-    /* Choose step size: use cbuffer override if provided, else default. */
-    float step_size    = (ssr_step_size > 0.0) ? ssr_step_size : SSR_STEP_SIZE;
-    float max_distance = (ssr_max_distance > 0.0) ? ssr_max_distance : SSR_MAX_DISTANCE;
+    /* Choose parameters: use cbuffer overrides if provided, else defaults. */
+    float step_size    = (ssr_step_size > 0.0)    ? ssr_step_size    : SSR_DEFAULT_STEP_SIZE;
+    float max_distance = (ssr_max_distance > 0.0)  ? ssr_max_distance : SSR_DEFAULT_MAX_DISTANCE;
+    int   max_steps    = (ssr_max_steps > 0)       ? ssr_max_steps    : SSR_DEFAULT_MAX_STEPS;
+    float thickness    = (ssr_thickness > 0.0)     ? ssr_thickness    : SSR_DEFAULT_THICKNESS;
 
     /* ── Linear ray march in view space ────────────────────────────── */
     float3 ray_pos = view_pos;
     float  traveled = 0.0;
 
-    for (int i = 0; i < SSR_MAX_STEPS; i++)
+    for (int i = 0; i < max_steps; i++)
     {
         /* Advance one step along the reflected ray. */
         ray_pos  += reflect_dir * step_size;
@@ -159,6 +161,11 @@ float4 main(float4 clip_pos : SV_Position,
             sample_uv.y < 0.0 || sample_uv.y > 1.0)
             break;
 
+        /* Skip early steps to avoid self-intersection — the ray can
+         * false-hit the surface it started from at shallow angles. */
+        if (traveled < SSR_MIN_TRAVEL)
+            continue;
+
         /* Sample the depth buffer at the projected position. */
         float sample_depth = depth_tex.Sample(depth_smp, sample_uv).r;
         float3 sample_view = reconstruct_view_pos(sample_uv, sample_depth);
@@ -168,7 +175,7 @@ float4 main(float4 clip_pos : SV_Position,
          * thickness tolerance. Negative Z = further from camera. */
         float depth_diff = ray_pos.z - sample_view.z;
 
-        if (depth_diff < 0.0 && depth_diff > -SSR_THICKNESS)
+        if (depth_diff < 0.0 && depth_diff > -thickness)
         {
             /* ── Hit detected ──────────────────────────────────── */
             float3 hit_color = color_tex.Sample(color_smp, sample_uv).rgb;
