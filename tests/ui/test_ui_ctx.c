@@ -94,6 +94,21 @@ static int fail_count = 0;
 #define ASCII_END         126
 #define ASCII_COUNT       (ASCII_END - ASCII_START + 1)
 
+/* ── Audit fix test constants ────────────────────────────────────────── */
+#define TEST_FNV1A_OFFSET_BASIS  0x811c9dc5u
+#define TEST_FNV1A_ALT_SEED     0x12345678u
+#define TEST_FNV1A_MIN_SEED     0x00000001u
+
+/* Separator / audit fix test rects */
+#define TEST_SEP_PANEL_X     10.0f
+#define TEST_SEP_PANEL_Y     10.0f
+#define TEST_SEP_PANEL_W     300.0f
+#define TEST_SEP_PANEL_H     200.0f
+#define TEST_SEP_BTN_X       10.0f
+#define TEST_SEP_BTN_Y       10.0f
+#define TEST_SEP_BTN_W       100.0f
+#define TEST_SEP_BTN_H       30.0f
+
 static ForgeUiFont     test_font;
 static ForgeUiFontAtlas test_atlas;
 static bool font_loaded  = false;
@@ -5412,6 +5427,513 @@ static void test_display_text_separator(void)
     ASSERT_EQ_INT((int)(end3 - label3), 0);
 }
 
+/* ── Audit fix tests ─────────────────────────────────────────────────────── */
+
+static void test_fnv1a_null_returns_seed(void)
+{
+    TEST("fnv1a: NULL str returns seed unchanged");
+    Uint32 seed = TEST_FNV1A_OFFSET_BASIS;
+    Uint32 result = forge_ui__fnv1a(NULL, seed);
+    ASSERT_EQ_U32(result, seed);
+}
+
+static void test_fnv1a_empty_string_returns_seed(void)
+{
+    TEST("fnv1a: empty string returns seed unchanged");
+    Uint32 seed = TEST_FNV1A_OFFSET_BASIS;
+    Uint32 result = forge_ui__fnv1a("", seed);
+    ASSERT_EQ_U32(result, seed);
+}
+
+static void test_fnv1a_different_strings_differ(void)
+{
+    TEST("fnv1a: different strings produce different hashes");
+    Uint32 seed = TEST_FNV1A_OFFSET_BASIS;
+    Uint32 h1 = forge_ui__fnv1a("hello", seed);
+    Uint32 h2 = forge_ui__fnv1a("world", seed);
+    ASSERT_TRUE(h1 != h2);
+}
+
+static void test_fnv1a_same_string_same_hash(void)
+{
+    TEST("fnv1a: same string produces same hash");
+    Uint32 seed = TEST_FNV1A_ALT_SEED;
+    Uint32 h1 = forge_ui__fnv1a("test", seed);
+    Uint32 h2 = forge_ui__fnv1a("test", seed);
+    ASSERT_EQ_U32(h1, h2);
+}
+
+static void test_fnv1a_different_seeds_differ(void)
+{
+    TEST("fnv1a: same string with different seeds produces different hashes");
+    Uint32 h1 = forge_ui__fnv1a("test", TEST_FNV1A_OFFSET_BASIS);
+    Uint32 h2 = forge_ui__fnv1a("test", TEST_FNV1A_MIN_SEED);
+    ASSERT_TRUE(h1 != h2);
+}
+
+static void test_display_end_null_returns_null(void)
+{
+    TEST("display_end: NULL returns NULL");
+    const char *result = forge_ui__display_end(NULL);
+    ASSERT_TRUE(result == NULL);
+}
+
+static void test_display_end_no_separator(void)
+{
+    TEST("display_end: string without ## returns end");
+    const char *label = "Hello";
+    const char *result = forge_ui__display_end(label);
+    ASSERT_TRUE(result == label + 5);
+}
+
+static void test_display_end_with_separator(void)
+{
+    TEST("display_end: string with ## returns pointer to ##");
+    const char *label = "Save##file";
+    const char *result = forge_ui__display_end(label);
+    ASSERT_TRUE(result == label + 4);
+    ASSERT_EQ_INT((int)(result - label), 4);
+}
+
+static void test_display_end_double_separator(void)
+{
+    TEST("display_end: string with two ## returns first");
+    const char *label = "A##B##C";
+    const char *result = forge_ui__display_end(label);
+    ASSERT_TRUE(result == label + 1);
+    ASSERT_EQ_INT((int)(result - label), 1);
+}
+
+static void test_display_end_only_separator(void)
+{
+    TEST("display_end: '##' only returns pointer to start");
+    const char *label = "##";
+    const char *result = forge_ui__display_end(label);
+    ASSERT_TRUE(result == label);
+    ASSERT_EQ_INT((int)(result - label), 0);
+}
+
+static void test_display_end_empty_string(void)
+{
+    TEST("display_end: empty string returns pointer to end");
+    const char *label = "";
+    const char *result = forge_ui__display_end(label);
+    ASSERT_TRUE(result == label);
+}
+
+static void test_hash_id_null_label_returns_one(void)
+{
+    TEST("hash_id: NULL label returns 1");
+    Uint32 result = forge_ui_hash_id(NULL, NULL);
+    ASSERT_EQ_U32(result, 1u);
+}
+
+static void test_hash_id_empty_label_returns_one(void)
+{
+    TEST("hash_id: empty label returns 1");
+    Uint32 result = forge_ui_hash_id(NULL, "");
+    ASSERT_EQ_U32(result, 1u);
+}
+
+static void test_hash_id_null_ctx_uses_default_seed(void)
+{
+    TEST("hash_id: NULL ctx uses default FNV offset basis");
+    Uint32 h1 = forge_ui_hash_id(NULL, "Save");
+    ASSERT_TRUE(h1 != 0);
+    ASSERT_TRUE(h1 != 1);
+    /* Should be deterministic */
+    Uint32 h2 = forge_ui_hash_id(NULL, "Save");
+    ASSERT_EQ_U32(h1, h2);
+}
+
+static void test_hash_id_separator_changes_hash(void)
+{
+    TEST("hash_id: ## separator hashes only suffix portion");
+    Uint32 h_plain = forge_ui_hash_id(NULL, "Save");
+    Uint32 h_sep   = forge_ui_hash_id(NULL, "Save##file");
+    Uint32 h_sep2  = forge_ui_hash_id(NULL, "Load##file");
+    /* "Save" and "Save##file" should differ (different hash input) */
+    ASSERT_TRUE(h_plain != h_sep);
+    /* "Save##file" and "Load##file" should be the same (both hash "##file") */
+    ASSERT_EQ_U32(h_sep, h_sep2);
+}
+
+static void test_push_id_null_ctx_no_crash(void)
+{
+    TEST("push_id: NULL ctx does not crash");
+    forge_ui_push_id(NULL, "scope");
+    /* Should not crash — just returns early */
+    ASSERT_TRUE(true);
+}
+
+static void test_pop_id_null_ctx_no_crash(void)
+{
+    TEST("pop_id: NULL ctx does not crash");
+    forge_ui_pop_id(NULL);
+    ASSERT_TRUE(true);
+}
+
+static void test_pop_id_underflow_no_crash(void)
+{
+    TEST("pop_id: underflow does not crash");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ASSERT_EQ_INT(ctx.id_stack_depth, 0);
+    /* Pop on empty stack — should log warning and return safely */
+    forge_ui_pop_id(&ctx);
+    ASSERT_EQ_INT(ctx.id_stack_depth, 0);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_push_id_overflow_no_crash(void)
+{
+    TEST("push_id: overflow at max depth logs and returns safely");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    /* Push to max depth */
+    for (int i = 0; i < FORGE_UI_ID_STACK_MAX_DEPTH; i++) {
+        forge_ui_push_id(&ctx, "scope");
+    }
+    ASSERT_EQ_INT(ctx.id_stack_depth, FORGE_UI_ID_STACK_MAX_DEPTH);
+    /* One more should fail gracefully */
+    forge_ui_push_id(&ctx, "overflow");
+    ASSERT_EQ_INT(ctx.id_stack_depth, FORGE_UI_ID_STACK_MAX_DEPTH);
+    /* Pop all to clean up */
+    for (int i = 0; i < FORGE_UI_ID_STACK_MAX_DEPTH; i++) {
+        forge_ui_pop_id(&ctx);
+    }
+    ASSERT_EQ_INT(ctx.id_stack_depth, 0);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_push_id_changes_hash(void)
+{
+    TEST("push_id: changes hash_id result for same label");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    Uint32 h_root = forge_ui_hash_id(&ctx, "Button");
+    forge_ui_push_id(&ctx, "Window");
+    Uint32 h_scoped = forge_ui_hash_id(&ctx, "Button");
+    ASSERT_TRUE(h_root != h_scoped);
+    forge_ui_pop_id(&ctx);
+    Uint32 h_restored = forge_ui_hash_id(&ctx, "Button");
+    ASSERT_EQ_U32(h_root, h_restored);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_ctx_begin_resets_id_stack(void)
+{
+    TEST("ctx_begin: resets id_stack_depth to 0 if leaked");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    /* Simulate a leaked push (no matching pop) */
+    forge_ui_push_id(&ctx, "leaked");
+    ASSERT_EQ_INT(ctx.id_stack_depth, 1);
+    /* Begin a new frame — should reset */
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_EQ_INT(ctx.id_stack_depth, 0);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_panel_title_strips_separator(void)
+{
+    TEST("panel_begin: title with ## only displays text before ##");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float scroll_y = 0.0f;
+    ForgeUiRect rect = { TEST_SEP_PANEL_X, TEST_SEP_PANEL_Y,
+                         TEST_SEP_PANEL_W, TEST_SEP_PANEL_H };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    bool ok = forge_ui_ctx_panel_begin(&ctx, "Controls##p1", rect, &scroll_y);
+    ASSERT_TRUE(ok);
+    /* The panel should have a valid hashed ID */
+    ASSERT_TRUE(ctx._panel.id != FORGE_UI_ID_NONE);
+    /* The ID should use the ## convention — hash("##p1") not hash("Controls##p1") */
+    Uint32 expected_id = forge_ui_hash_id(NULL, "Controls##p1");
+    /* Note: panel ID is computed BEFORE push_id, so it uses the root seed */
+    ASSERT_EQ_U32(ctx._panel.id, expected_id);
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_panel_separator_different_ids(void)
+{
+    TEST("panel_begin: panels with same display text but different ## suffixes get different IDs");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float scroll_y = 0.0f;
+    ForgeUiRect rect = { TEST_SEP_PANEL_X, TEST_SEP_PANEL_Y,
+                         TEST_SEP_PANEL_W, TEST_SEP_PANEL_H };
+
+    /* Panel with ##p1 */
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, "Settings##p1", rect, &scroll_y));
+    Uint32 id1 = ctx._panel.id;
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Panel with ##p2 — same display text, different ID */
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(forge_ui_ctx_panel_begin(&ctx, "Settings##p2", rect, &scroll_y));
+    Uint32 id2 = ctx._panel.id;
+    forge_ui_ctx_panel_end(&ctx);
+    forge_ui_ctx_end(&ctx);
+
+    ASSERT_TRUE(id1 != id2);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_button_separator_display_text(void)
+{
+    TEST("button: ## separator does not appear in rendered text");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiRect rect = { TEST_SEP_BTN_X, TEST_SEP_BTN_Y,
+                         TEST_SEP_BTN_W, TEST_SEP_BTN_H };
+
+    /* Render a button with separator — "OK##dialog1" */
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_ctx_button(&ctx, "OK##dialog1", rect);
+    int verts_sep = ctx.vertex_count;
+    forge_ui_ctx_end(&ctx);
+
+    /* Render a button with just "OK" (no separator) */
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_ctx_button(&ctx, "OK", rect);
+    int verts_plain = ctx.vertex_count;
+    forge_ui_ctx_end(&ctx);
+
+    /* Both should emit the same number of vertices (same display text "OK") */
+    ASSERT_EQ_INT(verts_sep, verts_plain);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_button_separator_different_ids(void)
+{
+    TEST("button: same display text with different ## suffix gets different IDs");
+    Uint32 h1 = forge_ui_hash_id(NULL, "Delete##audio");
+    Uint32 h2 = forge_ui_hash_id(NULL, "Delete##video");
+    ASSERT_TRUE(h1 != h2);
+}
+
+/* ── NaN/Inf validation ──────────────────────────────────────────────── */
+
+static void test_label_nan_x_rejected(void)
+{
+    TEST("label: NaN x coordinate produces no vertices");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_ctx_label(&ctx, "Test", NAN, 10.0f, 1, 1, 1, 1);
+    ASSERT_EQ_INT(ctx.vertex_count, 0);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_label_inf_y_rejected(void)
+{
+    TEST("label: Inf y coordinate produces no vertices");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_ctx_label(&ctx, "Test", 10.0f, INFINITY, 1, 1, 1, 1);
+    ASSERT_EQ_INT(ctx.vertex_count, 0);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_button_nan_rect_x_rejected(void)
+{
+    TEST("button: NaN rect.x returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiRect rect = { NAN, 10.0f, 100.0f, 30.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_button(&ctx, "OK", rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_button_inf_rect_w_rejected(void)
+{
+    TEST("button: Inf rect.w returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiRect rect = { 10.0f, 10.0f, INFINITY, 30.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_button(&ctx, "OK", rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_button_neg_inf_rect_h_rejected(void)
+{
+    TEST("button: -Inf rect.h returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiRect rect = { 10.0f, 10.0f, 100.0f, -INFINITY };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_button(&ctx, "OK", rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_checkbox_nan_rect_rejected(void)
+{
+    TEST("checkbox: NaN rect.y returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    bool val = false;
+    ForgeUiRect rect = { 10.0f, NAN, 200.0f, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_checkbox(&ctx, "Enable", &val, rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_checkbox_inf_rect_rejected(void)
+{
+    TEST("checkbox: Inf rect.w returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    bool val = false;
+    ForgeUiRect rect = { 10.0f, 10.0f, INFINITY, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_checkbox(&ctx, "Enable", &val, rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_slider_nan_rect_rejected(void)
+{
+    TEST("slider: NaN rect.x returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float val = 0.5f;
+    ForgeUiRect rect = { NAN, 10.0f, 200.0f, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_slider(&ctx, "Volume", &val, 0.0f, 1.0f, rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_slider_inf_rect_rejected(void)
+{
+    TEST("slider: Inf rect.h returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float val = 0.5f;
+    ForgeUiRect rect = { 10.0f, 10.0f, 200.0f, INFINITY };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_slider(&ctx, "Volume", &val, 0.0f, 1.0f, rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_slider_nan_value_sanitized(void)
+{
+    TEST("slider: NaN *value is sanitized to 0");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float val = NAN;
+    ForgeUiRect rect = { 10.0f, 10.0f, 200.0f, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_ctx_slider(&ctx, "Volume", &val, 0.0f, 1.0f, rect);
+    ASSERT_TRUE(isfinite(val));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_slider_inf_value_sanitized(void)
+{
+    TEST("slider: Inf *value is sanitized to finite");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float val = INFINITY;
+    ForgeUiRect rect = { 10.0f, 10.0f, 200.0f, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_ctx_slider(&ctx, "Volume", &val, 0.0f, 1.0f, rect);
+    ASSERT_TRUE(isfinite(val));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_text_input_nan_rect_rejected(void)
+{
+    TEST("text_input: NaN rect.x returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    char buf[32] = "";
+    ForgeUiTextInputState tis = { buf, 32, 0, 0 };
+    ForgeUiRect rect = { NAN, 10.0f, 200.0f, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_text_input(&ctx, "##user", &tis, rect, true));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_text_input_inf_rect_rejected(void)
+{
+    TEST("text_input: Inf rect.w returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    char buf[32] = "";
+    ForgeUiTextInputState tis = { buf, 32, 0, 0 };
+    ForgeUiRect rect = { 10.0f, 10.0f, INFINITY, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_text_input(&ctx, "##user", &tis, rect, true));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_layout_push_nan_rect_rejected(void)
+{
+    TEST("layout_push: NaN rect.x returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiRect rect = { NAN, 10.0f, 400.0f, 300.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_layout_push(&ctx, rect, FORGE_UI_LAYOUT_VERTICAL, 8.0f, 4.0f));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_layout_push_inf_rect_rejected(void)
+{
+    TEST("layout_push: Inf rect.w returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiRect rect = { 10.0f, 10.0f, INFINITY, 300.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_layout_push(&ctx, rect, FORGE_UI_LAYOUT_VERTICAL, 8.0f, 4.0f));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
 /* ── Main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -5759,6 +6281,60 @@ int main(int argc, char *argv[])
     test_hash_id_separator();
     test_push_pop_id_scoping();
     test_display_text_separator();
+
+    /* Audit fix: fnv1a */
+    test_fnv1a_null_returns_seed();
+    test_fnv1a_empty_string_returns_seed();
+    test_fnv1a_different_strings_differ();
+    test_fnv1a_same_string_same_hash();
+    test_fnv1a_different_seeds_differ();
+
+    /* Audit fix: display_end */
+    test_display_end_null_returns_null();
+    test_display_end_no_separator();
+    test_display_end_with_separator();
+    test_display_end_double_separator();
+    test_display_end_only_separator();
+    test_display_end_empty_string();
+
+    /* Audit fix: hash_id edge cases */
+    test_hash_id_null_label_returns_one();
+    test_hash_id_empty_label_returns_one();
+    test_hash_id_null_ctx_uses_default_seed();
+    test_hash_id_separator_changes_hash();
+
+    /* Audit fix: push_id / pop_id */
+    test_push_id_null_ctx_no_crash();
+    test_pop_id_null_ctx_no_crash();
+    test_pop_id_underflow_no_crash();
+    test_push_id_overflow_no_crash();
+    test_push_id_changes_hash();
+    test_ctx_begin_resets_id_stack();
+
+    /* Audit fix: panel ## separator */
+    test_panel_title_strips_separator();
+    test_panel_separator_different_ids();
+
+    /* Audit fix: button ## separator */
+    test_button_separator_display_text();
+    test_button_separator_different_ids();
+
+    /* NaN/Inf validation */
+    test_label_nan_x_rejected();
+    test_label_inf_y_rejected();
+    test_button_nan_rect_x_rejected();
+    test_button_inf_rect_w_rejected();
+    test_button_neg_inf_rect_h_rejected();
+    test_checkbox_nan_rect_rejected();
+    test_checkbox_inf_rect_rejected();
+    test_slider_nan_rect_rejected();
+    test_slider_inf_rect_rejected();
+    test_slider_nan_value_sanitized();
+    test_slider_inf_value_sanitized();
+    test_text_input_nan_rect_rejected();
+    test_text_input_inf_rect_rejected();
+    test_layout_push_nan_rect_rejected();
+    test_layout_push_inf_rect_rejected();
 
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
             test_count, pass_count, fail_count);

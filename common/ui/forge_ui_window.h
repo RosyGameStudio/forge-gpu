@@ -596,6 +596,7 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
 {
     if (!wctx || !wctx->ctx || !wctx->ctx->atlas ||
         !state || !title || title[0] == '\0') {
+        SDL_Log("forge_ui_wctx_window_begin: NULL or invalid argument");
         return false;
     }
 
@@ -820,16 +821,24 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
         }
     }
 
-    /* ── Draw title text (offset to the right of the toggle) ───────────── */
+    /* ── Draw title text (offset to the right of the toggle, strip ##) ── */
     if (title && title[0] != '\0') {
-        ForgeUiTextMetrics m = forge_ui_text_measure(ctx->atlas, title, NULL);
+        const char *disp_end = forge_ui__display_end(title);
+        int disp_len = (int)(disp_end - title);
+        char disp_buf[256];
+        if (disp_len >= (int)sizeof(disp_buf))
+            disp_len = (int)sizeof(disp_buf) - 1;
+        SDL_memcpy(disp_buf, title, (size_t)disp_len);
+        disp_buf[disp_len] = '\0';
+
+        ForgeUiTextMetrics m = forge_ui_text_measure(ctx->atlas, disp_buf, NULL);
         float ascender_px = forge_ui__ascender_px(ctx->atlas);
         float title_text_x = state->rect.x + FORGE_UI_WIN_TOGGLE_PAD
                              + FORGE_UI_WIN_TOGGLE_SIZE + FORGE_UI_WIN_TOGGLE_PAD;
         float title_text_y = state->rect.y
                              + (FORGE_UI_WIN_TITLE_HEIGHT - m.height) * 0.5f
                              + ascender_px;
-        forge_ui_ctx_label(ctx, title, title_text_x, title_text_y,
+        forge_ui_ctx_label(ctx, disp_buf, title_text_x, title_text_y,
                            FORGE_UI_WIN_TITLE_TEXT_R, FORGE_UI_WIN_TITLE_TEXT_G,
                            FORGE_UI_WIN_TITLE_TEXT_B, FORGE_UI_WIN_TITLE_TEXT_A);
     }

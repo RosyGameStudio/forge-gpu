@@ -178,6 +178,14 @@ static int fail_count = 0;
 #define TEST_PANEL_H      200.0f
 /* (TEST_PANEL_ID removed — title string used instead) */
 
+/* ── Audit fix test constants ────────────────────────────────────────── */
+#define TEST_WIN_SEP_W       300.0f   /* separator test window width     */
+#define TEST_WIN_SEP_H       200.0f   /* separator test window height    */
+#define TEST_WIN_AUDIT2_X    220.0f   /* audit second-window x offset    */
+#define TEST_WIN_SMALL_W     200.0f   /* small audit window width        */
+#define TEST_WIN_SMALL_H     150.0f   /* small audit window height       */
+#define TEST_FNV1A_OFFSET_BASIS 0x811c9dc5u  /* FNV-1a offset basis */
+
 /* Text input keyboard focus leak test */
 /* (TEST_TI_ID removed — label string used instead) */
 #define TEST_TI_BUF_CAP   32               /* text input buffer capacity */
@@ -1746,7 +1754,7 @@ static void test_covered_window_blocks_keyboard(void)
      * "##input" is hashed inside window "WinA"'s push_id scope:
      *   scope_seed = fnv1a("WinA", FNV_OFFSET_BASIS)
      *   widget_id  = fnv1a("##input", scope_seed)                        */
-    Uint32 wina_scope_seed = forge_ui__fnv1a("WinA", 0x811c9dc5u);
+    Uint32 wina_scope_seed = forge_ui__fnv1a("WinA", TEST_FNV1A_OFFSET_BASIS);
     Uint32 expected_ti_id  = forge_ui__fnv1a("##input", wina_scope_seed);
     if (expected_ti_id == FORGE_UI_ID_NONE) expected_ti_id = 1;
 
@@ -1855,6 +1863,204 @@ static void test_covered_window_blocks_keyboard(void)
 
 #undef DECLARE_BOTH_WINDOWS
 
+    forge_ui_wctx_free(&wctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Audit fix tests
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void test_window_begin_null_wctx(void)
+{
+    TEST("window_begin: NULL wctx returns false");
+    ForgeUiWindowState state = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_SMALL_W, TEST_WIN_SMALL_H },
+        .z_order = 0
+    };
+    bool result = forge_ui_wctx_window_begin(NULL, "Test", &state);
+    ASSERT_TRUE(!result);
+}
+
+static void test_window_begin_null_title(void)
+{
+    TEST("window_begin: NULL title returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+    ForgeUiWindowState state = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_SMALL_W, TEST_WIN_SMALL_H },
+        .z_order = 0
+    };
+
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_wctx_begin(&wctx);
+
+    bool result = forge_ui_wctx_window_begin(&wctx, NULL, &state);
+    ASSERT_TRUE(!result);
+    /* Window count should not have changed */
+    ASSERT_EQ_INT(wctx.window_count, 0);
+
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_wctx_free(&wctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_window_title_strips_separator(void)
+{
+    TEST("window_begin: title with ## only displays text before ##");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+    ForgeUiWindowState state = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_SEP_W, TEST_WIN_SEP_H },
+        .z_order = 0
+    };
+
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_wctx_begin(&wctx);
+
+    bool expanded = forge_ui_wctx_window_begin(&wctx, "Debug##win1", &state);
+    ASSERT_TRUE(expanded);
+    /* The window ID should use the ## convention */
+    Uint32 win_id = wctx.window_entries[0].id;
+    ASSERT_TRUE(win_id != FORGE_UI_ID_NONE);
+    int verts_with_sep = ctx.vertex_count;
+
+    forge_ui_wctx_window_end(&wctx);
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Now render with just "Debug" (no separator) to compare vertex count */
+    ForgeUiWindowState state2 = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_SEP_W, TEST_WIN_SEP_H },
+        .z_order = 0
+    };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_wctx_begin(&wctx);
+
+    expanded = forge_ui_wctx_window_begin(&wctx, "Debug", &state2);
+    ASSERT_TRUE(expanded);
+    int verts_without_sep = ctx.vertex_count;
+    forge_ui_wctx_window_end(&wctx);
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Both should emit the same number of vertices (same display text) */
+    ASSERT_EQ_INT(verts_with_sep, verts_without_sep);
+
+    forge_ui_wctx_free(&wctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_window_separator_different_ids(void)
+{
+    TEST("window_begin: same display text with different ## suffix gets different IDs");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+    ForgeUiWindowState s1 = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_SMALL_W, TEST_WIN_SMALL_H },
+        .z_order = 0
+    };
+    ForgeUiWindowState s2 = {
+        .rect = { TEST_WIN_AUDIT2_X, TEST_WIN_Y, TEST_WIN_SMALL_W, TEST_WIN_SMALL_H },
+        .z_order = 1
+    };
+
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_wctx_begin(&wctx);
+
+    ASSERT_TRUE(forge_ui_wctx_window_begin(&wctx, "Panel##a", &s1));
+    Uint32 id1 = wctx.window_entries[0].id;
+    forge_ui_wctx_window_end(&wctx);
+
+    ASSERT_TRUE(forge_ui_wctx_window_begin(&wctx, "Panel##b", &s2));
+    Uint32 id2 = wctx.window_entries[1].id;
+    forge_ui_wctx_window_end(&wctx);
+
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* Same display text "Panel", different ## suffix — different IDs */
+    ASSERT_TRUE(id1 != id2);
+
+    forge_ui_wctx_free(&wctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_window_scope_isolates_children(void)
+{
+    TEST("window_begin: same-label widgets in different windows get different IDs");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+    ForgeUiWindowState s1 = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H },
+        .z_order = 0
+    };
+    ForgeUiWindowState s2 = {
+        .rect = { TEST_WIN_AUDIT2_X, TEST_WIN_Y, TEST_WIN_W, TEST_WIN_H },
+        .z_order = 1
+    };
+
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_wctx_begin(&wctx);
+
+    /* Window "Audio" scope */
+    ASSERT_TRUE(forge_ui_wctx_window_begin(&wctx, "Audio", &s1));
+    Uint32 h_audio_enable = forge_ui_hash_id(&ctx, "Enable");
+    forge_ui_wctx_window_end(&wctx);
+
+    /* Window "Video" scope */
+    ASSERT_TRUE(forge_ui_wctx_window_begin(&wctx, "Video", &s2));
+    Uint32 h_video_enable = forge_ui_hash_id(&ctx, "Enable");
+    forge_ui_wctx_window_end(&wctx);
+
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
+
+    /* "Enable" in Audio scope != "Enable" in Video scope */
+    ASSERT_TRUE(h_audio_enable != h_video_enable);
+
+    forge_ui_wctx_free(&wctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_window_begin_return_checked(void)
+{
+    TEST("window_begin: callers must check return value before window_end");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    ForgeUiWindowContext wctx;
+    ASSERT_TRUE(forge_ui_wctx_init(&wctx, &ctx));
+
+    /* A collapsed window returns false — window_end must NOT be called */
+    ForgeUiWindowState state = {
+        .rect = { TEST_WIN_X, TEST_WIN_Y, TEST_WIN_SMALL_W, TEST_WIN_SMALL_H },
+        .z_order = 0,
+        .collapsed = true
+    };
+
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    forge_ui_wctx_begin(&wctx);
+
+    bool expanded = forge_ui_wctx_window_begin(&wctx, "Collapsed", &state);
+    ASSERT_TRUE(!expanded);
+    /* window_end should NOT be called here — verify no crash */
+
+    forge_ui_wctx_end(&wctx);
+    forge_ui_ctx_end(&ctx);
     forge_ui_wctx_free(&wctx);
     forge_ui_ctx_free(&ctx);
 }
@@ -1971,6 +2177,15 @@ int main(int argc, char *argv[])
     /* Keyboard focus leak fix */
     SDL_Log("--- Keyboard Focus Leak ---");
     test_covered_window_blocks_keyboard();
+
+    /* Audit fix: NULL args and ## separator */
+    SDL_Log("--- Audit Fixes ---");
+    test_window_begin_null_wctx();
+    test_window_begin_null_title();
+    test_window_title_strips_separator();
+    test_window_separator_different_ids();
+    test_window_scope_isolates_children();
+    test_window_begin_return_checked();
 
     SDL_Log("");
     SDL_Log("=== Results: %d tests, %d assertions passed, %d failed ===",

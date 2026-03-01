@@ -763,6 +763,7 @@ static inline bool forge_ui__widget_mouse_over(const ForgeUiContext *ctx,
  * the caller passes the parent scope's hash as the seed instead. */
 static inline Uint32 forge_ui__fnv1a(const char *str, Uint32 seed)
 {
+    if (!str) return seed;
     Uint32 hash = seed;
     for (const char *p = str; *p != '\0'; p++) {
         hash ^= (Uint32)(unsigned char)*p;
@@ -807,6 +808,7 @@ static inline Uint32 forge_ui_hash_id(const ForgeUiContext *ctx,
  * The caller can compute display length as (result - label). */
 static inline const char *forge_ui__display_end(const char *label)
 {
+    if (!label) return label;
     const char *sep = strstr(label, "##");
     return sep ? sep : (label + strlen(label));
 }
@@ -832,8 +834,12 @@ static inline void forge_ui_push_id(ForgeUiContext *ctx, const char *name)
         parent_seed = ctx->id_seed_stack[ctx->id_stack_depth - 1];
     }
 
+    const char *scope_name = (name && name[0] != '\0') ? name : "";
+    if (scope_name[0] == '\0') {
+        SDL_Log("forge_ui_push_id: empty scope name has no effect on IDs");
+    }
     ctx->id_seed_stack[ctx->id_stack_depth] =
-        forge_ui__fnv1a(name ? name : "", parent_seed);
+        forge_ui__fnv1a(scope_name, parent_seed);
     ctx->id_stack_depth++;
 }
 
@@ -1330,6 +1336,7 @@ static inline void forge_ui_ctx_label(ForgeUiContext *ctx,
                                       float r, float g, float b, float a)
 {
     if (!ctx || !text || !ctx->atlas) return;
+    if (!isfinite(x) || !isfinite(y)) return;
 
     ForgeUiTextOpts opts = { 0.0f, FORGE_UI_TEXT_ALIGN_LEFT, r, g, b, a };
     ForgeUiTextLayout layout;
@@ -1344,6 +1351,8 @@ static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
                                        ForgeUiRect rect)
 {
     if (!ctx || !ctx->atlas || !text || text[0] == '\0') return false;
+    if (!isfinite(rect.x) || !isfinite(rect.y) ||
+        !isfinite(rect.w) || !isfinite(rect.h)) return false;
     Uint32 id = forge_ui_hash_id(ctx, text);
 
     bool clicked = false;
@@ -1438,6 +1447,8 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
                                           ForgeUiRect rect)
 {
     if (!ctx || !ctx->atlas || !label || !value || label[0] == '\0') return false;
+    if (!isfinite(rect.x) || !isfinite(rect.y) ||
+        !isfinite(rect.w) || !isfinite(rect.h)) return false;
     Uint32 id = forge_ui_hash_id(ctx, label);
 
     bool toggled = false;
@@ -1540,6 +1551,11 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
                                         ForgeUiRect rect)
 {
     if (!ctx || !ctx->atlas || !value || !label || label[0] == '\0') return false;
+    if (!isfinite(rect.x) || !isfinite(rect.y) ||
+        !isfinite(rect.w) || !isfinite(rect.h)) return false;
+    /* Sanitize *value: NaN/Inf would poison the thumb position and
+     * propagate into vertex data.  Clamp to min_val as a safe default. */
+    if (!isfinite(*value)) *value = 0.0f;
     Uint32 id = forge_ui_hash_id(ctx, label);
     if (!(max_val > min_val)) return false;  /* also rejects NaN */
 
@@ -1585,8 +1601,8 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
         if (track_w > 0.0f) {
             t = (ctx->mouse_x - track_x) / track_w;
         }
-        if (t < 0.0f) t = 0.0f;
-        if (t > 1.0f) t = 1.0f;
+        if (!(t >= 0.0f)) t = 0.0f;  /* NaN-safe: NaN fails >= */
+        if (!(t <= 1.0f)) t = 1.0f;
         float new_val = min_val + t * (max_val - min_val);
         if (new_val != *value) {
             *value = new_val;
@@ -1606,8 +1622,8 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
     /* Use the canonical *value (not the drag t) so the thumb reflects any
      * clamping or quantization the caller may apply between frames. */
     float t = (*value - min_val) / (max_val - min_val);
-    if (t < 0.0f) t = 0.0f;
-    if (t > 1.0f) t = 1.0f;
+    if (!(t >= 0.0f)) t = 0.0f;  /* NaN-safe: NaN fails >= */
+    if (!(t <= 1.0f)) t = 1.0f;
 
     /* ── Track — thin bar so the thumb visually protrudes above/below ── */
     float track_draw_y = rect.y + (rect.h - FORGE_UI_SL_TRACK_HEIGHT) * 0.5f;
@@ -1673,6 +1689,8 @@ static inline bool forge_ui_ctx_text_input(ForgeUiContext *ctx,
 {
     if (!ctx || !ctx->atlas || !state || !state->buffer
         || !label || label[0] == '\0') return false;
+    if (!isfinite(rect.x) || !isfinite(rect.y) ||
+        !isfinite(rect.w) || !isfinite(rect.h)) return false;
     Uint32 id = forge_ui_hash_id(ctx, label);
 
     /* Validate state invariants to prevent out-of-bounds access.
@@ -1906,6 +1924,12 @@ static inline bool forge_ui_ctx_layout_push(ForgeUiContext *ctx,
         SDL_Log("forge_ui_ctx_layout_push: invalid direction %d"
                 " (expected FORGE_UI_LAYOUT_VERTICAL or FORGE_UI_LAYOUT_HORIZONTAL)",
                 (int)direction);
+        return false;
+    }
+
+    /* Reject NaN/Inf in rect fields */
+    if (!isfinite(rect.x) || !isfinite(rect.y) ||
+        !isfinite(rect.w) || !isfinite(rect.h)) {
         return false;
     }
 
@@ -2144,14 +2168,22 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
                         FORGE_UI_PANEL_TITLE_BG_R, FORGE_UI_PANEL_TITLE_BG_G,
                         FORGE_UI_PANEL_TITLE_BG_B, FORGE_UI_PANEL_TITLE_BG_A);
 
-    /* Center the title text in the title bar */
+    /* Center the title text in the title bar (strip ## suffix) */
     if (title && title[0] != '\0') {
-        ForgeUiTextMetrics m = forge_ui_text_measure(ctx->atlas, title, NULL);
+        const char *disp_end = forge_ui__display_end(title);
+        int disp_len = (int)(disp_end - title);
+        char disp_buf[256];
+        if (disp_len >= (int)sizeof(disp_buf))
+            disp_len = (int)sizeof(disp_buf) - 1;
+        SDL_memcpy(disp_buf, title, (size_t)disp_len);
+        disp_buf[disp_len] = '\0';
+
+        ForgeUiTextMetrics m = forge_ui_text_measure(ctx->atlas, disp_buf, NULL);
         float ascender_px = forge_ui__ascender_px(ctx->atlas);
         float tx = rect.x + (rect.w - m.width) * 0.5f;
         float ty = rect.y + (FORGE_UI_PANEL_TITLE_HEIGHT - m.height) * 0.5f
                    + ascender_px;
-        forge_ui_ctx_label(ctx, title, tx, ty,
+        forge_ui_ctx_label(ctx, disp_buf, tx, ty,
                            FORGE_UI_PANEL_TITLE_TEXT_R, FORGE_UI_PANEL_TITLE_TEXT_G,
                            FORGE_UI_PANEL_TITLE_TEXT_B, FORGE_UI_PANEL_TITLE_TEXT_A);
     }
