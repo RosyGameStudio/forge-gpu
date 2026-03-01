@@ -838,6 +838,11 @@ static inline bool forge_ui_push_id(ForgeUiContext *ctx, const char *name)
     }
 
     const char *scope_name = (name && name[0] != '\0') ? name : "";
+    /* Apply the same ## identity extraction as forge_ui_hash_id:
+     * if "Label##id" is passed, hash only "##id" so scope seeds
+     * remain stable when only display text changes. */
+    const char *sep = SDL_strstr(scope_name, "##");
+    if (sep) scope_name = sep;
     if (scope_name[0] == '\0') {
         SDL_Log("forge_ui_push_id: empty scope name has no effect on IDs");
     }
