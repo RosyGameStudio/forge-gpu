@@ -78,9 +78,9 @@
 #define PITCH_CLAMP        1.5f
 
 /* Camera initial position — front-right, looking at the origin. */
-#define CAM_START_X         2.0f
-#define CAM_START_Y         1.5f
-#define CAM_START_Z         3.5f
+#define CAM_START_X         4.0f
+#define CAM_START_Y         3.0f
+#define CAM_START_Z         7.0f
 #define CAM_START_YAW_DEG   30.0f
 #define CAM_START_PITCH_DEG -8.0f
 
