@@ -118,6 +118,16 @@ float3 reconstruct_view_pos(float2 uv, float depth)
     return view_pos.xyz / view_pos.w;
 }
 
+/* ── Helper: interleaved gradient noise (Jimenez 2014) ─────────────── */
+/* Returns a value in [0, 1) that varies smoothly per pixel.  Used to
+ * jitter the ray march starting offset so adjacent pixels do not step
+ * in lock-step, converting regular staircase artifacts into noise. */
+
+float interleaved_gradient_noise(float2 pixel)
+{
+    return frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
+}
+
 /* ── Helper: fade reflections near screen edges ────────────────────── */
 
 float screen_edge_fade(float2 uv)
@@ -161,14 +171,27 @@ float4 main(float4 clip_pos : SV_Position,
     int   max_steps    = (ssr_max_steps > 0)       ? ssr_max_steps    : SSR_DEFAULT_MAX_STEPS;
     float thickness    = (ssr_thickness > 0.0)     ? ssr_thickness    : SSR_DEFAULT_THICKNESS;
 
+    /* ── Jitter the ray start ────────────────────────────────────────── */
+    /* Without jitter, every pixel's ray steps fall on the same regular
+     * grid (0.15, 0.30, 0.45 …).  Adjacent floor pixels that reflect
+     * an angled surface (like a truck hood) snap to different grid
+     * positions, producing visible staircase artifacts.
+     *
+     * Adding a per-pixel random offset in [0, step_size) randomises the
+     * grid so neighbouring pixels no longer step in lock-step.  The
+     * staircase becomes noise, which is far less noticeable.  Interleaved
+     * gradient noise (Jimenez 2014) gives a well-distributed value per
+     * pixel without needing a noise texture. */
+    float jitter = interleaved_gradient_noise(clip_pos.xy) * step_size;
+
     /* ── Phase 1: Linear ray march in view space ────────────────────── */
     /* March along the reflected ray in fixed steps.  When the ray passes
      * behind a scene surface (depth buffer hit), record the interval
      * between the last "in front" position and the first "behind"
      * position for binary search refinement. */
-    float3 ray_pos  = view_pos;
+    float3 ray_pos  = view_pos + reflect_dir * jitter;
     float3 prev_pos = view_pos;
-    float  traveled = 0.0;
+    float  traveled = jitter;
     bool   found_hit = false;
 
     for (int i = 0; i < max_steps; i++)

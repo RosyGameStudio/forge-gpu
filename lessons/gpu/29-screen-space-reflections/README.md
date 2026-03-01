@@ -451,6 +451,28 @@ between steps. To increase the apparent resolution of reflections:
 The current setup (128 steps at 0.15 = 19.2 units with binary refinement)
 balances quality and simplicity for a learning project.
 
+### Ray jittering
+
+Even with binary refinement, adjacent floor pixels march along the same
+regular grid (0.15, 0.30, 0.45 ...). When an angled surface like a truck
+hood crosses the reflection, neighbouring pixels snap to different grid
+positions, producing visible staircase artifacts.
+
+The fix is to add a per-pixel random offset in [0, step_size) to the ray's
+starting position. This randomises the step grid so neighbouring pixels no
+longer march in lock-step — the staircase becomes noise, which is far less
+noticeable:
+
+```hlsl
+float jitter = interleaved_gradient_noise(clip_pos.xy) * step_size;
+float3 ray_pos = view_pos + reflect_dir * jitter;
+```
+
+Interleaved gradient noise (Jimenez 2014) is a cheap, deterministic hash with
+blue-noise-like spectral properties — the same function used for dithering in
+[Lesson 25 (Shader Noise)](../25-shader-noise/) and sample rotation in
+[Lesson 27 (SSAO)](../27-ssao/).
+
 ### Tuning parameters
 
 | Parameter | Default | Effect |
