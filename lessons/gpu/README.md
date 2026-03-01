@@ -210,6 +210,7 @@ the same pattern. Use these to build projects quickly:
 - **`/shader-noise`** — GPU noise functions (hash, Perlin, fBm, domain warp)
 - **`/procedural-sky`** — Physically-based procedural atmospheric scattering
 - **`/ssao`** — Screen-space ambient occlusion
+- **`/ui-rendering`** — Immediate-mode UI on GPU with font atlas and dynamic buffers
 
 **How to use:**
 

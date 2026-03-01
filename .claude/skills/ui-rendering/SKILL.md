@@ -61,6 +61,42 @@ the SDL GPU API. Based on GPU Lesson 28.
 6. **No backface culling** — UI quads may have either winding order.
 7. **Single draw call** — all widgets batched into one vertex/index stream by the UI context.
 
+## Theme colors
+
+The forge-gpu project uses a dark blue-gray palette defined in
+`scripts/forge_diagrams/_common.py`. All UI colors follow this theme. The
+key property: dark surfaces carry a strong blue tint (B/R ratio ~1.8) that
+tapers toward neutral at brighter levels (~1.07 for text).
+
+### Reference palette (sRGB)
+
+| Role | Hex | RGBA float | Used for |
+|------|-----|------------|----------|
+| Background | `#1a1a2e` | (0.10, 0.10, 0.18, 1.0) | Clear color |
+| Surface | `#252545` | (0.14, 0.14, 0.27, 1.0) | Panel/window BG |
+| Grid | `#2a2a4a` | (0.16, 0.16, 0.29, 1.0) | Title bar BG |
+| Accent cyan | `#4fc3f7` | (0.31, 0.76, 0.97, 1.0) | Active/focused states, cursors, borders |
+| Accent orange | `#ff7043` | (1.00, 0.44, 0.26, 1.0) | Secondary highlights |
+| Accent green | `#66bb6a` | (0.40, 0.73, 0.42, 1.0) | Tertiary highlights |
+| Accent purple | `#ab47bc` | (0.67, 0.28, 0.74, 1.0) | Special elements |
+| Warn yellow | `#ffd54f` | (1.00, 0.84, 0.31, 1.0) | Warnings, annotations |
+| Text | `#e0e0f0` | (0.88, 0.88, 0.94, 1.0) | Primary text, labels |
+| Dim text | `#8888aa` | (0.53, 0.53, 0.67, 1.0) | Secondary/info text |
+
+### Deriving new colors
+
+When adding new UI elements, derive colors from the theme by maintaining
+the blue tint ratio for the brightness level:
+
+- **Dark** (0.10–0.20 R/G): set B ≈ R × 1.7–1.8
+- **Medium** (0.20–0.40 R/G): set B ≈ R × 1.5–1.6
+- **Bright** (0.40–0.60 R/G): set B ≈ R × 1.3–1.4
+- **Near-white** (0.80+ R/G): set B ≈ R × 1.05–1.15
+
+The default widget colors in `forge_ui_ctx.h` and `forge_ui_window.h`
+already follow this theme. The clear color and label colors are set per
+lesson (see `main.c` `CLEAR_R/G/B` and `TITLE_LABEL_R/G/B` defines).
+
 ## Common mistakes
 
 1. **Using RGBA8 for the atlas** — wastes 4x GPU memory and requires CPU-side pixel expansion. Use R8_UNORM.

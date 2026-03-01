@@ -54,10 +54,10 @@
 #define WINDOW_WIDTH  1280
 #define WINDOW_HEIGHT 720
 
-/* Clear color -- dark blue-gray background so UI panels stand out. */
-#define CLEAR_R 0.12f
-#define CLEAR_G 0.12f
-#define CLEAR_B 0.15f
+/* Clear color -- matches the project theme background (#1a1a2e). */
+#define CLEAR_R 0.10f
+#define CLEAR_G 0.10f
+#define CLEAR_B 0.18f
 #define CLEAR_A 1.0f
 
 /* Font asset path (relative to executable, same as all UI lessons). */
@@ -118,14 +118,14 @@
 /* Text input backing buffer size. */
 #define TEXT_INPUT_BUF_SIZE 128
 
-/* Label colors (linear space, near-white for title, muted for info). */
-#define TITLE_LABEL_R  0.90f
-#define TITLE_LABEL_G  0.90f
-#define TITLE_LABEL_B  0.95f
+/* Label colors — theme text (#e0e0f0) and dim text (#8888aa). */
+#define TITLE_LABEL_R  0.88f
+#define TITLE_LABEL_G  0.88f
+#define TITLE_LABEL_B  0.94f
 #define TITLE_LABEL_A  1.00f
-#define INFO_LABEL_R   0.70f
-#define INFO_LABEL_G   0.70f
-#define INFO_LABEL_B   0.75f
+#define INFO_LABEL_R   0.60f
+#define INFO_LABEL_G   0.60f
+#define INFO_LABEL_B   0.72f
 #define INFO_LABEL_A   1.00f
 
 /* Cursor blink timing (in milliseconds). */
@@ -174,7 +174,7 @@ typedef struct app_state {
     int                  click_count;    /* button click counter          */
 
     /* ---- Per-frame keyboard state (consumed by ctx_set_keyboard) ----- */
-    const char *frame_text_input;        /* UTF-8 chars typed this frame  */
+    char        frame_text_buf[64];      /* stable buffer for text typed this frame */
     bool        frame_key_backspace; /* backspace pressed this frame       */
     bool        frame_key_delete;    /* delete pressed this frame          */
     bool        frame_key_left;      /* left arrow pressed this frame      */
@@ -765,11 +765,18 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         }
         break;
 
-    case SDL_EVENT_TEXT_INPUT:
-        /* Store the typed text pointer for this frame.  SDL guarantees
-         * the pointer is valid until the next event poll cycle. */
-        state->frame_text_input = event->text.text;
+    case SDL_EVENT_TEXT_INPUT: {
+        /* Copy the typed text into a stable buffer owned by state.
+         * Append rather than overwrite so multiple text events in the
+         * same frame are all delivered to the UI context. */
+        size_t cur = SDL_strlen(state->frame_text_buf);
+        size_t add = SDL_strlen(event->text.text);
+        if (cur + add < sizeof(state->frame_text_buf)) {
+            SDL_memcpy(state->frame_text_buf + cur, event->text.text,
+                       add + 1);
+        }
         break;
+    }
 
     case SDL_EVENT_MOUSE_WHEEL:
         /* Accumulate scroll delta.  Positive y = scroll down, matching
@@ -798,8 +805,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     /* ── Query current window size and mouse state ──────────────── */
 
-    int win_w, win_h;
-    SDL_GetWindowSizeInPixels(state->window, &win_w, &win_h);
+    int win_w = WINDOW_WIDTH;
+    int win_h = WINDOW_HEIGHT;
+    if (!SDL_GetWindowSizeInPixels(state->window, &win_w, &win_h)) {
+        SDL_Log("SDL_GetWindowSizeInPixels failed: %s", SDL_GetError());
+    }
 
     float mx, my;
     Uint32 mouse_buttons = SDL_GetMouseState(&mx, &my);
@@ -816,7 +826,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
      * context so that the text input widget can process key presses. */
     forge_ui_ctx_set_keyboard(
         &state->ui_ctx,
-        state->frame_text_input,
+        state->frame_text_buf[0] ? state->frame_text_buf : NULL,
         state->frame_key_backspace,
         state->frame_key_delete,
         state->frame_key_left,
@@ -900,7 +910,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     /* Reset per-frame keyboard state now that the UI has consumed it.
      * This prevents stale key presses from being processed twice. */
-    state->frame_text_input    = NULL;
+    state->frame_text_buf[0]   = '\0';
     state->frame_key_backspace = false;
     state->frame_key_delete    = false;
     state->frame_key_left      = false;
@@ -1165,7 +1175,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 #ifdef FORGE_CAPTURE
     if (state->capture.mode != FORGE_CAPTURE_NONE) {
         if (!forge_capture_finish_frame(&state->capture, cmd, swapchain)) {
-            SDL_SubmitGPUCommandBuffer(cmd);
+            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                SDL_Log("SDL_SubmitGPUCommandBuffer failed: %s",
+                        SDL_GetError());
+                return SDL_APP_FAILURE;
+            }
         }
         if (forge_capture_should_quit(&state->capture)) {
             return SDL_APP_SUCCESS;
@@ -1197,7 +1211,11 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 #endif
 
     /* Stop text input events. */
-    SDL_StopTextInput(state->window);
+    if (state->window) {
+        if (!SDL_StopTextInput(state->window)) {
+            SDL_Log("SDL_StopTextInput failed: %s", SDL_GetError());
+        }
+    }
 
     /* UI contexts (CPU-side, free vertex/index draw lists). */
     forge_ui_wctx_free(&state->ui_wctx);

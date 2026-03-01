@@ -318,7 +318,7 @@ forge_ui_ctx_begin(&ui_ctx, mouse_x, mouse_y, mouse_down);
 forge_ui_wctx_begin(&ui_wctx);
 
 if (forge_ui_wctx_window_begin(&ui_wctx, 100, "UI Demo", &demo_window)) {
-    forge_ui_ctx_label_layout(&ui_ctx, "Hello, GPU UI!", 26, 0.9f, 0.9f, 0.95f, 1.0f);
+    forge_ui_ctx_label_layout(&ui_ctx, "Hello, GPU UI!", 26, 0.88f, 0.88f, 0.94f, 1.0f);
     if (forge_ui_ctx_button_layout(&ui_ctx, 101, "Click me", 36))
         click_count++;
     forge_ui_ctx_checkbox_layout(&ui_ctx, 102, "Toggle option", &checkbox_value, 30);
@@ -352,7 +352,7 @@ SDL_BindGPUGraphicsPipeline(pass, pipeline);
 SDL_BindGPUVertexBuffers(pass, 0, &vtx_binding, 1);
 SDL_BindGPUIndexBuffer(pass, &idx_binding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
 SDL_BindGPUFragmentSamplers(pass, 0, &atlas_binding, 1);
-SDL_PushVertexUniformData(cmd, 0, &uniforms, sizeof(UiUniforms));
+SDL_PushGPUVertexUniformData(cmd, 0, &uniforms, sizeof(UiUniforms));
 SDL_DrawIndexedPrimitives(pass, ui_ctx.index_count, 1, 0, 0, 0);
 ```
 
