@@ -101,11 +101,14 @@
 #define TEXT_INPUT_HEIGHT    32.0f
 
 /* Demo widget IDs (unique non-zero integers). */
+/* Widget IDs must not collide with the window's internal IDs.
+ * forge_ui_wctx_window_begin reserves id+1 (scrollbar) and id+2
+ * (collapse toggle), so content widgets must start at id+3 or higher. */
 #define DEMO_WINDOW_ID      100
-#define BUTTON_ID           101
-#define CHECKBOX_ID         102
-#define SLIDER_ID           103
-#define TEXT_INPUT_ID       104
+#define BUTTON_ID           200
+#define CHECKBOX_ID         201
+#define SLIDER_ID           202
+#define TEXT_INPUT_ID       203
 
 /* Demo slider range. */
 #define SLIDER_MIN 0.0f
