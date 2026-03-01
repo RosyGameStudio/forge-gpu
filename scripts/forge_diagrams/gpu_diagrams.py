@@ -10040,7 +10040,7 @@ def diagram_ssr_ray_march():
             break
 
     last_step = hit_index if hit_index is not None else num_steps - 1
-    ray_end = step_positions[min(last_step + 1, num_steps - 1)]
+    ray_end = step_positions[last_step]
     ax.plot(
         [p_point[0], ray_end[0]],
         [p_point[1], ray_end[1]],
