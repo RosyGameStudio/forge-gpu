@@ -131,7 +131,9 @@ PSOutput main(float4 clip_pos  : SV_Position,
     output.view_normal = float4(normalize(view_nrm), 1.0);
 
     /* ── World-space position for SSR ray reconstruction ───────────── */
-    output.world_pos = float4(world_pos, 1.0);
+    /* Alpha = 0 marks this surface as non-reflective.  Only the grid
+     * shader writes a non-zero reflectivity in the alpha channel. */
+    output.world_pos = float4(world_pos, 0.0);
 
     return output;
 }
