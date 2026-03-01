@@ -412,6 +412,34 @@ Rather than a hard cutoff (which creates visible holes at certain viewing
 angles), the `smoothstep` provides a gentle ramp from full reflection at
 `dot = 0` to fully rejected at `dot = 0.25`.
 
+### Reflection resolution
+
+The SSR pass samples the scene color texture, which is the same resolution as
+the window. So the reflection color is full-resolution — there is no
+downsampling.
+
+What makes reflections *appear* lower resolution is the **step size**. Each
+linear march step jumps 0.15 view-space units. When projected to screen
+space, that jump can skip multiple pixels, especially at grazing angles or
+for nearby surfaces. The ray is blind between steps — it can only detect
+geometry at the positions it actually samples.
+
+Binary search refinement improves precision at the hit point (narrowing the
+last step interval to sub-pixel accuracy), but it does not fill in the gaps
+between steps. To increase the apparent resolution of reflections:
+
+- **Decrease `step_size`** — finer marching, but reduces range unless
+  `max_steps` also increases.
+- **Increase `max_steps`** — covers the same distance with finer steps, but
+  costs more GPU time per pixel.
+- **March in screen space instead of view space** — step by a fixed number of
+  pixels so the sampling density is uniform regardless of depth. Production
+  engines typically use this approach (hierarchical Z-buffer tracing), but it
+  is significantly more complex to implement.
+
+The current setup (128 steps at 0.15 = 19.2 units with binary refinement)
+balances quality and simplicity for a learning project.
+
 ### Tuning parameters
 
 | Parameter | Default | Effect |
