@@ -317,13 +317,13 @@ through [UI Lesson 10 — Windows](../../ui/10-windows/):
 forge_ui_ctx_begin(&ui_ctx, mouse_x, mouse_y, mouse_down);
 forge_ui_wctx_begin(&ui_wctx);
 
-if (forge_ui_wctx_window_begin(&ui_wctx, 100, "UI Demo", &demo_window)) {
+if (forge_ui_wctx_window_begin(&ui_wctx, "UI Demo", &demo_window)) {
     forge_ui_ctx_label_layout(&ui_ctx, "Hello, GPU UI!", 26, 0.88f, 0.88f, 0.94f, 1.0f);
-    if (forge_ui_ctx_button_layout(&ui_ctx, 101, "Click me", 36))
+    if (forge_ui_ctx_button_layout(&ui_ctx, "Click me", 36))
         click_count++;
-    forge_ui_ctx_checkbox_layout(&ui_ctx, 102, "Toggle option", &checkbox_value, 30);
-    forge_ui_ctx_slider_layout(&ui_ctx, 103, &slider_value, 0.0f, 1.0f, 30);
-    forge_ui_ctx_text_input(&ui_ctx, 104, &text_input, layout_rect, cursor_visible);
+    forge_ui_ctx_checkbox_layout(&ui_ctx, "Toggle option", &checkbox_value, 30);
+    forge_ui_ctx_slider_layout(&ui_ctx, "##slider", &slider_value, 0.0f, 1.0f, 30);
+    forge_ui_ctx_text_input(&ui_ctx, "##text_input", &text_input, layout_rect, cursor_visible);
     forge_ui_wctx_window_end(&ui_wctx);
 }
 
