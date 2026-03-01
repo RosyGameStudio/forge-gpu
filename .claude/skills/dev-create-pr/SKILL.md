@@ -204,19 +204,21 @@ omissions.
 
 2. **Run quality checks on staged content:**
 
-   - If any `.md` files are staged:
+   - If any `.md` files are staged, lint only those files:
 
      ```bash
-     npx markdownlint-cli2 "**/*.md"
+     git diff --cached --name-only -- '*.md' \
+       | xargs -r npx markdownlint-cli2
      ```
 
      If errors are found in staged files, fix them, re-stage, and re-check.
      Never bypass lint rules.
 
-   - If any `scripts/*.py` files are staged:
+   - If any `scripts/*.py` files are staged, lint only those files:
 
      ```bash
-     ruff check scripts/ && ruff format --check scripts/
+     STAGED_PY=$(git diff --cached --name-only -- 'scripts/*.py')
+     [ -n "$STAGED_PY" ] && ruff check $STAGED_PY && ruff format --check $STAGED_PY
      ```
 
      Fix issues if found.
@@ -279,6 +281,22 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ---
 
 ### Phase 6 — Commit and push
+
+0. **Block secrets before commit:**
+
+   Scan staged file names for `.env` files or credential patterns. If any
+   are found, refuse to proceed:
+
+   ```bash
+   git diff --cached --name-only \
+     | grep -E '(^|/)\.env(\.|$)' && {
+       echo "Refusing to commit .env files. Unstage them first."
+       exit 1
+     }
+   ```
+
+   Also check for common secret file patterns (`credentials.json`,
+   `*.pem`, `*.key`). If detected, warn and unstage before continuing.
 
 1. **Commit:**
 

@@ -162,7 +162,9 @@ Find and delete local branches whose work has been merged into `origin/main`.
 2. **Find merged branches:**
 
    ```bash
-   git branch --merged origin/main | grep -v '^\*' | grep -v 'main'
+   git branch --merged origin/main \
+     | sed 's/^[* ]*//' \
+     | grep -v '^main$'
    ```
 
 3. **Find branches whose remote tracking branch is gone** (PR was merged and
