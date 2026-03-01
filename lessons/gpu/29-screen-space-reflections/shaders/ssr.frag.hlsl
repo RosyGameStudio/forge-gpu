@@ -1,5 +1,6 @@
 /*
- * SSR fragment shader — screen-space reflection via linear ray marching.
+ * SSR fragment shader — screen-space reflection via linear ray marching
+ * with binary search refinement.
  *
  * For each pixel the shader:
  *   1. Reconstructs the view-space position from the depth buffer
@@ -7,8 +8,10 @@
  *   3. Reflects the view direction across the surface normal
  *   4. Marches along the reflected ray in view space, projecting each
  *      sample back to screen space to compare against the depth buffer
- *   5. When the ray passes behind scene geometry (depth buffer hit),
- *      the shader samples the scene color at that screen location
+ *   5. When the ray passes behind scene geometry (coarse hit), refines
+ *      the intersection with binary search for sub-pixel precision
+ *   6. Rejects back-face hits where the surface normal faces away from
+ *      the camera along the reflection direction
  *
  * Output: float4(reflection_color.rgb, hit_alpha)
  *   hit_alpha = 0 means no reflection (ray missed or left the screen)
@@ -26,6 +29,12 @@
 #define SSR_DEFAULT_THICKNESS    0.15
 #define SSR_DEFAULT_MAX_DISTANCE 20.0
 
+/* Number of binary search iterations to refine the hit point after the
+ * linear march finds a coarse intersection.  Each iteration halves the
+ * remaining error, so 8 steps give ~256x the precision of the linear
+ * step size (0.15 / 256 ≈ 0.0006 view-space units). */
+#define SSR_REFINE_STEPS 8
+
 /* Minimum view-space travel before accepting a hit — prevents the ray
  * from immediately intersecting the surface it originated from. */
 #define SSR_MIN_TRAVEL 0.3
@@ -33,6 +42,17 @@
 /* Screen-edge fade margin — reflections fade when the sample point
  * is within this fraction of the screen border. */
 #define SSR_EDGE_FADE_START 0.8
+
+/* Back-face fade range — when the hit surface's normal faces the same
+ * direction as the reflected ray (dot > 0), the camera sees the FRONT
+ * of that surface but the reflection should see the BACK.  Since SSR
+ * can only sample screen-visible colors, these hits produce incorrect
+ * reflections.  Instead of a hard cutoff (which creates holes), we
+ * fade the reflection to zero over the range [FADE_START, FADE_END].
+ * This gives a smooth transition that hides the inherent SSR limitation
+ * without removing valid reflections of surfaces like rooftops. */
+#define SSR_BACKFACE_FADE_START 0.25
+#define SSR_BACKFACE_FADE_END   0.75
 
 /* ── Texture bindings ──────────────────────────────────────────────── */
 
@@ -139,13 +159,19 @@ float4 main(float4 clip_pos : SV_Position,
     int   max_steps    = (ssr_max_steps > 0)       ? ssr_max_steps    : SSR_DEFAULT_MAX_STEPS;
     float thickness    = (ssr_thickness > 0.0)     ? ssr_thickness    : SSR_DEFAULT_THICKNESS;
 
-    /* ── Linear ray march in view space ────────────────────────────── */
-    float3 ray_pos = view_pos;
+    /* ── Phase 1: Linear ray march in view space ────────────────────── */
+    /* March along the reflected ray in fixed steps.  When the ray passes
+     * behind a scene surface (depth buffer hit), record the interval
+     * between the last "in front" position and the first "behind"
+     * position for binary search refinement. */
+    float3 ray_pos  = view_pos;
+    float3 prev_pos = view_pos;
     float  traveled = 0.0;
+    bool   found_hit = false;
 
     for (int i = 0; i < max_steps; i++)
     {
-        /* Advance one step along the reflected ray. */
+        prev_pos  = ray_pos;
         ray_pos  += reflect_dir * step_size;
         traveled += step_size;
 
@@ -177,20 +203,69 @@ float4 main(float4 clip_pos : SV_Position,
 
         if (depth_diff < 0.0 && depth_diff > -thickness)
         {
-            /* ── Hit detected ──────────────────────────────────── */
-            float3 hit_color = color_tex.Sample(color_smp, sample_uv).rgb;
-
-            /* Fade near screen edges to hide hard cutoff artifacts. */
-            float edge_alpha = screen_edge_fade(sample_uv);
-
-            /* Fade with travel distance so distant reflections are subtle. */
-            float distance_alpha = 1.0 - saturate(traveled / max_distance);
-
-            float alpha = edge_alpha * distance_alpha * reflectivity;
-            return float4(hit_color, alpha);
+            found_hit = true;
+            break;
         }
     }
 
-    /* No hit — return transparent black. */
-    return float4(0.0, 0.0, 0.0, 0.0);
+    if (!found_hit)
+        return float4(0.0, 0.0, 0.0, 0.0);
+
+    /* ── Phase 2: Binary search refinement ───────────────────────── */
+    /* The linear march found a coarse hit between prev_pos (in front
+     * of the surface) and ray_pos (behind it).  Binary search narrows
+     * this interval to find a much more precise intersection point.
+     * Each iteration halves the error, giving sub-pixel accuracy. */
+    float3 refine_lo = prev_pos;   /* last position in front of surface */
+    float3 refine_hi = ray_pos;    /* first position behind surface     */
+
+    for (int j = 0; j < SSR_REFINE_STEPS; j++)
+    {
+        float3 mid = (refine_lo + refine_hi) * 0.5;
+        float2 mid_uv = view_to_screen_uv(mid);
+
+        /* Abandon refinement if the midpoint leaves the screen. */
+        if (mid_uv.x < 0.0 || mid_uv.x > 1.0 ||
+            mid_uv.y < 0.0 || mid_uv.y > 1.0)
+            break;
+
+        float  mid_depth = depth_tex.Sample(depth_smp, mid_uv).r;
+        float3 mid_view  = reconstruct_view_pos(mid_uv, mid_depth);
+        float  mid_diff  = mid.z - mid_view.z;
+
+        if (mid_diff < 0.0)
+            refine_hi = mid;   /* still behind surface — narrow upper */
+        else
+            refine_lo = mid;   /* in front of surface — narrow lower  */
+    }
+
+    /* Use the refined "behind" position as the final hit point. */
+    float2 hit_uv = view_to_screen_uv(refine_hi);
+
+    /* Clamp to valid screen space (in case refinement drifted). */
+    if (hit_uv.x < 0.0 || hit_uv.x > 1.0 ||
+        hit_uv.y < 0.0 || hit_uv.y > 1.0)
+        return float4(0.0, 0.0, 0.0, 0.0);
+
+    /* ── Phase 3: Compute final color and confidence ────────────── */
+    float3 hit_color = color_tex.Sample(color_smp, hit_uv).rgb;
+
+    /* Fade near screen edges to hide hard cutoff artifacts. */
+    float edge_alpha = screen_edge_fade(hit_uv);
+
+    /* Fade with travel distance so distant reflections are subtle. */
+    float distance_alpha = 1.0 - saturate(traveled / max_distance);
+
+    /* Back-face fade — when the hit surface normal faces the same
+     * direction as the reflected ray, the screen-visible color may
+     * not match what the reflection should show.  Fade these hits
+     * smoothly instead of rejecting them outright (hard cutoffs
+     * create visible holes at certain viewing angles). */
+    float3 hit_normal = normalize(normal_tex.Sample(normal_smp, hit_uv).xyz);
+    float facing = dot(reflect_dir, hit_normal);
+    float backface_fade = 1.0 - smoothstep(SSR_BACKFACE_FADE_START,
+                                            SSR_BACKFACE_FADE_END, facing);
+
+    float alpha = edge_alpha * distance_alpha * backface_fade * reflectivity;
+    return float4(hit_color, alpha);
 }
