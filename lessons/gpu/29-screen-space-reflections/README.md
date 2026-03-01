@@ -50,6 +50,17 @@ sampling the depth buffer at each step. When the ray's depth matches the
 stored depth, a hit is detected and the corresponding scene color is used as
 the reflection.
 
+The name "screen-space" refers to *where* the algorithm searches for hits —
+the 2D buffers (depth, color, normals) that the camera already rendered. The
+ray march itself runs in **view space**: at each step the shader advances a
+3D point along the reflection direction and projects it back to screen UV to
+sample the depth buffer. The alternative — marching directly in screen space
+by stepping pixel-by-pixel along the projected ray (DDA traversal with a
+hierarchical Z-buffer) — gives more uniform sampling density but is
+significantly more complex. Both approaches are "screen-space reflections"
+because they share the same core property: the reflection can only show what
+is already on screen.
+
 The key trade-off: SSR can only reflect geometry that is visible on screen.
 Anything behind the camera, occluded by another object, or outside the
 viewport cannot contribute to reflections. This makes SSR a complement to
