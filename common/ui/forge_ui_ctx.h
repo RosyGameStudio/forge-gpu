@@ -1353,6 +1353,34 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
         ctx->scale = 1.0f;
     }
 
+    /* Validate spacing fields: NaN, Inf, or negative values would produce
+     * corrupt geometry (inverted rects, infinite positions).  Clamp each
+     * field to its compiled default.  This catches accidental corruption
+     * from uninitialised memory or bad arithmetic. */
+    {
+        struct { float *field; float fallback; const char *name; } checks[] = {
+            { &ctx->spacing.widget_padding,    FORGE_UI_WIDGET_PADDING,        "widget_padding" },
+            { &ctx->spacing.item_spacing,      FORGE_UI_PANEL_CONTENT_SPACING, "item_spacing" },
+            { &ctx->spacing.panel_padding,     FORGE_UI_PANEL_PADDING,         "panel_padding" },
+            { &ctx->spacing.title_bar_height,  FORGE_UI_PANEL_TITLE_HEIGHT,    "title_bar_height" },
+            { &ctx->spacing.checkbox_box_size, FORGE_UI_CB_BOX_SIZE,           "checkbox_box_size" },
+            { &ctx->spacing.slider_thumb_width,  FORGE_UI_SL_THUMB_WIDTH,      "slider_thumb_width" },
+            { &ctx->spacing.slider_thumb_height, FORGE_UI_SL_THUMB_HEIGHT,     "slider_thumb_height" },
+            { &ctx->spacing.slider_track_height, FORGE_UI_SL_TRACK_HEIGHT,     "slider_track_height" },
+            { &ctx->spacing.text_input_padding,  FORGE_UI_TI_PADDING,          "text_input_padding" },
+            { &ctx->spacing.scrollbar_width,     FORGE_UI_SCROLLBAR_WIDTH,     "scrollbar_width" },
+        };
+        for (int i = 0; i < 10; i++) {
+            if (!isfinite(*checks[i].field) || *checks[i].field < 0.0f) {
+                SDL_Log("forge_ui_ctx_begin: invalid spacing.%s = %.4f, "
+                        "resetting to %.1f",
+                        checks[i].name, (double)*checks[i].field,
+                        (double)checks[i].fallback);
+                *checks[i].field = checks[i].fallback;
+            }
+        }
+    }
+
     /* Reset scroll and panel state for this frame.  The caller sets
      * scroll_delta after begin if mouse wheel input is available. */
     ctx->scroll_delta = 0.0f;

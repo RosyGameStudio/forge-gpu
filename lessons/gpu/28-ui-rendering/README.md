@@ -72,7 +72,7 @@ glyphs are anti-aliased via alpha blending against the font atlas.
 
 ## The UI data contract
 
-The forge-gpu UI library (built across UI Lessons 01–11) is entirely
+The forge-gpu UI library (built across UI Lessons 01–12) is entirely
 CPU-side. It parses fonts, rasterizes glyphs into an atlas, and generates
 draw data every frame — but never touches the GPU. This lesson is where that
 data reaches the screen.

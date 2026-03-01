@@ -62,9 +62,10 @@ if (forge_ui_ttf_load("font.ttf", &font)) {
   cursor position, remaining space
 - **`ForgeUiPanel`** -- Panel container: outer rect, content rect, scroll
   offset pointer, computed content height, and widget ID
-- **`ForgeUiSpacing`** -- Themed spacing defaults: padding, widget spacing,
-  indent, title bar height, scrollbar width, and slider thumb width (all in
-  logical pixels, scaled via `FORGE_UI_SCALED`)
+- **`ForgeUiSpacing`** -- Themed spacing defaults: widget padding, item spacing,
+  panel padding, title bar height, checkbox box size, slider dimensions,
+  text input padding, and scrollbar width (all in logical pixels, scaled via
+  `FORGE_UI_SCALED`)
 - **`FORGE_UI_SCALED(ctx, value)`** -- Macro that multiplies a logical pixel
   value by the context's current scale factor (`ctx->scale`). Use for all
   spacing and sizing constants to support DPI-independent layout

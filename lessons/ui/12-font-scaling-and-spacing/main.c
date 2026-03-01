@@ -43,11 +43,14 @@
 #define DEMO_VOLUME_SPACIOUS 0.80f  /* slider value for spacious spacing panel */
 #define DEMO_VOLUME_COMPACT  0.35f  /* slider value for compact spacing panel */
 
-/* Background color — dark navy matching the project theme */
-#define BG_R  0.102f
-#define BG_G  0.102f
-#define BG_B  0.180f
-#define BG_A  1.00f
+/* Background color — neutral mid-gray to contrast with the dark navy panels.
+ * The UI widgets use dark blue-gray tones (~0.12-0.18 luminance), so a
+ * lighter neutral gray ensures the panel edges, headers, and widget
+ * backgrounds are all clearly distinguishable. */
+#define BG_R  0.30f
+#define BG_G  0.30f
+#define BG_B  0.32f
+#define BG_A  1.0f
 
 /* Label text color — theme text #e0e0f0 */
 #define TEXT_R  0.878f
@@ -212,9 +215,11 @@ static bool render_frame_scales(ForgeRasterBuffer *fb,
             &tex);
     }
 
-    /* Write BMP output */
+    /* Write BMP output — propagate failure so main() can return non-zero */
     if (!forge_raster_write_bmp(fb, "scaling_comparison.bmp")) {
         SDL_Log("Failed to write scaling_comparison.bmp");
+        for (int i = 0; i < NUM_SCALES; i++) scaled_ui_free(&sui[i]);
+        return false;
     }
 
     for (int i = 0; i < NUM_SCALES; i++) {
@@ -329,6 +334,9 @@ static bool render_frame_spacing(ForgeRasterBuffer *fb,
 
     if (!forge_raster_write_bmp(fb, "spacing_comparison.bmp")) {
         SDL_Log("Failed to write spacing_comparison.bmp");
+        scaled_ui_free(&spacious);
+        scaled_ui_free(&compact);
+        return false;
     }
 
     SDL_Log("Frame 2: Rendered spacious (2x) vs compact (0.5x) spacing");
@@ -406,10 +414,13 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    int exit_code = 0;
+
     /* Frame 1: Scale comparison */
     SDL_Log("--- Frame 1: Scale comparison ---");
     if (!render_frame_scales(&fb, &font)) {
         SDL_Log("Frame 1 failed");
+        exit_code = 1;
     }
     SDL_Log("");
 
@@ -417,14 +428,17 @@ int main(int argc, char *argv[])
     SDL_Log("--- Frame 2: Spacing override comparison ---");
     if (!render_frame_spacing(&fb, &font)) {
         SDL_Log("Frame 2 failed");
+        exit_code = 1;
     }
     SDL_Log("");
 
-    SDL_Log("Output: scaling_comparison.bmp, spacing_comparison.bmp");
+    if (exit_code == 0) {
+        SDL_Log("Output: scaling_comparison.bmp, spacing_comparison.bmp");
+    }
     SDL_Log("Done.");
 
     forge_raster_buffer_destroy(&fb);
     forge_ui_ttf_free(&font);
     SDL_Quit();
-    return 0;
+    return exit_code;
 }

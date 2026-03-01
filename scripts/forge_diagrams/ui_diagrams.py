@@ -8759,14 +8759,14 @@ def diagram_scale_factor_effect():
     """Show the same button rendered at scale 0.75, 1.0, 1.5, and 2.0 with
     proportional growth of rect dimensions, font size, and padding."""
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(13, 5))
     fig.patch.set_facecolor(STYLE["bg"])
-    setup_axes(ax, xlim=(-0.5, 13), ylim=(-1.5, 7), grid=False, aspect=None)
+    setup_axes(ax, xlim=(-0.5, 16.5), ylim=(-1.5, 7), grid=False, aspect=None)
     ax.axis("off")
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
     ax.text(
-        6.25,
+        8.0,
         6.3,
         "Scale Factor Effect on Widget Dimensions",
         color=STYLE["text"],
@@ -8784,7 +8784,7 @@ def diagram_scale_factor_effect():
     colors = [STYLE["accent4"], STYLE["accent1"], STYLE["accent2"], STYLE["accent3"]]
 
     # Render each button proportionally
-    vis_scale = 0.022  # scale pixels to axes units
+    vis_scale = 0.018  # scale pixels to axes units
     x_cursor = 0.3
 
     for _i, (s, col) in enumerate(zip(scales, colors)):
@@ -8880,11 +8880,11 @@ def diagram_scale_factor_effect():
             path_effects=stroke,
         )
 
-        x_cursor += w + 0.7
+        x_cursor += w + 0.8
 
     # Footer formula
     ax.text(
-        6.25,
+        8.0,
         -0.8,
         "final_size = base_size * ctx->scale",
         color=STYLE["warn"],
@@ -8903,15 +8903,15 @@ def diagram_spacing_anatomy():
     """Vertical layout with three widgets showing widget_padding, item_spacing,
     and panel_padding with labeled dimension arrows."""
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(10, 7))
     fig.patch.set_facecolor(STYLE["bg"])
-    setup_axes(ax, xlim=(-1, 11), ylim=(-0.5, 10), grid=False, aspect=None)
+    setup_axes(ax, xlim=(-3, 13), ylim=(-1, 11), grid=False, aspect=None)
     ax.axis("off")
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
     ax.text(
         5.0,
-        9.5,
+        10.3,
         "Spacing Anatomy — Padding and Gaps",
         color=STYLE["text"],
         fontsize=14,
@@ -8921,9 +8921,9 @@ def diagram_spacing_anatomy():
     )
 
     # Panel outer rect
-    panel_x, panel_y = 1.0, 0.5
-    panel_w, panel_h = 8.0, 8.5
-    panel_pad = 0.6  # visual panel_padding
+    panel_x, panel_y = 1.5, 0.8
+    panel_w, panel_h = 7.0, 8.5
+    panel_pad = 0.8  # visual panel_padding (larger for clarity)
 
     panel_rect = mpatches.FancyBboxPatch(
         (panel_x, panel_y),
@@ -8943,9 +8943,9 @@ def diagram_spacing_anatomy():
     inner_h = panel_h - 2 * panel_pad
 
     # Draw three widgets inside the panel
-    widget_h = 1.5
-    item_spacing = 0.6
-    widget_pad = 0.3  # visual widget_padding
+    widget_h = 1.6
+    item_spacing = 0.8
+    widget_pad = 0.35  # visual widget_padding
     widget_labels = ["Button: Submit", "Slider: Volume", "Checkbox: Mute"]
     widget_colors = [STYLE["accent1"], STYLE["accent2"], STYLE["accent3"]]
 
@@ -8993,100 +8993,135 @@ def diagram_spacing_anatomy():
         widgets.append((inner_x, wy, inner_w, widget_h))
         wy -= widget_h + item_spacing
 
-    # --- Dimension arrows ---
+    # --- Dimension annotations placed clearly outside the panel ---
 
-    # panel_padding (left side, vertical extent from panel edge to inner region)
-    arr_x = panel_x - 0.15
+    # 1. panel_padding — left side, tall bracket spanning panel edge to content
+    pp_x = panel_x - 0.3
+    pp_top = panel_y + panel_h
+    pp_bot = inner_y + inner_h
     ax.annotate(
         "",
-        xy=(panel_x, inner_y + inner_h),
-        xytext=(panel_x, panel_y + panel_h),
+        xy=(pp_x, pp_bot),
+        xytext=(pp_x, pp_top),
         arrowprops={
-            "arrowstyle": "<->,head_width=0.15,head_length=0.08",
+            "arrowstyle": "<->,head_width=0.18,head_length=0.1",
             "color": STYLE["accent4"],
-            "lw": 1.5,
+            "lw": 2,
         },
     )
     ax.text(
-        arr_x - 0.3,
-        panel_y + panel_h - panel_pad / 2,
+        pp_x - 0.4,
+        (pp_top + pp_bot) / 2,
+        "panel_padding",
+        color=STYLE["accent4"],
+        fontsize=10,
+        fontweight="bold",
+        ha="right",
+        va="center",
+        path_effects=stroke,
+    )
+
+    # 2. panel_padding — bottom, horizontal bracket
+    pp_b_y = panel_y - 0.3
+    ax.annotate(
+        "",
+        xy=(panel_x, pp_b_y),
+        xytext=(panel_x + panel_pad, pp_b_y),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.18,head_length=0.1",
+            "color": STYLE["accent4"],
+            "lw": 2,
+        },
+    )
+    ax.text(
+        panel_x + panel_pad / 2,
+        pp_b_y - 0.45,
         "panel_padding",
         color=STYLE["accent4"],
         fontsize=9,
         fontweight="bold",
-        ha="right",
-        va="center",
-        rotation=90,
-        path_effects=stroke,
-    )
-
-    # panel_padding bottom
-    ax.annotate(
-        "",
-        xy=(panel_x + panel_w / 2, panel_y),
-        xytext=(panel_x + panel_w / 2, inner_y),
-        arrowprops={
-            "arrowstyle": "<->,head_width=0.15,head_length=0.08",
-            "color": STYLE["accent4"],
-            "lw": 1.5,
-        },
-    )
-    ax.text(
-        panel_x + panel_w / 2,
-        panel_y + panel_pad / 2 - 0.05,
-        "panel_padding",
-        color=STYLE["accent4"],
-        fontsize=8,
         ha="center",
         path_effects=stroke,
     )
 
-    # widget_padding (inside first widget, right side)
+    # 3. widget_padding — right side of first widget, clear vertical bracket
     w0_x, w0_y, w0_w, w0_h = widgets[0]
-    wp_arr_x = w0_x + w0_w + 0.2
+    wp_x = panel_x + panel_w + 0.4
+    wp_top = w0_y + w0_h
+    wp_bot = w0_y + w0_h - widget_pad
     ax.annotate(
         "",
-        xy=(w0_x + w0_w, w0_y + w0_h),
-        xytext=(w0_x + w0_w, w0_y + w0_h - widget_pad),
+        xy=(wp_x, wp_bot),
+        xytext=(wp_x, wp_top),
         arrowprops={
-            "arrowstyle": "<->,head_width=0.12,head_length=0.06",
+            "arrowstyle": "<->,head_width=0.15,head_length=0.08",
             "color": STYLE["warn"],
-            "lw": 1.5,
+            "lw": 2,
         },
     )
+    # Horizontal leader line from widget edge to arrow
+    ax.plot(
+        [w0_x + w0_w, wp_x],
+        [wp_top, wp_top],
+        color=STYLE["warn"],
+        lw=0.8,
+        linestyle=":",
+    )
+    ax.plot(
+        [w0_x + w0_w, wp_x],
+        [wp_bot, wp_bot],
+        color=STYLE["warn"],
+        lw=0.8,
+        linestyle=":",
+    )
     ax.text(
-        wp_arr_x + 0.1,
-        w0_y + w0_h - widget_pad / 2,
+        wp_x + 0.3,
+        (wp_top + wp_bot) / 2,
         "widget_padding",
         color=STYLE["warn"],
-        fontsize=9,
+        fontsize=10,
         fontweight="bold",
         ha="left",
         va="center",
         path_effects=stroke,
     )
 
-    # item_spacing (between first and second widget)
+    # 4. item_spacing — right side, between first and second widget
     w1_x, w1_y, w1_w, w1_h = widgets[1]
-    gap_top = w0_y  # bottom of first widget
-    gap_bot = w1_y + w1_h  # top of second widget
-    gap_x = w0_x + w0_w + 0.2
+    gap_top = w0_y  # bottom edge of first widget
+    gap_bot = w1_y + w1_h  # top edge of second widget
+    is_x = wp_x  # align with widget_padding arrow
     ax.annotate(
         "",
-        xy=(gap_x, gap_bot),
-        xytext=(gap_x, gap_top),
+        xy=(is_x, gap_bot),
+        xytext=(is_x, gap_top),
         arrowprops={
-            "arrowstyle": "<->,head_width=0.12,head_length=0.06",
+            "arrowstyle": "<->,head_width=0.15,head_length=0.08",
             "color": STYLE["accent1"],
-            "lw": 1.5,
+            "lw": 2,
         },
     )
+    # Horizontal leader lines
+    ax.plot(
+        [w0_x + w0_w, is_x],
+        [gap_top, gap_top],
+        color=STYLE["accent1"],
+        lw=0.8,
+        linestyle=":",
+    )
+    ax.plot(
+        [w1_x + w1_w, is_x],
+        [gap_bot, gap_bot],
+        color=STYLE["accent1"],
+        lw=0.8,
+        linestyle=":",
+    )
     ax.text(
-        gap_x + 0.15,
+        is_x + 0.3,
         (gap_top + gap_bot) / 2,
         "item_spacing",
         color=STYLE["accent1"],
-        fontsize=9,
+        fontsize=10,
         fontweight="bold",
         ha="left",
         va="center",
@@ -9098,18 +9133,19 @@ def diagram_spacing_anatomy():
 
 
 def diagram_spacing_struct_overview():
-    """ForgeUiSpacing struct fields visualized as a reference card with a mini
-    UI mockup and labeled arrows from each field name to its visual area."""
+    """ForgeUiSpacing struct fields visualized as a reference card: a mini UI
+    mockup on the right with each spacing field labeled inline via colored
+    dimension arrows and callout labels — no crossing arrows."""
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(11, 8))
     fig.patch.set_facecolor(STYLE["bg"])
-    setup_axes(ax, xlim=(-0.5, 14), ylim=(-0.5, 10), grid=False, aspect=None)
+    setup_axes(ax, xlim=(-1, 15), ylim=(-0.5, 12), grid=False, aspect=None)
     ax.axis("off")
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
     ax.text(
         7.0,
-        9.5,
+        11.3,
         "ForgeUiSpacing Struct — Field Reference",
         color=STYLE["text"],
         fontsize=14,
@@ -9118,9 +9154,9 @@ def diagram_spacing_struct_overview():
         path_effects=stroke,
     )
 
-    # --- Right side: mini UI mockup ---
-    mock_x, mock_y = 6.0, 0.5
-    mock_w, mock_h = 7.0, 8.2
+    # --- Central UI mockup ---
+    mock_x, mock_y = 3.0, 0.5
+    mock_w, mock_h = 8.0, 10.0
 
     # Panel outer rect
     panel = mpatches.FancyBboxPatch(
@@ -9135,7 +9171,7 @@ def diagram_spacing_struct_overview():
     ax.add_patch(panel)
 
     # Title bar
-    title_bar_h = 0.7
+    title_bar_h = 0.9
     title_y = mock_y + mock_h - title_bar_h
     title_bar = mpatches.FancyBboxPatch(
         (mock_x + 0.15, title_y),
@@ -9153,7 +9189,7 @@ def diagram_spacing_struct_overview():
         title_y + title_bar_h / 2,
         "Panel Title",
         color=STYLE["text"],
-        fontsize=9,
+        fontsize=10,
         fontweight="bold",
         ha="center",
         va="center",
@@ -9161,14 +9197,14 @@ def diagram_spacing_struct_overview():
     )
 
     # Panel padding inset zone
-    pp = 0.5  # panel_padding visual
+    pp = 0.7  # panel_padding visual
     content_x = mock_x + pp
     content_y = mock_y + pp
     content_w = mock_w - 2 * pp
-    content_top = title_y - 0.15
+    content_top = title_y - 0.2
 
     # Button widget
-    btn_h = 0.8
+    btn_h = 1.0
     btn_y = content_top - btn_h
     btn_rect = mpatches.FancyBboxPatch(
         (content_x, btn_y),
@@ -9185,22 +9221,21 @@ def diagram_spacing_struct_overview():
         btn_y + btn_h / 2,
         "Button",
         color=STYLE["accent1"],
-        fontsize=9,
+        fontsize=10,
         ha="center",
         va="center",
         path_effects=stroke,
     )
 
     # item_spacing gap
-    isp = 0.35
+    isp = 0.5
 
     # Checkbox widget
-    cb_y = btn_y - isp - 0.8
-    cb_h = 0.8
-    # Checkbox box
-    cb_box_size = 0.5
+    cb_y = btn_y - isp - 1.0
+    cb_h = 1.0
+    cb_box_size = 0.6
     cb_box = mpatches.FancyBboxPatch(
-        (content_x + 0.2, cb_y + (cb_h - cb_box_size) / 2),
+        (content_x + 0.3, cb_y + (cb_h - cb_box_size) / 2),
         cb_box_size,
         cb_box_size,
         boxstyle="round,pad=0.03",
@@ -9210,25 +9245,24 @@ def diagram_spacing_struct_overview():
     )
     ax.add_patch(cb_box)
     ax.text(
-        content_x + 0.2 + cb_box_size + 0.3,
+        content_x + 0.3 + cb_box_size + 0.4,
         cb_y + cb_h / 2,
         "Checkbox label",
         color=STYLE["accent3"],
-        fontsize=8,
+        fontsize=9,
         ha="left",
         va="center",
         path_effects=stroke,
     )
 
     # Slider widget
-    sl_y = cb_y - isp - 0.8
-    sl_h = 0.8
-    track_h = 0.12
+    sl_y = cb_y - isp - 1.0
+    sl_h = 1.0
+    track_h = 0.15
     track_y = sl_y + sl_h / 2 - track_h / 2
-    # Track
     track_rect = mpatches.FancyBboxPatch(
-        (content_x + 0.2, track_y),
-        content_w - 0.4,
+        (content_x + 0.3, track_y),
+        content_w - 0.6,
         track_h,
         boxstyle="round,pad=0.03",
         facecolor=STYLE["grid"],
@@ -9236,9 +9270,8 @@ def diagram_spacing_struct_overview():
         linewidth=1,
     )
     ax.add_patch(track_rect)
-    # Thumb
-    thumb_w = 0.35
-    thumb_h = 0.5
+    thumb_w = 0.45
+    thumb_h = 0.65
     thumb_x = content_x + content_w * 0.5
     thumb_y = sl_y + sl_h / 2 - thumb_h / 2
     thumb_rect = mpatches.FancyBboxPatch(
@@ -9253,8 +9286,8 @@ def diagram_spacing_struct_overview():
     ax.add_patch(thumb_rect)
 
     # Text input widget
-    ti_y = sl_y - isp - 0.8
-    ti_h = 0.8
+    ti_y = sl_y - isp - 1.0
+    ti_h = 1.0
     ti_rect = mpatches.FancyBboxPatch(
         (content_x, ti_y),
         content_w,
@@ -9265,20 +9298,20 @@ def diagram_spacing_struct_overview():
         linewidth=1.5,
     )
     ax.add_patch(ti_rect)
-    ti_pad = 0.25
+    ti_pad = 0.35
     ax.text(
         content_x + ti_pad,
         ti_y + ti_h / 2,
         "Text input...",
         color=STYLE["text_dim"],
-        fontsize=8,
+        fontsize=9,
         ha="left",
         va="center",
         path_effects=stroke,
     )
 
     # Scrollbar (right edge)
-    sb_w = 0.25
+    sb_w = 0.3
     sb_x = mock_x + mock_w - pp - sb_w
     sb_y = content_y
     sb_h = content_top - content_y
@@ -9293,77 +9326,256 @@ def diagram_spacing_struct_overview():
     )
     ax.add_patch(sb_rect)
 
-    # --- Left side: field list with arrows ---
-    fields = [
-        (
-            "title_bar_height",
-            STYLE["accent1"],
-            (mock_x + mock_w / 2, title_y + title_bar_h / 2),
-        ),
-        ("panel_padding", STYLE["accent4"], (mock_x + pp / 2, mock_y + mock_h / 2)),
-        ("widget_padding", STYLE["warn"], (content_x + 0.15, btn_y + btn_h / 2)),
-        (
-            "item_spacing",
-            STYLE["accent1"],
-            (content_x + content_w / 2, btn_y - isp / 2),
-        ),
-        (
-            "checkbox_box_size",
-            STYLE["accent3"],
-            (
-                content_x + 0.2 + cb_box_size / 2,
-                cb_y + (cb_h - cb_box_size) / 2 + cb_box_size / 2,
-            ),
-        ),
-        (
-            "slider_thumb_width",
-            STYLE["accent2"],
-            (thumb_x + thumb_w / 2, thumb_y + thumb_h / 2),
-        ),
-        (
-            "slider_track_height",
-            STYLE["text_dim"],
-            (content_x + content_w * 0.3, track_y + track_h / 2),
-        ),
-        ("scrollbar_width", STYLE["text_dim"], (sb_x + sb_w / 2, sb_y + sb_h / 2)),
-        (
-            "text_input_padding",
-            STYLE["warn"],
-            (content_x + ti_pad / 2, ti_y + ti_h / 2),
-        ),
-    ]
+    # --- Inline dimension annotations (no crossing arrows) ---
 
-    list_x = 0.0
-    list_top = 8.5
-    list_spacing = 0.85
+    # 1. title_bar_height — right side of title bar
+    tbh_x = mock_x + mock_w + 0.3
+    ax.annotate(
+        "",
+        xy=(tbh_x, title_y),
+        xytext=(tbh_x, title_y + title_bar_h),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.15,head_length=0.08",
+            "color": STYLE["accent1"],
+            "lw": 2,
+        },
+    )
+    ax.text(
+        tbh_x + 0.3,
+        title_y + title_bar_h / 2,
+        "title_bar_height",
+        color=STYLE["accent1"],
+        fontsize=9,
+        fontweight="bold",
+        ha="left",
+        va="center",
+        family="monospace",
+        path_effects=stroke,
+    )
 
-    for i, (name, col, target) in enumerate(fields):
-        ly = list_top - i * list_spacing
-        ax.text(
-            list_x,
-            ly,
-            name,
-            color=col,
-            fontsize=8,
-            fontweight="bold",
-            ha="left",
-            va="center",
-            family="monospace",
-            path_effects=stroke,
-        )
+    # 2. panel_padding — left side of panel
+    ppd_x = mock_x - 0.3
+    ax.annotate(
+        "",
+        xy=(ppd_x, mock_y + mock_h),
+        xytext=(ppd_x, content_top),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.15,head_length=0.08",
+            "color": STYLE["accent4"],
+            "lw": 2,
+        },
+    )
+    ax.text(
+        ppd_x - 0.3,
+        (mock_y + mock_h + content_top) / 2,
+        "panel_padding",
+        color=STYLE["accent4"],
+        fontsize=9,
+        fontweight="bold",
+        ha="right",
+        va="center",
+        family="monospace",
+        path_effects=stroke,
+    )
 
-        # Arrow from label to target point on mockup
-        ax.annotate(
-            "",
-            xy=target,
-            xytext=(list_x + len(name) * 0.16 + 0.2, ly),
-            arrowprops={
-                "arrowstyle": "->,head_width=0.12,head_length=0.06",
-                "color": col,
-                "lw": 1,
-                "connectionstyle": "arc3,rad=0.15",
-            },
-        )
+    # 3. widget_padding — horizontal bracket inside button
+    wp_y = btn_y - 0.25
+    ax.annotate(
+        "",
+        xy=(content_x, wp_y),
+        xytext=(content_x + 0.35, wp_y),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.12,head_length=0.06",
+            "color": STYLE["warn"],
+            "lw": 1.5,
+        },
+    )
+    ax.text(
+        content_x + 0.17,
+        wp_y - 0.35,
+        "widget_padding",
+        color=STYLE["warn"],
+        fontsize=8,
+        fontweight="bold",
+        ha="center",
+        family="monospace",
+        path_effects=stroke,
+    )
+
+    # 4. item_spacing — right side between button and checkbox
+    is_x = mock_x + mock_w + 0.3
+    is_top = btn_y
+    is_bot = cb_y + cb_h
+    ax.annotate(
+        "",
+        xy=(is_x, is_bot),
+        xytext=(is_x, is_top),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.15,head_length=0.08",
+            "color": STYLE["accent1"],
+            "lw": 2,
+        },
+    )
+    ax.text(
+        is_x + 0.3,
+        (is_top + is_bot) / 2,
+        "item_spacing",
+        color=STYLE["accent1"],
+        fontsize=9,
+        fontweight="bold",
+        ha="left",
+        va="center",
+        family="monospace",
+        path_effects=stroke,
+    )
+
+    # 5. checkbox_box_size — below checkbox box
+    cb_center_x = content_x + 0.3 + cb_box_size / 2
+    cb_bot_y = cb_y + (cb_h - cb_box_size) / 2
+    cbs_y = cb_bot_y - 0.25
+    ax.annotate(
+        "",
+        xy=(content_x + 0.3, cbs_y),
+        xytext=(content_x + 0.3 + cb_box_size, cbs_y),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.12,head_length=0.06",
+            "color": STYLE["accent3"],
+            "lw": 1.5,
+        },
+    )
+    ax.text(
+        cb_center_x,
+        cbs_y - 0.35,
+        "checkbox_box_size",
+        color=STYLE["accent3"],
+        fontsize=8,
+        fontweight="bold",
+        ha="center",
+        family="monospace",
+        path_effects=stroke,
+    )
+
+    # 6. slider_thumb_width — below thumb
+    stw_y = thumb_y - 0.25
+    ax.annotate(
+        "",
+        xy=(thumb_x, stw_y),
+        xytext=(thumb_x + thumb_w, stw_y),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.12,head_length=0.06",
+            "color": STYLE["accent2"],
+            "lw": 1.5,
+        },
+    )
+    ax.text(
+        thumb_x + thumb_w / 2,
+        stw_y - 0.35,
+        "slider_thumb_width",
+        color=STYLE["accent2"],
+        fontsize=8,
+        fontweight="bold",
+        ha="center",
+        family="monospace",
+        path_effects=stroke,
+    )
+
+    # 6b. slider_thumb_height — right side of thumb
+    sthh_x = thumb_x + thumb_w + 0.15
+    ax.annotate(
+        "",
+        xy=(sthh_x, thumb_y),
+        xytext=(sthh_x, thumb_y + thumb_h),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.1,head_length=0.05",
+            "color": STYLE["accent2"],
+            "lw": 1.5,
+        },
+    )
+    ax.text(
+        sthh_x + 0.2,
+        thumb_y + thumb_h / 2,
+        "slider_thumb_height",
+        color=STYLE["accent2"],
+        fontsize=8,
+        fontweight="bold",
+        ha="left",
+        va="center",
+        family="monospace",
+        path_effects=stroke,
+    )
+
+    # 7. slider_track_height — left side of track
+    sth_x = content_x - 0.15
+    ax.annotate(
+        "",
+        xy=(sth_x, track_y),
+        xytext=(sth_x, track_y + track_h),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.1,head_length=0.05",
+            "color": STYLE["text_dim"],
+            "lw": 1.5,
+        },
+    )
+    ax.text(
+        sth_x - 0.3,
+        track_y + track_h / 2,
+        "slider_track_height",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        fontweight="bold",
+        ha="right",
+        va="center",
+        family="monospace",
+        path_effects=stroke,
+    )
+
+    # 8. text_input_padding — inside text input, left side
+    tip_y = ti_y + ti_h + 0.15
+    ax.annotate(
+        "",
+        xy=(content_x, tip_y),
+        xytext=(content_x + ti_pad, tip_y),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.12,head_length=0.06",
+            "color": STYLE["warn"],
+            "lw": 1.5,
+        },
+    )
+    ax.text(
+        content_x + ti_pad / 2,
+        tip_y + 0.3,
+        "text_input_padding",
+        color=STYLE["warn"],
+        fontsize=8,
+        fontweight="bold",
+        ha="center",
+        family="monospace",
+        path_effects=stroke,
+    )
+
+    # 9. scrollbar_width — below scrollbar
+    sbw_y = sb_y - 0.25
+    ax.annotate(
+        "",
+        xy=(sb_x, sbw_y),
+        xytext=(sb_x + sb_w, sbw_y),
+        arrowprops={
+            "arrowstyle": "<->,head_width=0.12,head_length=0.06",
+            "color": STYLE["text_dim"],
+            "lw": 1.5,
+        },
+    )
+    ax.text(
+        sb_x + sb_w / 2,
+        sbw_y - 0.35,
+        "scrollbar_width",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        fontweight="bold",
+        ha="center",
+        family="monospace",
+        path_effects=stroke,
+    )
 
     fig.tight_layout()
     save(fig, LESSON_12_PATH, "spacing_struct_overview.png")
@@ -9373,37 +9585,35 @@ def diagram_atlas_rebuild_at_scale():
     """Side-by-side atlas texture excerpts at scale 1.0 and 2.0 showing that
     scaling requires rebuilding the atlas, not just stretching UVs."""
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(11, 5))
     fig.patch.set_facecolor(STYLE["bg"])
+    setup_axes(ax, xlim=(-0.5, 14), ylim=(-1.5, 6), grid=False, aspect=None)
+    ax.axis("off")
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
+    ax.text(
+        7.0,
+        5.5,
+        "Atlas Rebuild at Different Scales",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        ha="center",
+        path_effects=stroke,
+    )
+
     configs = [
-        ("Scale 1.0", "16px", "256 x 128", 1.0, STYLE["accent1"]),
-        ("Scale 2.0", "32px", "512 x 256", 2.0, STYLE["accent2"]),
+        ("Scale 1.0", "16px", "256 x 128", 1.0, STYLE["accent1"], 0.5),
+        ("Scale 2.0", "32px", "512 x 256", 2.0, STYLE["accent2"], 7.5),
     ]
 
-    for ax_i, (title, font_label, dims, scale, col) in enumerate(configs):
-        ax = axes[ax_i]
-        setup_axes(ax, xlim=(-0.5, 6), ylim=(-1, 5.5), grid=False, aspect=None)
-        ax.axis("off")
-
-        # Title
-        ax.text(
-            2.75,
-            5.0,
-            title,
-            color=col,
-            fontsize=13,
-            fontweight="bold",
-            ha="center",
-            path_effects=stroke,
-        )
-
-        # Atlas rectangle
-        atlas_w = 2.5 + scale * 0.8
-        atlas_h = 1.5 + scale * 0.5
-        atlas_x = 2.75 - atlas_w / 2
-        atlas_y = 1.5
+    atlas_centers = []
+    for title, font_label, dims, scale, col, base_x in configs:
+        # Atlas rectangle — both aligned at same y, right one larger
+        atlas_w = 3.0 + (scale - 1.0) * 1.5
+        atlas_h = 2.0 + (scale - 1.0) * 0.8
+        atlas_x = base_x
+        atlas_y = 1.2
 
         atlas_rect = mpatches.FancyBboxPatch(
             (atlas_x, atlas_y),
@@ -9415,6 +9625,19 @@ def diagram_atlas_rebuild_at_scale():
             linewidth=2,
         )
         ax.add_patch(atlas_rect)
+        atlas_centers.append((atlas_x + atlas_w / 2, atlas_y + atlas_h / 2))
+
+        # Title above atlas
+        ax.text(
+            atlas_x + atlas_w / 2,
+            atlas_y + atlas_h + 0.45,
+            title,
+            color=col,
+            fontsize=13,
+            fontweight="bold",
+            ha="center",
+            path_effects=stroke,
+        )
 
         # "Aa" text inside atlas at varying sizes
         font_size = 14 + int(scale * 8)
@@ -9442,9 +9665,9 @@ def diagram_atlas_rebuild_at_scale():
             alpha=0.6,
         )
 
-        # Font size label
+        # Font size label below
         ax.text(
-            2.75,
+            atlas_x + atlas_w / 2,
             atlas_y - 0.35,
             f"Font rasterized at {font_label}",
             color=STYLE["text"],
@@ -9452,11 +9675,9 @@ def diagram_atlas_rebuild_at_scale():
             ha="center",
             path_effects=stroke,
         )
-
-        # Dimension label
         ax.text(
-            2.75,
-            atlas_y - 0.75,
+            atlas_x + atlas_w / 2,
+            atlas_y - 0.8,
             f"Atlas: {dims}",
             color=STYLE["text_dim"],
             fontsize=9,
@@ -9465,11 +9686,35 @@ def diagram_atlas_rebuild_at_scale():
             path_effects=stroke,
         )
 
-    # Arrow between the two panels
-    # Central annotation on figure level
-    fig.text(
-        0.5,
-        0.08,
+    # Clean horizontal arrow between the two atlas boxes
+    arrow_start = atlas_centers[0][0] + 2.0
+    arrow_end = configs[1][5] - 0.3  # left edge of second atlas
+    arrow_y = 2.5
+    ax.annotate(
+        "",
+        xy=(arrow_end, arrow_y),
+        xytext=(arrow_start, arrow_y),
+        arrowprops={
+            "arrowstyle": "->,head_width=0.25,head_length=0.15",
+            "color": STYLE["warn"],
+            "lw": 3,
+        },
+    )
+    ax.text(
+        (arrow_start + arrow_end) / 2,
+        arrow_y + 0.45,
+        "rebuild",
+        color=STYLE["warn"],
+        fontsize=11,
+        fontweight="bold",
+        ha="center",
+        path_effects=stroke,
+    )
+
+    # Footer message
+    ax.text(
+        7.0,
+        -1.1,
         "Rebuild required \u2014 not just stretching UVs",
         color=STYLE["warn"],
         fontsize=12,
@@ -9478,26 +9723,13 @@ def diagram_atlas_rebuild_at_scale():
         path_effects=stroke,
     )
 
-    # Arrow drawn on figure between the two subplots
-    fig.patches.append(
-        mpatches.FancyArrowPatch(
-            (0.44, 0.50),
-            (0.56, 0.50),
-            transform=fig.transFigure,
-            arrowstyle="->,head_width=6,head_length=4",
-            color=STYLE["warn"],
-            lw=2.5,
-            mutation_scale=15,
-        )
-    )
-
-    fig.tight_layout(rect=[0, 0.14, 1, 1])
+    fig.tight_layout()
     save(fig, LESSON_12_PATH, "atlas_rebuild_at_scale.png")
 
 
 def diagram_before_after_spacing():
     """Split comparison showing hardcoded spacing (left) vs ForgeUiSpacing
-    struct (right) with a vertical divider."""
+    struct (right) using a two-subplot layout."""
 
     fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(10, 5))
     fig.patch.set_facecolor(STYLE["bg"])

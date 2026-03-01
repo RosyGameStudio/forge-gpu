@@ -284,6 +284,10 @@ three-scale comparison and the spacing override comparison.
   why glyph bitmaps must be rasterized at the target pixel height
 - [UI Lesson 08 — Layout](../08-layout/) covers the layout system that now
   uses themed spacing defaults
+- [Math Lesson 01 — Vectors](../../math/01-vectors/) provides the vec2
+  arithmetic used for position and size calculations throughout the UI
+- [Engine Lesson 01 — Intro to C](../../engine/01-intro-to-c/) covers the
+  struct and `#define` conventions used for `ForgeUiSpacing`
 - [Apple Human Interface Guidelines — Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
   discusses scaling and spacing in production UI systems
 - [Windows DPI Awareness](https://learn.microsoft.com/en-us/windows/win32/hidpi/high-dpi-desktop-application-development-on-windows)
