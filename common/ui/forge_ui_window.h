@@ -906,12 +906,13 @@ static inline bool forge_ui_wctx_window_begin(ForgeUiWindowContext *wctx,
     ctx->_panel.id = id;
     ctx->_panel_active = true;
 
-    /* Pass -1 for padding so layout_push treats it as explicit zero
-     * (no default substitution) — the content rect already accounts
-     * for window padding.  Spacing uses the themed item_spacing. */
+    /* Pass FORGE_UI_LAYOUT_EXPLICIT_ZERO for padding so layout_push
+     * treats it as explicit zero (no default substitution) — the
+     * content rect already accounts for window padding.  Spacing
+     * uses the themed item_spacing. */
     if (!forge_ui_ctx_layout_push(ctx, content,
                                    FORGE_UI_LAYOUT_VERTICAL,
-                                   -1.0f,
+                                   FORGE_UI_LAYOUT_EXPLICIT_ZERO,
                                    FORGE_UI_SCALED(ctx, ctx->spacing.item_spacing))) {
         SDL_Log("forge_ui_wctx_window_begin: layout_push failed");
         ctx->has_clip = false;

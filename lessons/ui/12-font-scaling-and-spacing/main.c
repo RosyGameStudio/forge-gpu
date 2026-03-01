@@ -64,13 +64,17 @@
 #define ACCENT_B  0.969f
 #define ACCENT_A  1.00f
 
-/* ASCII printable codepoints (32-126) for atlas building */
-static Uint32 codepoints[95];
+/* ASCII printable codepoints (space 0x20 through tilde 0x7E) */
+#define ASCII_PRINTABLE_START  32   /* first printable ASCII codepoint (space) */
+#define ASCII_PRINTABLE_COUNT  95   /* number of printable ASCII chars (32-126) */
+#define ATLAS_GLYPH_PADDING     2   /* pixels between packed glyphs in atlas */
+
+static Uint32 codepoints[ASCII_PRINTABLE_COUNT];
 
 static void init_codepoints(void)
 {
-    for (int i = 0; i < 95; i++) {
-        codepoints[i] = (Uint32)(32 + i);
+    for (int i = 0; i < ASCII_PRINTABLE_COUNT; i++) {
+        codepoints[i] = (Uint32)(ASCII_PRINTABLE_START + i);
     }
 }
 
@@ -125,7 +129,8 @@ static bool scaled_ui_init(ScaledUI *sui, const ForgeUiFont *font,
      * must be rebuilt at the target size, not stretched. */
     float atlas_px = BASE_PIXEL_HEIGHT * scale;
 
-    if (!forge_ui_atlas_build(font, atlas_px, codepoints, 95, 2,
+    if (!forge_ui_atlas_build(font, atlas_px, codepoints,
+                              ASCII_PRINTABLE_COUNT, ATLAS_GLYPH_PADDING,
                               &sui->atlas)) {
         SDL_Log("Failed to build atlas at scale %.2f", (double)scale);
         return false;

@@ -57,6 +57,12 @@
  * must use non-zero IDs for their widgets. */
 #define FORGE_UI_ID_NONE  0
 
+/* Layout sentinel: pass as padding to forge_ui_ctx_layout_push to request
+ * explicit zero padding (no themed default substitution).  Positive values
+ * override the themed default; zero uses the themed default; this negative
+ * sentinel is clamped to 0 internally but skips the "use theme" path. */
+#define FORGE_UI_LAYOUT_EXPLICIT_ZERO  -1.0f
+
 /* Maximum nesting depth for the ID seed stack.  8 levels is enough for
  * most UI hierarchies (e.g. window > panel > row > widget).  The stack
  * is bounds-checked at runtime with SDL_Log on overflow/underflow. */
@@ -66,15 +72,16 @@
 
 /* Button appearance varies with interaction state.  Colors follow the
  * project's dark blue-gray theme (#1a1a2e background, #4fc3f7 accent).
- * All values are RGBA floats in [0, 1]. */
-#define FORGE_UI_BTN_NORMAL_R   0.145f
-#define FORGE_UI_BTN_NORMAL_G   0.176f
-#define FORGE_UI_BTN_NORMAL_B   0.290f
+ * Button normal is ~30% brighter than panel BG so it stands out as an
+ * interactive element.  All values are RGBA floats in [0, 1]. */
+#define FORGE_UI_BTN_NORMAL_R   0.180f
+#define FORGE_UI_BTN_NORMAL_G   0.216f
+#define FORGE_UI_BTN_NORMAL_B   0.353f
 #define FORGE_UI_BTN_NORMAL_A   1.00f
 
-#define FORGE_UI_BTN_HOT_R      0.180f
-#define FORGE_UI_BTN_HOT_G      0.220f
-#define FORGE_UI_BTN_HOT_B      0.376f
+#define FORGE_UI_BTN_HOT_R      0.224f
+#define FORGE_UI_BTN_HOT_G      0.271f
+#define FORGE_UI_BTN_HOT_B      0.427f
 #define FORGE_UI_BTN_HOT_A      1.00f
 
 #define FORGE_UI_BTN_ACTIVE_R   0.102f
@@ -102,20 +109,21 @@
  * ForgeUiSpacing.widget_padding. */
 #define FORGE_UI_WIDGET_PADDING   8.0f
 
-/* Box outline colors by state — themed dark navy (RGBA floats in [0, 1]) */
-#define FORGE_UI_CB_NORMAL_R    0.165f
-#define FORGE_UI_CB_NORMAL_G    0.200f
-#define FORGE_UI_CB_NORMAL_B    0.314f
+/* Box outline colors by state — brighter than panel BG so the unchecked
+ * box is clearly visible against the panel body.  (RGBA floats in [0, 1]) */
+#define FORGE_UI_CB_NORMAL_R    0.204f
+#define FORGE_UI_CB_NORMAL_G    0.247f
+#define FORGE_UI_CB_NORMAL_B    0.392f
 #define FORGE_UI_CB_NORMAL_A    1.00f
 
-#define FORGE_UI_CB_HOT_R       0.227f
-#define FORGE_UI_CB_HOT_G       0.290f
-#define FORGE_UI_CB_HOT_B       0.416f
+#define FORGE_UI_CB_HOT_R       0.267f
+#define FORGE_UI_CB_HOT_G       0.329f
+#define FORGE_UI_CB_HOT_B       0.475f
 #define FORGE_UI_CB_HOT_A       1.00f
 
-#define FORGE_UI_CB_ACTIVE_R    0.118f
-#define FORGE_UI_CB_ACTIVE_G    0.157f
-#define FORGE_UI_CB_ACTIVE_B    0.259f
+#define FORGE_UI_CB_ACTIVE_R    0.145f
+#define FORGE_UI_CB_ACTIVE_G    0.180f
+#define FORGE_UI_CB_ACTIVE_B    0.298f
 #define FORGE_UI_CB_ACTIVE_A    1.00f
 
 /* Inner fill color when checked (accent cyan #4fc3f7) */
@@ -141,10 +149,11 @@
 #define FORGE_UI_SL_THUMB_WIDTH   12.0f   /* thumb rectangle width */
 #define FORGE_UI_SL_THUMB_HEIGHT  22.0f   /* thumb rectangle height */
 
-/* Track background color — themed dark navy */
-#define FORGE_UI_SL_TRACK_R     0.145f
-#define FORGE_UI_SL_TRACK_G     0.176f
-#define FORGE_UI_SL_TRACK_B     0.290f
+/* Track background color — brighter than panel BG so the slider rail
+ * is visible inside the panel body. */
+#define FORGE_UI_SL_TRACK_R     0.180f
+#define FORGE_UI_SL_TRACK_G     0.216f
+#define FORGE_UI_SL_TRACK_B     0.353f
 #define FORGE_UI_SL_TRACK_A     1.00f
 
 /* Thumb color varies with interaction state to give visual feedback
@@ -228,10 +237,11 @@
 #define FORGE_UI_PANEL_BG_B     0.282f
 #define FORGE_UI_PANEL_BG_A     1.00f
 
-/* Title bar background RGBA — brighter navy to distinguish from body */
-#define FORGE_UI_PANEL_TITLE_BG_R   0.145f
-#define FORGE_UI_PANEL_TITLE_BG_G   0.188f
-#define FORGE_UI_PANEL_TITLE_BG_B   0.314f
+/* Title bar background RGBA — notably brighter than panel BG so the
+ * header is the most prominent chrome element.  ~45% brighter. */
+#define FORGE_UI_PANEL_TITLE_BG_R   0.200f
+#define FORGE_UI_PANEL_TITLE_BG_G   0.243f
+#define FORGE_UI_PANEL_TITLE_BG_B   0.400f
 #define FORGE_UI_PANEL_TITLE_BG_A   1.00f
 
 /* Title bar text color — matches theme text #e0e0f0 */
@@ -1370,7 +1380,7 @@ static inline void forge_ui_ctx_begin(ForgeUiContext *ctx,
             { &ctx->spacing.text_input_padding,  FORGE_UI_TI_PADDING,          "text_input_padding" },
             { &ctx->spacing.scrollbar_width,     FORGE_UI_SCROLLBAR_WIDTH,     "scrollbar_width" },
         };
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < (int)(sizeof(checks) / sizeof(checks[0])); i++) {
             if (!isfinite(*checks[i].field) || *checks[i].field < 0.0f) {
                 SDL_Log("forge_ui_ctx_begin: invalid spacing.%s = %.4f, "
                         "resetting to %.1f",
@@ -2452,12 +2462,13 @@ static inline bool forge_ui_ctx_panel_begin(ForgeUiContext *ctx,
     /* ── Push a vertical layout (no extra padding, 8px spacing between
      *    child widgets) so children fill the content width and stack
      *    downward with consistent gaps. ───────────────────────────────── */
-    /* Pass -1 for padding so layout_push treats it as explicit zero
-     * (no default substitution) — the content rect already accounts
-     * for panel padding.  Spacing uses the themed item_spacing. */
+    /* Pass FORGE_UI_LAYOUT_EXPLICIT_ZERO for padding so layout_push
+     * treats it as explicit zero (no default substitution) — the
+     * content rect already accounts for panel padding.  Spacing uses
+     * the themed item_spacing. */
     if (!forge_ui_ctx_layout_push(ctx, content,
                                    FORGE_UI_LAYOUT_VERTICAL,
-                                   -1.0f,
+                                   FORGE_UI_LAYOUT_EXPLICIT_ZERO,
                                    FORGE_UI_SCALED(ctx, ctx->spacing.item_spacing))) {
         SDL_Log("forge_ui_ctx_panel_begin: layout_push failed (stack full?)");
         ctx->has_clip = false;

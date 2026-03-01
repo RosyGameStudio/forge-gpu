@@ -9897,6 +9897,11 @@ def diagram_scaled_dimensions_formula():
     ax.axis("off")
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
+    # Lighter fill for boxes so they are clearly distinguishable from the
+    # diagram background (#1a1a2e).  STYLE["surface"] (#252545) is only ~11
+    # RGB units brighter — not enough.  #3a3a60 gives ~32 units of contrast.
+    box_fill = "#3a3a60"
+
     ax.text(
         5.75,
         6.3,
@@ -9916,7 +9921,7 @@ def diagram_scaled_dimensions_formula():
         box1_w,
         box1_h,
         boxstyle="round,pad=0.15",
-        facecolor=STYLE["surface"],
+        facecolor=box_fill,
         edgecolor=STYLE["accent1"],
         linewidth=2.5,
     )
@@ -9971,7 +9976,7 @@ def diagram_scaled_dimensions_formula():
         box2_w,
         box2_h,
         boxstyle="round,pad=0.15",
-        facecolor=STYLE["surface"],
+        facecolor=box_fill,
         edgecolor=STYLE["warn"],
         linewidth=2.5,
     )
@@ -10026,7 +10031,7 @@ def diagram_scaled_dimensions_formula():
         box3_w,
         box3_h,
         boxstyle="round,pad=0.15",
-        facecolor=STYLE["surface"],
+        facecolor=box_fill,
         edgecolor=STYLE["accent3"],
         linewidth=2.5,
     )

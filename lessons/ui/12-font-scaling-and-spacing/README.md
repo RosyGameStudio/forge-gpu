@@ -286,8 +286,12 @@ three-scale comparison and the spacing override comparison.
   uses themed spacing defaults
 - [Math Lesson 01 — Vectors](../../math/01-vectors/) provides the vec2
   arithmetic used for position and size calculations throughout the UI
+- [Math Lesson 02 — Coordinate Spaces](../../math/02-coordinate-spaces/)
+  covers the screen-space rect math used for widget bounds and layout
 - [Engine Lesson 01 — Intro to C](../../engine/01-intro-to-c/) covers the
   struct and `#define` conventions used for `ForgeUiSpacing`
+- [Engine Lesson 04 — Pointers and Memory](../../engine/04-pointers-and-memory/)
+  explains the allocation patterns behind dynamic vertex/index buffers
 - [Apple Human Interface Guidelines — Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
   discusses scaling and spacing in production UI systems
 - [Windows DPI Awareness](https://learn.microsoft.com/en-us/windows/win32/hidpi/high-dpi-desktop-application-development-on-windows)
