@@ -157,8 +157,11 @@ inline comments.
 Fetch review bodies from CodeRabbit:
 
 ```bash
-gh api repos/{owner}/{repo}/pulls/{pr-number}/reviews \
-  | jq '[.[] | select(.user.login == "coderabbitai[bot]") | {id: .id, state: .state, body: .body, date: .submitted_at}]'
+gh api --paginate repos/{owner}/{repo}/pulls/{pr-number}/reviews \
+  | jq -s 'add
+    | map(select(.user.login == "coderabbitai[bot]"))
+    | sort_by(.submitted_at)
+    | map({id: .id, state: .state, body: .body, date: .submitted_at})'
 ```
 
 **Look for these sections in the review body:**

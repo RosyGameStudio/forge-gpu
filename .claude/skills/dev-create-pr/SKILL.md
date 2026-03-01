@@ -93,7 +93,7 @@ Formulate a one-line description of the task, e.g.:
 
 #### 2b. Classify each changed file
 
-For every modified, added, or untracked file, assign one of:
+For every modified, added, deleted, or untracked file, assign one of:
 
 | Classification | Meaning |
 |---|---|
@@ -374,6 +374,6 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
   prompted.
 - **Never force-pushes.**
 - **Never commits secrets or `.env` files** — if detected in the staged set,
-  warn and unstage.
+  block the commit and exit so the user can unstage them.
 - **Never bypasses quality checks** — lint must pass before commit.
 - **Always shows the commit message** for user approval before committing.
