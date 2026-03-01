@@ -83,13 +83,13 @@
 #define FORGE_UI_WIN_TOGGLE_SIZE     10.0f  /* triangle side length */
 #define FORGE_UI_WIN_TOGGLE_PAD       8.0f  /* padding from left edge */
 
-/* Window background RGBA — themed surface (#252545), matches panel */
+/* Window background RGBA — based on theme surface, matches panel */
 #define FORGE_UI_WIN_BG_R     0.12f
 #define FORGE_UI_WIN_BG_G     0.12f
 #define FORGE_UI_WIN_BG_B     0.22f
 #define FORGE_UI_WIN_BG_A     1.00f
 
-/* Title bar background RGBA — themed grid (#2a2a4a), matches panel */
+/* Title bar background RGBA — based on theme grid, matches panel */
 #define FORGE_UI_WIN_TITLE_BG_R   0.16f
 #define FORGE_UI_WIN_TITLE_BG_G   0.16f
 #define FORGE_UI_WIN_TITLE_BG_B   0.28f

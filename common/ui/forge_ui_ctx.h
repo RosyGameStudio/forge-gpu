@@ -210,13 +210,13 @@
 #define FORGE_UI_PANEL_TITLE_HEIGHT    30.0f
 #define FORGE_UI_PANEL_PADDING         10.0f
 
-/* Panel background RGBA — themed surface (#252545) */
+/* Panel background RGBA — based on theme surface, darker for contrast */
 #define FORGE_UI_PANEL_BG_R     0.12f
 #define FORGE_UI_PANEL_BG_G     0.12f
 #define FORGE_UI_PANEL_BG_B     0.22f
 #define FORGE_UI_PANEL_BG_A     1.00f
 
-/* Title bar background RGBA — themed grid (#2a2a4a) */
+/* Title bar background RGBA — based on theme grid, slightly lighter */
 #define FORGE_UI_PANEL_TITLE_BG_R   0.16f
 #define FORGE_UI_PANEL_TITLE_BG_G   0.16f
 #define FORGE_UI_PANEL_TITLE_BG_B   0.28f
