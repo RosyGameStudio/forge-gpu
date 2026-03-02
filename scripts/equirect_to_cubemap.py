@@ -246,6 +246,8 @@ def convert(input_path, output_dir, size, preloaded_hdr=None):
             # Grayscale (H, W) → broadcast to (H, W, 3)
             source = np.stack([source] * 3, axis=-1)
         elif source.ndim == 3:
+            if source.shape[2] == 0:
+                sys.exit("Unsupported HDR channel count: 0")
             if source.shape[2] == 1:
                 # Single channel (H, W, 1) → broadcast to (H, W, 3)
                 source = np.broadcast_to(source, (source.shape[0], source.shape[1], 3))

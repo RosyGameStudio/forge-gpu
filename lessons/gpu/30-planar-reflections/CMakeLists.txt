@@ -1,10 +1,10 @@
 add_executable(30-planar-reflections WIN32
     main.c
-    ${CMAKE_SOURCE_DIR}/third_party/cJSON/cJSON.c
+    ${PROJECT_SOURCE_DIR}/third_party/cJSON/cJSON.c
 )
 target_include_directories(30-planar-reflections PRIVATE
     ${FORGE_COMMON_DIR}
-    ${CMAKE_SOURCE_DIR}/third_party/cJSON
+    ${PROJECT_SOURCE_DIR}/third_party/cJSON
 )
 target_link_libraries(30-planar-reflections PRIVATE SDL3::SDL3
     $<$<NOT:$<C_COMPILER_ID:MSVC>>:m>)
@@ -19,6 +19,7 @@ if(TARGET SDL3::SDL3-shared)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:SDL3::SDL3-shared>
             $<TARGET_FILE_DIR:30-planar-reflections>
+        VERBATIM
     )
 endif()
 
@@ -28,5 +29,6 @@ foreach(asset_dir IN ITEMS boat rocks skybox)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${CMAKE_CURRENT_SOURCE_DIR}/assets/${asset_dir}
             $<TARGET_FILE_DIR:30-planar-reflections>/assets/${asset_dir}
+        VERBATIM
     )
 endforeach()

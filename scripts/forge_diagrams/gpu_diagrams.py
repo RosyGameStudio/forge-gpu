@@ -11832,7 +11832,7 @@ def diagram_planar_render_pipeline():
         refl_cx,
         refl_out_y,
         "Reflection",
-        "RGBA8 sRGB",
+        "Swapchain fmt",
         pass_colors[1],
         stroke_thin,
     )
