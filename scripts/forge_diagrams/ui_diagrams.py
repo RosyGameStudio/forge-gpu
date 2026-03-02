@@ -8885,7 +8885,7 @@ def diagram_scale_factor_effect():
             path_effects=stroke,
         )
 
-        x_cursor += w + 0.8
+        x_cursor += w + gap
 
     # Footer formula
     ax.text(
