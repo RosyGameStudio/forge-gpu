@@ -236,11 +236,13 @@ def convert(input_path, output_dir, size, preloaded_hdr=None):
         if not _HAS_IMAGEIO:
             sys.exit("HDR input requires imageio — install with: pip install imageio")
         print(f"Loading HDR: {input_path}")
-        source = (
-            preloaded_hdr
-            if preloaded_hdr is not None
-            else iio.imread(input_path).astype(np.float32)
-        )
+        if preloaded_hdr is not None:
+            source = preloaded_hdr
+        else:
+            try:
+                source = iio.imread(input_path).astype(np.float32)
+            except Exception as exc:
+                sys.exit(f"Failed to decode HDR/EXR image '{input_path}': {exc}")
         # Normalize channels: ensure 3-channel (H, W, 3) output
         if source.ndim == 2:
             # Grayscale (H, W) → broadcast to (H, W, 3)
@@ -325,7 +327,14 @@ def main():
             )
             return 1
         # Load once and reuse for both validation and conversion.
-        preloaded_hdr = iio.imread(args.input).astype(np.float32)
+        try:
+            preloaded_hdr = iio.imread(args.input).astype(np.float32)
+        except Exception as exc:
+            print(
+                f"Failed to decode HDR/EXR image '{args.input}': {exc}",
+                file=sys.stderr,
+            )
+            return 1
         if preloaded_hdr.ndim < 2:
             print(
                 f"Unsupported HDR image rank: {preloaded_hdr.ndim}",

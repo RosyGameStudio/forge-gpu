@@ -11103,7 +11103,7 @@ def diagram_reflection_camera():
     ax.text(
         -2.0,
         -5.5,
-        "For plane Y=0:  y\u2032 = \u2212y\nGeneral plane ax+by+cz+d=0:\np\u2032 = p \u2212 2(n\u22c5p + d)n",
+        "For plane Y=0:  y\u2032 = \u2212y\nGeneral (unit n):\np\u2032 = p \u2212 2(n\u22c5p + d)n",
         color=STYLE["text"],
         fontsize=10,
         fontfamily="monospace",
