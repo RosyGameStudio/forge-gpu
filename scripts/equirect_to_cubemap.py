@@ -214,8 +214,9 @@ def _tone_map_reinhard(hdr, exposure=1.0):
 
     Returns a uint8 array suitable for saving as PNG.
     """
-    # Apply exposure
-    hdr = hdr * exposure
+    # Apply exposure and sanitize invalid/negative radiance
+    hdr = np.nan_to_num(hdr * exposure, nan=0.0, posinf=1e6, neginf=0.0)
+    hdr = np.clip(hdr, 0.0, None)
     # Reinhard: L / (1 + L)
     mapped = hdr / (1.0 + hdr)
     # sRGB gamma (simplified pow 1/2.2)
@@ -223,15 +224,23 @@ def _tone_map_reinhard(hdr, exposure=1.0):
     return np.clip(mapped * 255.0, 0, 255).astype(np.uint8)
 
 
-def convert(input_path, output_dir, size):
-    """Convert an equirectangular image to 6 cube map face PNGs."""
+def convert(input_path, output_dir, size, preloaded_hdr=None):
+    """Convert an equirectangular image to 6 cube map face PNGs.
+
+    If *preloaded_hdr* is provided (a float32 ndarray from the preflight check),
+    it is reused directly, avoiding a second decode of the HDR file.
+    """
     is_hdr = _is_hdr(input_path)
 
     if is_hdr:
         if not _HAS_IMAGEIO:
             sys.exit("HDR input requires imageio — install with: pip install imageio")
         print(f"Loading HDR: {input_path}")
-        source = iio.imread(input_path).astype(np.float32)
+        source = (
+            preloaded_hdr
+            if preloaded_hdr is not None
+            else iio.imread(input_path).astype(np.float32)
+        )
         # Normalize channels: ensure 3-channel (H, W, 3) output
         if source.ndim == 2:
             # Grayscale (H, W) → broadcast to (H, W, 3)
@@ -303,6 +312,7 @@ def main():
 
     # Validate that the input image has an approximately 2:1 aspect ratio
     # (expected for equirectangular projections).
+    preloaded_hdr = None
     if _is_hdr(args.input):
         if not _HAS_IMAGEIO:
             print(
@@ -310,9 +320,10 @@ def main():
                 file=sys.stderr,
             )
             return 1
-        probe = iio.imread(args.input)
-        ratio = probe.shape[1] / probe.shape[0]
-        dims_str = f"{probe.shape[1]}x{probe.shape[0]}"
+        # Load once and reuse for both validation and conversion.
+        preloaded_hdr = iio.imread(args.input).astype(np.float32)
+        ratio = preloaded_hdr.shape[1] / preloaded_hdr.shape[0]
+        dims_str = f"{preloaded_hdr.shape[1]}x{preloaded_hdr.shape[0]}"
     else:
         img = Image.open(args.input)
         ratio = img.width / img.height
@@ -327,7 +338,7 @@ def main():
         )
         return 1
 
-    convert(args.input, args.output_dir, args.size)
+    convert(args.input, args.output_dir, args.size, preloaded_hdr=preloaded_hdr)
     return 0
 
 

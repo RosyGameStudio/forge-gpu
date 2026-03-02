@@ -1003,14 +1003,21 @@ static bool upload_model_to_gpu(SDL_GPUDevice *device, ModelData *model)
                     }
                 }
 
-                if (!found && loaded_count < FORGE_GLTF_MAX_IMAGES) {
-                    dst->texture = load_texture(device, src->texture_path);
-                    if (dst->texture) {
-                        loaded_textures[loaded_count] = dst->texture;
-                        loaded_paths[loaded_count]    = src->texture_path;
-                        loaded_count++;
+                if (!found) {
+                    if (loaded_count < FORGE_GLTF_MAX_IMAGES) {
+                        dst->texture = load_texture(device, src->texture_path);
+                        if (dst->texture) {
+                            loaded_textures[loaded_count] = dst->texture;
+                            loaded_paths[loaded_count]    = src->texture_path;
+                            loaded_count++;
+                        } else {
+                            dst->has_texture = false;
+                        }
                     } else {
+                        SDL_Log("Texture cache full (%d), skipping texture for material %d",
+                                FORGE_GLTF_MAX_IMAGES, i);
                         dst->has_texture = false;
+                        dst->texture     = NULL;
                     }
                 }
             }

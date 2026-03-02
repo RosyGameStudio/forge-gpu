@@ -87,8 +87,8 @@ not.
 
 The solution is Eric Lengyel's oblique near-plane clipping method: modify the
 mirrored camera's projection matrix so its near plane coincides with the water
-surface. Geometry below the water is automatically clipped by the hardware depth
-test.
+surface. Geometry below the water is clipped by the near-plane test in clip
+space, before rasterization or depth testing.
 
 The method transforms the water plane from view space to clip space, then
 replaces row 2 of the projection matrix:
@@ -177,7 +177,7 @@ Each frame executes four GPU render passes:
 
 ```text
 Pass 1: Shadow       -> shadow_depth     (D32_FLOAT, 2048x2048)
-Pass 2: Reflection   -> reflection_color (R8G8B8A8_UNORM_SRGB, window size)
+Pass 2: Reflection   -> reflection_color (swapchain color format, window size)
 Pass 3: Main Scene   -> swapchain        (sRGB output)
 Pass 4: Water        -> swapchain        (alpha-blended over main scene)
 ```
