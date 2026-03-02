@@ -42,19 +42,25 @@ validate any custom palette before shipping it.
 
 The demo program produces three BMP images demonstrating the theme system.
 
-**Frame 1 — Palette swatches (`frame1_palette.bmp`):**
+**Frame 1 — Palette swatches:**
+
+![All 14 theme color slots as labeled swatches](assets/frame1_palette.png)
 
 All 14 `ForgeUiTheme` color slots rendered as labeled swatches, organized
 by role (backgrounds, text, accents, borders).  Each swatch shows its hex
 value so you can visually verify the default palette.
 
-**Frame 2 — Widget showcase (`frame2_widgets.bmp`):**
+**Frame 2 — Widget showcase:**
+
+![Common widgets rendered with the default theme](assets/frame2_widgets.png)
 
 Common UI widgets (labels, buttons, checkboxes, sliders, text inputs,
 panels) rendered using the default theme.  Every widget reads its colors
 from `ctx->theme` instead of hardcoded constants.
 
-**Frame 3 — Bad theme validation (`frame3_bad_theme.bmp`):**
+**Frame 3 — Bad theme validation:**
+
+![Low-contrast theme with WCAG validation results](assets/frame3_bad_theme.png)
 
 A deliberately low-contrast theme is validated with
 `forge_ui_theme_validate()`, and the failing color pairs are listed with
