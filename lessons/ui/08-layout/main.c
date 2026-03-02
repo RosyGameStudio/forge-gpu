@@ -74,18 +74,6 @@
 #define BG_CLEAR_B      0.12f
 #define BG_CLEAR_A      1.00f
 
-/* ── Title label color (soft blue-gray) ──────────────────────────────────── */
-#define TITLE_R         0.70f
-#define TITLE_G         0.80f
-#define TITLE_B         0.90f
-#define TITLE_A         1.00f
-
-/* ── Status label color (warm gold) ──────────────────────────────────────── */
-#define STATUS_R        0.90f
-#define STATUS_G        0.90f
-#define STATUS_B        0.60f
-#define STATUS_A        1.00f
-
 /* ── Panel background color ──────────────────────────────────────────────── */
 #define PANEL_BG_R      0.12f
 #define PANEL_BG_G      0.12f
@@ -192,8 +180,8 @@ static void declare_settings_panel_layout(ForgeUiContext *ctx,
     }
 
     /* Title label */
-    forge_ui_ctx_label_layout(ctx, "Settings", LABEL_HEIGHT,
-                              TITLE_R, TITLE_G, TITLE_B, TITLE_A);
+    forge_ui_ctx_label_colored_layout(ctx, "Settings", LABEL_HEIGHT,
+                              0.70f, 0.80f, 0.90f, 1.00f);
 
     /* Three checkboxes stacked vertically (return value = toggled this
      * frame; we don't need per-frame toggle info in this demo because
@@ -262,8 +250,8 @@ static void declare_settings_panel_manual(ForgeUiContext *ctx,
     {
         float text_y = cy + (LABEL_HEIGHT - ctx->atlas->pixel_height) * 0.5f
                        + ascender_px;
-        forge_ui_ctx_label(ctx, "Settings", cx, text_y,
-                           TITLE_R, TITLE_G, TITLE_B, TITLE_A);
+        forge_ui_ctx_label_colored(ctx, "Settings", cx, text_y,
+                           0.70f, 0.80f, 0.90f, 1.00f);
         cy += LABEL_HEIGHT + WIDGET_SPACING;
     }
 
@@ -554,9 +542,9 @@ int main(int argc, char *argv[])
                          aa_on ? "ON" : "OFF",
                          (double)volume);
 
-            forge_ui_ctx_label(&ctx, status_buf,
+            forge_ui_ctx_label_colored(&ctx, status_buf,
                                PANEL_X, PANEL_Y + PANEL_H + STATUS_LABEL_GAP + ascender_px,
-                               STATUS_R, STATUS_G, STATUS_B, STATUS_A);
+                               0.90f, 0.90f, 0.60f, 1.00f);
         }
 
         forge_ui_ctx_end(&ctx);

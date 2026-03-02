@@ -73,24 +73,6 @@
 #define BG_CLEAR_B      0.12f
 #define BG_CLEAR_A      1.00f
 
-/* ── Title label color (soft blue-gray) ──────────────────────────────────── */
-#define TITLE_R         0.70f
-#define TITLE_G         0.80f
-#define TITLE_B         0.90f
-#define TITLE_A         1.00f
-
-/* ── Status label color (warm gold) ──────────────────────────────────────── */
-#define STATUS_R        0.90f
-#define STATUS_G        0.90f
-#define STATUS_B        0.60f
-#define STATUS_A        1.00f
-
-/* ── Slider name/value label color (dim gray) ────────────────────────────── */
-#define SL_LABEL_R      0.75f
-#define SL_LABEL_G      0.75f
-#define SL_LABEL_B      0.80f
-#define SL_LABEL_A      1.00f
-
 /* ── Mouse cursor dot ────────────────────────────────────────────────────── */
 #define CURSOR_DOT_RADIUS_SQ  5   /* squared pixel radius for circular shape */
 #define CURSOR_DOT_R    255       /* red channel (uint8) */
@@ -341,17 +323,17 @@ int main(int argc, char *argv[])
         /* ── Declare widgets ──────────────────────────────────────────── */
 
         /* Title label */
-        forge_ui_ctx_label(&ctx, "Checkboxes & Sliders",
+        forge_ui_ctx_label_colored(&ctx, "Checkboxes & Sliders",
                            MARGIN, MARGIN + ascender_px,
-                           TITLE_R, TITLE_G, TITLE_B, TITLE_A);
+                           0.70f, 0.80f, 0.90f, 1.00f);
 
         /* Checkbox: "Enable Audio" */
         bool cb_toggled = forge_ui_ctx_checkbox(
             &ctx, "Enable Audio", &audio_enabled, cb_rect);
 
         /* Slider name label: "Volume:" */
-        forge_ui_ctx_label(&ctx, "Volume:", MARGIN, sl_label_y,
-                           SL_LABEL_R, SL_LABEL_G, SL_LABEL_B, SL_LABEL_A);
+        forge_ui_ctx_label_colored(&ctx, "Volume:", MARGIN, sl_label_y,
+                           0.75f, 0.75f, 0.80f, 1.00f);
 
         /* Slider: volume control */
         bool sl_changed = forge_ui_ctx_slider(
@@ -362,11 +344,11 @@ int main(int argc, char *argv[])
          * float as text and render it with the same atlas and vertex format. */
         char val_str[32];
         SDL_snprintf(val_str, sizeof(val_str), "%.1f", (double)volume);
-        forge_ui_ctx_label(&ctx, val_str,
+        forge_ui_ctx_label_colored(&ctx, val_str,
                            sl_rect.x + sl_rect.w + SL_VALUE_GAP,
                            sl_rect.y + (sl_rect.h - atlas.pixel_height) * 0.5f
                                + ascender_px,
-                           SL_LABEL_R, SL_LABEL_G, SL_LABEL_B, SL_LABEL_A);
+                           0.75f, 0.75f, 0.80f, 1.00f);
 
         /* Status label */
         const char *status = "Hover and click to interact";
@@ -381,8 +363,8 @@ int main(int argc, char *argv[])
             status = status_buf;
         }
 
-        forge_ui_ctx_label(&ctx, status, MARGIN, status_y + ascender_px,
-                           STATUS_R, STATUS_G, STATUS_B, STATUS_A);
+        forge_ui_ctx_label_colored(&ctx, status, MARGIN, status_y + ascender_px,
+                           0.90f, 0.90f, 0.60f, 1.00f);
 
         /* End frame: finalize hot/active transitions */
         forge_ui_ctx_end(&ctx);

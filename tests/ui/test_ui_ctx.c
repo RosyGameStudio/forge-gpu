@@ -372,7 +372,7 @@ static void test_begin_resets_draw_data(void)
 
     /* Emit some data */
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_label(&ctx, "Hello", 10.0f, 10.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label(&ctx, "Hello", 10.0f, 10.0f);
     ASSERT_TRUE(ctx.vertex_count > 0);
 
     /* Begin again should reset */
@@ -498,7 +498,7 @@ static void test_label_emits_vertices(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
 
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_label(&ctx, "AB", 10.0f, 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "AB", 10.0f, 30.0f, 1, 1, 1, 1);
 
     /* 2 visible glyphs -> 2*4 = 8 vertices, 2*6 = 12 indices */
     ASSERT_EQ_INT(ctx.vertex_count, 8);
@@ -517,7 +517,7 @@ static void test_label_empty_string(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
 
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_label(&ctx, "", 10.0f, 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "", 10.0f, 30.0f, 1, 1, 1, 1);
 
     ASSERT_EQ_INT(ctx.vertex_count, 0);
     ASSERT_EQ_INT(ctx.index_count, 0);
@@ -535,7 +535,7 @@ static void test_label_null_text(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
 
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_label(&ctx, NULL, 10.0f, 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, NULL, 10.0f, 30.0f, 1, 1, 1, 1);
     ASSERT_EQ_INT(ctx.vertex_count, 0);
 
     forge_ui_ctx_end(&ctx);
@@ -545,7 +545,7 @@ static void test_label_null_text(void)
 static void test_label_null_ctx(void)
 {
     TEST("ctx_label: NULL ctx does not crash");
-    forge_ui_ctx_label(NULL, "Hello", 10.0f, 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(NULL, "Hello", 10.0f, 30.0f, 1, 1, 1, 1);
     ASSERT_TRUE(true);
 }
 
@@ -937,10 +937,10 @@ static void test_button_normal_color(void)
     forge_ui_ctx_button(&ctx, "A", rect);
     forge_ui_ctx_end(&ctx);
 
-    /* First vertex should have normal button color */
-    ASSERT_TRUE(ctx.vertices[0].r == FORGE_UI_BTN_NORMAL_R);
-    ASSERT_TRUE(ctx.vertices[0].g == FORGE_UI_BTN_NORMAL_G);
-    ASSERT_TRUE(ctx.vertices[0].b == FORGE_UI_BTN_NORMAL_B);
+    /* First vertex should have normal button color (theme surface) */
+    ASSERT_TRUE(ctx.vertices[0].r == ctx.theme.surface.r);
+    ASSERT_TRUE(ctx.vertices[0].g == ctx.theme.surface.g);
+    ASSERT_TRUE(ctx.vertices[0].b == ctx.theme.surface.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -966,9 +966,9 @@ static void test_button_hot_color(void)
     forge_ui_ctx_button(&ctx, "A", rect);
     forge_ui_ctx_end(&ctx);
 
-    ASSERT_TRUE(ctx.vertices[0].r == FORGE_UI_BTN_HOT_R);
-    ASSERT_TRUE(ctx.vertices[0].g == FORGE_UI_BTN_HOT_G);
-    ASSERT_TRUE(ctx.vertices[0].b == FORGE_UI_BTN_HOT_B);
+    ASSERT_TRUE(ctx.vertices[0].r == ctx.theme.surface_hot.r);
+    ASSERT_TRUE(ctx.vertices[0].g == ctx.theme.surface_hot.g);
+    ASSERT_TRUE(ctx.vertices[0].b == ctx.theme.surface_hot.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -994,9 +994,9 @@ static void test_button_active_color(void)
     forge_ui_ctx_button(&ctx, "A", rect);
     forge_ui_ctx_end(&ctx);
 
-    ASSERT_TRUE(ctx.vertices[0].r == FORGE_UI_BTN_ACTIVE_R);
-    ASSERT_TRUE(ctx.vertices[0].g == FORGE_UI_BTN_ACTIVE_G);
-    ASSERT_TRUE(ctx.vertices[0].b == FORGE_UI_BTN_ACTIVE_B);
+    ASSERT_TRUE(ctx.vertices[0].r == ctx.theme.surface_active.r);
+    ASSERT_TRUE(ctx.vertices[0].g == ctx.theme.surface_active.g);
+    ASSERT_TRUE(ctx.vertices[0].b == ctx.theme.surface_active.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -1491,10 +1491,10 @@ static void test_checkbox_normal_color(void)
     forge_ui_ctx_checkbox(&ctx, "Opt", &val, rect);
     forge_ui_ctx_end(&ctx);
 
-    /* First 4 vertices are the outer box */
-    ASSERT_TRUE(ctx.vertices[0].r == FORGE_UI_CB_NORMAL_R);
-    ASSERT_TRUE(ctx.vertices[0].g == FORGE_UI_CB_NORMAL_G);
-    ASSERT_TRUE(ctx.vertices[0].b == FORGE_UI_CB_NORMAL_B);
+    /* First 4 vertices are the outer box (theme surface) */
+    ASSERT_TRUE(ctx.vertices[0].r == ctx.theme.surface.r);
+    ASSERT_TRUE(ctx.vertices[0].g == ctx.theme.surface.g);
+    ASSERT_TRUE(ctx.vertices[0].b == ctx.theme.surface.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -1521,9 +1521,9 @@ static void test_checkbox_hot_color(void)
     forge_ui_ctx_checkbox(&ctx, "Opt", &val, rect);
     forge_ui_ctx_end(&ctx);
 
-    ASSERT_TRUE(ctx.vertices[0].r == FORGE_UI_CB_HOT_R);
-    ASSERT_TRUE(ctx.vertices[0].g == FORGE_UI_CB_HOT_G);
-    ASSERT_TRUE(ctx.vertices[0].b == FORGE_UI_CB_HOT_B);
+    ASSERT_TRUE(ctx.vertices[0].r == ctx.theme.surface_hot.r);
+    ASSERT_TRUE(ctx.vertices[0].g == ctx.theme.surface_hot.g);
+    ASSERT_TRUE(ctx.vertices[0].b == ctx.theme.surface_hot.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -1550,9 +1550,9 @@ static void test_checkbox_active_color(void)
     forge_ui_ctx_checkbox(&ctx, "Opt", &val, rect);
     forge_ui_ctx_end(&ctx);
 
-    ASSERT_TRUE(ctx.vertices[0].r == FORGE_UI_CB_ACTIVE_R);
-    ASSERT_TRUE(ctx.vertices[0].g == FORGE_UI_CB_ACTIVE_G);
-    ASSERT_TRUE(ctx.vertices[0].b == FORGE_UI_CB_ACTIVE_B);
+    ASSERT_TRUE(ctx.vertices[0].r == ctx.theme.surface_active.r);
+    ASSERT_TRUE(ctx.vertices[0].g == ctx.theme.surface_active.g);
+    ASSERT_TRUE(ctx.vertices[0].b == ctx.theme.surface_active.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -1914,9 +1914,9 @@ static void test_slider_normal_color(void)
 
     /* First 4 vertices = track, next 4 = thumb */
     ASSERT_TRUE(ctx.vertex_count >= 8);
-    ASSERT_TRUE(ctx.vertices[4].r == FORGE_UI_SL_NORMAL_R);
-    ASSERT_TRUE(ctx.vertices[4].g == FORGE_UI_SL_NORMAL_G);
-    ASSERT_TRUE(ctx.vertices[4].b == FORGE_UI_SL_NORMAL_B);
+    ASSERT_TRUE(ctx.vertices[4].r == ctx.theme.surface_hot.r);
+    ASSERT_TRUE(ctx.vertices[4].g == ctx.theme.surface_hot.g);
+    ASSERT_TRUE(ctx.vertices[4].b == ctx.theme.surface_hot.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -1943,9 +1943,9 @@ static void test_slider_hot_color(void)
     forge_ui_ctx_slider(&ctx, "##slider", &val, 0.0f, 1.0f, rect);
     forge_ui_ctx_end(&ctx);
 
-    ASSERT_TRUE(ctx.vertices[4].r == FORGE_UI_SL_HOT_R);
-    ASSERT_TRUE(ctx.vertices[4].g == FORGE_UI_SL_HOT_G);
-    ASSERT_TRUE(ctx.vertices[4].b == FORGE_UI_SL_HOT_B);
+    ASSERT_TRUE(ctx.vertices[4].r == ctx.theme.accent_hot.r);
+    ASSERT_TRUE(ctx.vertices[4].g == ctx.theme.accent_hot.g);
+    ASSERT_TRUE(ctx.vertices[4].b == ctx.theme.accent_hot.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -1972,9 +1972,9 @@ static void test_slider_active_color(void)
     forge_ui_ctx_slider(&ctx, "##slider", &val, 0.0f, 1.0f, rect);
     forge_ui_ctx_end(&ctx);
 
-    ASSERT_TRUE(ctx.vertices[4].r == FORGE_UI_SL_ACTIVE_R);
-    ASSERT_TRUE(ctx.vertices[4].g == FORGE_UI_SL_ACTIVE_G);
-    ASSERT_TRUE(ctx.vertices[4].b == FORGE_UI_SL_ACTIVE_B);
+    ASSERT_TRUE(ctx.vertices[4].r == ctx.theme.accent.r);
+    ASSERT_TRUE(ctx.vertices[4].g == ctx.theme.accent.g);
+    ASSERT_TRUE(ctx.vertices[4].b == ctx.theme.accent.b);
 
     forge_ui_ctx_free(&ctx);
 }
@@ -3283,7 +3283,7 @@ static void test_layout_pop_returns_true(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect r = { 0, 0, 100, 100 };
-    forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
     bool ok = forge_ui_ctx_layout_pop(&ctx);
     ASSERT_TRUE(ok);
     ASSERT_EQ_INT(ctx.layout_depth, 0);
@@ -3365,10 +3365,10 @@ static void test_layout_nested_push_pop(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect r = { 0, 0, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
     ASSERT_EQ_INT(ctx.layout_depth, 1);
 
-    forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_HORIZONTAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_HORIZONTAL, -1, -1));
     ASSERT_EQ_INT(ctx.layout_depth, 2);
 
     forge_ui_ctx_layout_pop(&ctx);
@@ -3423,8 +3423,8 @@ static void test_layout_vertical_positions(void)
     ForgeUiRect area = { 10.0f, 20.0f, 200.0f, 300.0f };
     float padding = 5.0f;
     float spacing = 8.0f;
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL,
-                             padding, spacing);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL,
+                             padding, spacing));
 
     /* First widget: should be at cursor start (no spacing before first) */
     ForgeUiRect r1 = forge_ui_ctx_layout_next(&ctx, 30.0f);
@@ -3460,8 +3460,8 @@ static void test_layout_horizontal_positions(void)
     ForgeUiRect area = { 10.0f, 20.0f, 300.0f, 50.0f };
     float padding = 4.0f;
     float spacing = 10.0f;
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_HORIZONTAL,
-                             padding, spacing);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_HORIZONTAL,
+                             padding, spacing));
 
     /* First widget */
     ForgeUiRect r1 = forge_ui_ctx_layout_next(&ctx, 80.0f);
@@ -3492,8 +3492,8 @@ static void test_layout_remaining_after_last_widget(void)
 
     /* 100px tall area, explicit 0 padding, 10px spacing */
     ForgeUiRect area = { 0, 0, 100, 100 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL,
-                             -1.0f, 10.0f);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL,
+                             -1.0f, 10.0f));
 
     /* Place one 30px widget */
     forge_ui_ctx_layout_next(&ctx, 30.0f);
@@ -3525,8 +3525,8 @@ static void test_layout_push_negative_padding_clamped(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 10, 20, 200, 100 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL,
-                             -5.0f, 0.0f);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL,
+                             -5.0f, 0.0f));
 
     ForgeUiLayout *layout = &ctx.layout_stack[0];
     ASSERT_NEAR(layout->padding, 0.0f, 0.001f);
@@ -3549,8 +3549,8 @@ static void test_layout_push_negative_spacing_clamped(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 100, 100 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL,
-                             0.0f, -10.0f);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL,
+                             0.0f, -10.0f));
 
     ForgeUiLayout *layout = &ctx.layout_stack[0];
     ASSERT_NEAR(layout->spacing, 0.0f, 0.001f);
@@ -3570,7 +3570,7 @@ static void test_layout_next_negative_size_clamped(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 100, 100 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
     ForgeUiRect r = forge_ui_ctx_layout_next(&ctx, -50.0f);
     ASSERT_NEAR(r.h, 0.0f, 0.001f);  /* negative size clamped to 0 */
@@ -3592,7 +3592,7 @@ static void test_layout_push_tiny_rect_no_negative_remaining(void)
 
     /* Rect smaller than 2*padding → inner space is 0, not negative */
     ForgeUiRect area = { 0, 0, 10, 10 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, 20.0f, -1.0f);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, 20.0f, -1.0f));
 
     ForgeUiLayout *layout = &ctx.layout_stack[0];
     ASSERT_NEAR(layout->remaining_w, 0.0f, 0.001f);
@@ -3616,7 +3616,7 @@ static void test_layout_begin_resets_depth(void)
     /* First frame: push without pop (intentional mismatch) */
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     ForgeUiRect r = { 0, 0, 100, 100 };
-    forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
     /* Note: no pop — this is the bug scenario being tested */
     forge_ui_ctx_end(&ctx);  /* end will log a warning */
 
@@ -3638,7 +3638,7 @@ static void test_layout_free_resets_depth(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect r = { 0, 0, 100, 100 };
-    forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, r, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
     /* Free without popping */
     forge_ui_ctx_end(&ctx);  /* logs warning */
     forge_ui_ctx_free(&ctx);
@@ -3657,7 +3657,7 @@ static void test_button_layout_null_text(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
     /* NULL text should fail without advancing cursor */
     bool clicked = forge_ui_ctx_button_layout(&ctx, NULL, 30.0f);
@@ -3682,7 +3682,7 @@ static void test_button_layout_empty_text(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
     bool clicked = forge_ui_ctx_button_layout(&ctx, "", 30.0f);
     ASSERT_TRUE(!clicked);
@@ -3705,7 +3705,7 @@ static void test_checkbox_layout_null_value(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
     bool toggled = forge_ui_ctx_checkbox_layout(&ctx, "Test", NULL, 30.0f);
     ASSERT_TRUE(!toggled);
@@ -3728,7 +3728,7 @@ static void test_checkbox_layout_null_label(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
     bool val = true;
     bool toggled = forge_ui_ctx_checkbox_layout(&ctx, NULL, &val, 30.0f);
@@ -3749,7 +3749,7 @@ static void test_slider_layout_null_value(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
     bool changed = forge_ui_ctx_slider_layout(&ctx, "##slider", NULL,
                                                0.0f, 100.0f, 30.0f);
@@ -3773,7 +3773,7 @@ static void test_slider_layout_invalid_range(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
     float val = 50.0f;
     /* min == max: invalid range */
@@ -3803,9 +3803,9 @@ static void test_label_layout_emits_draw_data(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 10, 20, 200, 100 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
-    forge_ui_ctx_label_layout(&ctx, "Hi", 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_layout(&ctx, "Hi", 30.0f);
     ASSERT_TRUE(ctx.vertex_count > 0);
     ASSERT_TRUE(ctx.index_count > 0);
 
@@ -3824,7 +3824,7 @@ static void test_button_layout_correct_rect(void)
     forge_ui_ctx_begin(&ctx, 200, 200, false);  /* mouse far away */
 
     ForgeUiRect area = { 10, 20, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, 5, 8);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, 5, 8));
 
     int verts_before = ctx.vertex_count;
     (void)forge_ui_ctx_button_layout(&ctx, "Test", 30.0f);
@@ -3852,7 +3852,7 @@ static void test_layout_no_spacing_before_first_widget(void)
 
     /* Large spacing to make a gap obvious if misapplied */
     ForgeUiRect area = { 0, 0, 100, 100 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, 50.0f);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, 50.0f));
 
     ForgeUiRect r1 = forge_ui_ctx_layout_next(&ctx, 10.0f);
     /* First widget should be at y=0, not y=50 */
@@ -3873,7 +3873,7 @@ static void test_layout_spacing_between_widgets(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 100, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, 10.0f);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, 10.0f));
 
     ForgeUiRect r1 = forge_ui_ctx_layout_next(&ctx, 20.0f);
     ForgeUiRect r2 = forge_ui_ctx_layout_next(&ctx, 20.0f);
@@ -3904,7 +3904,7 @@ static void test_layout_horizontal_spacing(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 300, 50 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_HORIZONTAL, -1, 10.0f);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_HORIZONTAL, -1, 10.0f));
 
     ForgeUiRect r1 = forge_ui_ctx_layout_next(&ctx, 40.0f);
     ForgeUiRect r2 = forge_ui_ctx_layout_next(&ctx, 60.0f);
@@ -3933,7 +3933,7 @@ static void test_layout_item_count(void)
     forge_ui_ctx_begin(&ctx, 0, 0, false);
 
     ForgeUiRect area = { 0, 0, 200, 200 };
-    forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1);
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, area, FORGE_UI_LAYOUT_VERTICAL, -1, -1));
 
     ASSERT_EQ_INT(ctx.layout_stack[0].item_count, 0);
     forge_ui_ctx_layout_next(&ctx, 10.0f);
@@ -4036,7 +4036,7 @@ static void test_label_layout_noop_without_layout(void)
 
     /* No layout pushed — label_layout should silently return */
     int v_before = ctx.vertex_count;
-    forge_ui_ctx_label_layout(&ctx, "Hi", 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_layout(&ctx, "Hi", 30.0f);
     ASSERT_EQ_INT(ctx.vertex_count, v_before);
 
     forge_ui_ctx_end(&ctx);
@@ -5734,7 +5734,7 @@ static void test_label_nan_x_rejected(void)
     ForgeUiContext ctx;
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
-    forge_ui_ctx_label(&ctx, "Test", NAN, 10.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "Test", NAN, 10.0f, 1, 1, 1, 1);
     ASSERT_EQ_INT(ctx.vertex_count, 0);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -5747,7 +5747,7 @@ static void test_label_inf_y_rejected(void)
     ForgeUiContext ctx;
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
-    forge_ui_ctx_label(&ctx, "Test", 10.0f, INFINITY, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "Test", 10.0f, INFINITY, 1, 1, 1, 1);
     ASSERT_EQ_INT(ctx.vertex_count, 0);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -6127,6 +6127,80 @@ static void test_emit_border_nan_width_rejected(void)
     ASSERT_EQ_INT(ctx.vertex_count, 0);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
+}
+
+/* ── Phase 2 Check 3: Inf/NaN guard tests ──────────────────────────────── */
+
+static void test_slider_inf_min_rejected(void)
+{
+    TEST("slider: Inf min_val returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float val = 0.5f;
+    ForgeUiRect rect = { 10.0f, 10.0f, 200.0f, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_slider(&ctx, "##s", &val, INFINITY, 1.0f, rect));
+    ASSERT_TRUE(!forge_ui_ctx_slider(&ctx, "##s", &val, -INFINITY, 1.0f, rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_slider_inf_max_rejected(void)
+{
+    TEST("slider: Inf max_val returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float val = 0.5f;
+    ForgeUiRect rect = { 10.0f, 10.0f, 200.0f, 28.0f };
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ASSERT_TRUE(!forge_ui_ctx_slider(&ctx, "##s", &val, 0.0f, INFINITY, rect));
+    ASSERT_TRUE(!forge_ui_ctx_slider(&ctx, "##s", &val, 0.0f, -INFINITY, rect));
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_slider_layout_inf_range_rejected(void)
+{
+    TEST("slider_layout: Inf min/max returns false");
+    if (!setup_atlas()) return;
+    ForgeUiContext ctx;
+    ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
+    float val = 0.5f;
+    forge_ui_ctx_begin(&ctx, 0, 0, false);
+    ForgeUiRect lr = { 0, 0, 300, 400 };
+    ASSERT_TRUE(forge_ui_ctx_layout_push(&ctx, lr,
+                FORGE_UI_LAYOUT_VERTICAL, -1, -1));
+    ASSERT_TRUE(!forge_ui_ctx_slider_layout(&ctx, "##s", &val, INFINITY, 1.0f, 28.0f));
+    ASSERT_TRUE(!forge_ui_ctx_slider_layout(&ctx, "##s", &val, 0.0f, INFINITY, 28.0f));
+    forge_ui_ctx_layout_pop(&ctx);
+    forge_ui_ctx_end(&ctx);
+    forge_ui_ctx_free(&ctx);
+}
+
+static void test_ascender_px_inf_pixel_height(void)
+{
+    TEST("ascender_px: Inf pixel_height returns 0");
+    ForgeUiFontAtlas atlas;
+    SDL_memset(&atlas, 0, sizeof(atlas));
+    atlas.units_per_em = 1000;
+    atlas.ascender = 800;
+    atlas.pixel_height = INFINITY;
+    float asc = forge_ui__ascender_px(&atlas);
+    ASSERT_NEAR(asc, 0.0f, 0.001f);
+}
+
+static void test_ascender_px_nan_pixel_height(void)
+{
+    TEST("ascender_px: NaN pixel_height returns 0");
+    ForgeUiFontAtlas atlas;
+    SDL_memset(&atlas, 0, sizeof(atlas));
+    atlas.units_per_em = 1000;
+    atlas.ascender = 800;
+    atlas.pixel_height = NAN;
+    float asc = forge_ui__ascender_px(&atlas);
+    ASSERT_NEAR(asc, 0.0f, 0.001f);
 }
 
 /* ── Main ────────────────────────────────────────────────────────────────── */
@@ -6546,6 +6620,11 @@ int main(int argc, char *argv[])
     test_text_input_inf_rect_rejected();
     test_layout_push_nan_rect_rejected();
     test_layout_push_inf_rect_rejected();
+    test_slider_inf_min_rejected();
+    test_slider_inf_max_rejected();
+    test_slider_layout_inf_range_rejected();
+    test_ascender_px_inf_pixel_height();
+    test_ascender_px_nan_pixel_height();
 
     SDL_Log("=== Results: %d tests, %d passed, %d failed ===",
             test_count, pass_count, fail_count);

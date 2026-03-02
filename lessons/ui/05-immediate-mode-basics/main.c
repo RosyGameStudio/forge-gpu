@@ -67,18 +67,6 @@
 #define BG_CLEAR_B      0.12f
 #define BG_CLEAR_A      1.00f
 
-/* ── Title label color (soft blue-gray) ─────────────────────────────────── */
-#define TITLE_R         0.70f
-#define TITLE_G         0.80f
-#define TITLE_B         0.90f
-#define TITLE_A         1.00f
-
-/* ── Status label color (warm gold) ─────────────────────────────────────── */
-#define STATUS_R        0.90f
-#define STATUS_G        0.90f
-#define STATUS_B        0.60f
-#define STATUS_A        1.00f
-
 /* ── Mouse cursor dot ───────────────────────────────────────────────────── */
 #define CURSOR_DOT_RADIUS_SQ  5   /* squared pixel radius for circular shape */
 #define CURSOR_DOT_R    255       /* red channel (uint8) */
@@ -302,9 +290,9 @@ int main(int argc, char *argv[])
          * generates draw data and handles state transitions. */
 
         /* Title label */
-        forge_ui_ctx_label(&ctx, "Immediate-Mode UI Demo",
+        forge_ui_ctx_label_colored(&ctx, "Immediate-Mode UI Demo",
                            MARGIN, MARGIN + ascender_px,
-                           TITLE_R, TITLE_G, TITLE_B, TITLE_A);
+                           0.70f, 0.80f, 0.90f, 1.00f);
 
         /* Buttons */
         bool clicked[BUTTON_COUNT];
@@ -327,10 +315,10 @@ int main(int argc, char *argv[])
         }
 
         /* Right-side status area */
-        forge_ui_ctx_label(&ctx, status,
+        forge_ui_ctx_label_colored(&ctx, status,
                            MARGIN + BUTTON_WIDTH + STATUS_GAP,
                            btn_rects[0].y + ascender_px,
-                           STATUS_R, STATUS_G, STATUS_B, STATUS_A);
+                           0.90f, 0.90f, 0.60f, 1.00f);
 
         /* End frame: finalize hot/active transitions */
         forge_ui_ctx_end(&ctx);

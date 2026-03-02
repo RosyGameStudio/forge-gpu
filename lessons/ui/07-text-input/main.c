@@ -72,24 +72,6 @@
 #define BG_CLEAR_B      0.12f
 #define BG_CLEAR_A      1.00f
 
-/* ── Title label color (soft blue-gray) ──────────────────────────────────── */
-#define TITLE_R         0.70f
-#define TITLE_G         0.80f
-#define TITLE_B         0.90f
-#define TITLE_A         1.00f
-
-/* ── Field label color (dim gray) ────────────────────────────────────────── */
-#define FIELD_LABEL_R   0.65f
-#define FIELD_LABEL_G   0.65f
-#define FIELD_LABEL_B   0.70f
-#define FIELD_LABEL_A   1.00f
-
-/* ── Status label color (warm gold) ──────────────────────────────────────── */
-#define STATUS_R        0.90f
-#define STATUS_G        0.90f
-#define STATUS_B        0.60f
-#define STATUS_A        1.00f
-
 /* ── Mouse cursor dot ────────────────────────────────────────────────────── */
 #define CURSOR_DOT_RADIUS_SQ  5   /* squared pixel radius for circular shape */
 #define CURSOR_DOT_R    255       /* red channel (uint8) */
@@ -403,15 +385,14 @@ int main(int argc, char *argv[])
         /* ── Declare widgets ──────────────────────────────────────────── */
 
         /* Title label */
-        forge_ui_ctx_label(&ctx, "Text Input",
+        forge_ui_ctx_label_colored(&ctx, "Text Input",
                            MARGIN, MARGIN + ascender_px,
-                           TITLE_R, TITLE_G, TITLE_B, TITLE_A);
+                           0.70f, 0.80f, 0.90f, 1.00f);
 
         /* "Username:" label */
-        forge_ui_ctx_label(&ctx, "Username:",
+        forge_ui_ctx_label_colored(&ctx, "Username:",
                            MARGIN, username_label_y,
-                           FIELD_LABEL_R, FIELD_LABEL_G,
-                           FIELD_LABEL_B, FIELD_LABEL_A);
+                           0.65f, 0.65f, 0.70f, 1.00f);
 
         /* Username text input (this is the field we interact with) */
         bool cursor_visible = (blink_counter % BLINK_PERIOD) < BLINK_ON_FRAMES;
@@ -420,10 +401,9 @@ int main(int argc, char *argv[])
             cursor_visible);
 
         /* "Email:" label */
-        forge_ui_ctx_label(&ctx, "Email:",
+        forge_ui_ctx_label_colored(&ctx, "Email:",
                            MARGIN, email_label_y,
-                           FIELD_LABEL_R, FIELD_LABEL_G,
-                           FIELD_LABEL_B, FIELD_LABEL_A);
+                           0.65f, 0.65f, 0.70f, 1.00f);
 
         /* Email text input (never focused in this demo -- shows
          * the unfocused visual state for comparison) */
@@ -449,8 +429,8 @@ int main(int argc, char *argv[])
             status = status_buf;
         }
 
-        forge_ui_ctx_label(&ctx, status, MARGIN, status_y + ascender_px,
-                           STATUS_R, STATUS_G, STATUS_B, STATUS_A);
+        forge_ui_ctx_label_colored(&ctx, status, MARGIN, status_y + ascender_px,
+                           0.90f, 0.90f, 0.60f, 1.00f);
 
         /* End frame: finalize hot/active/focus transitions */
         forge_ui_ctx_end(&ctx);
