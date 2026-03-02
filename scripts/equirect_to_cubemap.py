@@ -250,7 +250,9 @@ def convert(input_path, output_dir, size, preloaded_hdr=None):
                 sys.exit("Unsupported HDR channel count: 0")
             if source.shape[2] == 1:
                 # Single channel (H, W, 1) → broadcast to (H, W, 3)
-                source = np.broadcast_to(source, (source.shape[0], source.shape[1], 3)).copy()
+                source = np.broadcast_to(
+                    source, (source.shape[0], source.shape[1], 3)
+                ).copy()
             elif source.shape[2] == 2:
                 # Two channels (H, W, 2) → take first, broadcast to (H, W, 3)
                 source = np.stack([source[:, :, 0]] * 3, axis=-1)
