@@ -3,7 +3,7 @@
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Circle, Polygon, Rectangle
+from matplotlib.patches import Circle, FancyBboxPatch, Polygon, Rectangle
 
 from ._common import FORGE_CMAP, STYLE, draw_vector, save, setup_axes
 
@@ -9471,8 +9471,6 @@ def diagram_composite_modes():
 
 def _ssr_draw_pass_box(ax, x, y, w, h, title, number, color, stroke):
     """Draw a rounded pass box with a numbered title."""
-    from matplotlib.patches import FancyBboxPatch
-
     rect = FancyBboxPatch(
         (x, y),
         w,
@@ -11737,8 +11735,6 @@ def diagram_water_layers():
 
 def _pr_draw_pass_box(ax, x, y, w, h, title, number, color, stroke):
     """Draw a rounded pass box with a numbered title."""
-    from matplotlib.patches import FancyBboxPatch
-
     rect = FancyBboxPatch(
         (x, y),
         w,
@@ -11765,61 +11761,9 @@ def _pr_draw_pass_box(ax, x, y, w, h, title, number, color, stroke):
     )
 
 
-def _pr_draw_texture_tag(ax, x, y, label, fmt, color, stroke_thin):
-    """Draw a small texture output tag (label + format)."""
-    tag_w = 1.55
-    tag_h = 0.55
-    rect = Rectangle(
-        (x - tag_w / 2, y - tag_h / 2),
-        tag_w,
-        tag_h,
-        linewidth=1.2,
-        edgecolor=color,
-        facecolor=STYLE["bg"],
-        alpha=0.85,
-        zorder=5,
-    )
-    ax.add_patch(rect)
-    ax.text(
-        x,
-        y + 0.07,
-        label,
-        color=color,
-        fontsize=7.5,
-        fontweight="bold",
-        ha="center",
-        va="center",
-        path_effects=stroke_thin,
-        zorder=6,
-    )
-    ax.text(
-        x,
-        y - 0.17,
-        fmt,
-        color=STYLE["text_dim"],
-        fontsize=6,
-        ha="center",
-        va="center",
-        path_effects=stroke_thin,
-        zorder=6,
-    )
-
-
-def _pr_draw_arrow(ax, x_start, y_start, x_end, y_end, color=None):
-    """Draw a connecting arrow between elements."""
-    if color is None:
-        color = STYLE["text_dim"]
-    ax.annotate(
-        "",
-        xy=(x_end, y_end),
-        xytext=(x_start, y_start),
-        arrowprops={
-            "arrowstyle": "->,head_width=0.25,head_length=0.12",
-            "color": color,
-            "lw": 2,
-        },
-        zorder=2,
-    )
+# Planar reflections uses the same drawing helpers as SSR
+_pr_draw_texture_tag = _ssr_draw_texture_tag
+_pr_draw_arrow = _ssr_draw_arrow
 
 
 def diagram_planar_render_pipeline():
@@ -12154,7 +12098,7 @@ def diagram_frustum_plane_extraction():
 
     # Face labels with clip-space inequalities
     planes = [
-        ("Near", iso(0, 0, 1), STYLE["accent1"], "\u2212w \u2264 z"),
+        ("Near", iso(0, 0, 1), STYLE["accent1"], "0 \u2264 z"),
         ("Far", iso(0, 0, -1), STYLE["accent4"], "z \u2264 w"),
         ("Right", iso(1, 0, 0), STYLE["accent2"], "x \u2264 w"),
         ("Left", iso(-1, 0.3, 0.3), STYLE["accent3"], "\u2212w \u2264 x"),
@@ -12344,8 +12288,6 @@ def diagram_screen_space_projection():
 
     for i in range(4):
         x = 0.3 + i * (box_w + gap)
-        from matplotlib.patches import FancyBboxPatch
-
         rect = FancyBboxPatch(
             (x, y0),
             box_w,

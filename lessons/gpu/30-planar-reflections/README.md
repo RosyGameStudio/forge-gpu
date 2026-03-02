@@ -45,12 +45,13 @@ becomes fully reflective due to the Fresnel effect.
 ![Reflection Camera](assets/reflection_camera.png)
 
 To render the scene as it would appear reflected in a flat surface, mirror the
-camera across that surface. For a plane defined by normal **n** and distance
-*d* (the equation **n** · **x** + *d* = 0), the 4x4 reflection matrix is:
+camera across that surface. For a plane defined by normal $\mathbf{n}$ and
+distance $d$ (the equation $\mathbf{n} \cdot \mathbf{x} + d = 0$), the 4x4
+reflection matrix is:
 
-```text
-M = I − 2·n⊗n
-```
+$$
+M = I - 2\,\mathbf{n} \otimes \mathbf{n}
+$$
 
 For a horizontal water surface at Y = 0, the plane is (0, 1, 0, 0) and the
 reflection matrix simply negates the Y component:
@@ -71,6 +72,9 @@ static mat4 mat4_reflect(vec4 plane)
 Multiplying the camera position and view direction by this matrix produces the
 mirrored camera. Rendering the scene from this mirrored viewpoint gives the
 reflected image.
+
+See [Math Lesson 05 — Matrices](../../math/05-matrices/) for a detailed treatment
+of matrix transformations and composition.
 
 ### Oblique near-plane clipping
 
@@ -112,7 +116,7 @@ static mat4 mat4_oblique_near_plane(mat4 proj, vec4 clip_plane_view)
 ![Frustum Planes](assets/frustum_plane_extraction.png)
 
 In clip space, the six frustum planes correspond to simple inequalities on
-the clip-space coordinates. The near plane (−*w* ≤ *z*) is the one replaced
+the clip-space coordinates. The near plane ($0 \le z$) is the one replaced
 by the oblique clipping method. Understanding these relationships is essential
 for any frustum-based technique including culling, shadow map partitioning,
 and clip plane replacement.
@@ -124,15 +128,18 @@ and clip plane replacement.
 Real water surfaces are not uniformly reflective — reflectance depends on the
 viewing angle. Schlick's approximation models this efficiently:
 
-```text
-F(θ) = F₀ + (1 − F₀)·(1 − cosθ)⁵
-```
+$$
+F(\theta) = F_0 + (1 - F_0)(1 - \cos\theta)^5
+$$
 
-For water, F₀ ≈ 0.02, meaning only 2% of light is reflected when looking
+For water, $F_0 \approx 0.02$, meaning only 2% of light is reflected when looking
 straight down (steep angle), but nearly 100% is reflected at grazing angles.
 This matches everyday observation: you can see the bottom of a lake when
 looking straight down, but the surface becomes a mirror when you look across
 it at a low angle.
+
+See [Math Lesson 01 — Vectors](../../math/01-vectors/) to learn about the dot
+product ($\cos\theta$ term in the Fresnel formula).
 
 The water fragment shader uses Fresnel to blend between the reflection texture
 and a tint color representing the water itself:
@@ -182,6 +189,32 @@ light's perspective into a 2048x2048 depth-only texture. This is the same
 technique from [Lesson 15 (Cascaded Shadow Maps)](../15-cascaded-shadow-maps/)
 with front-face culling to reduce shadow acne.
 
+### Winding reversal in reflections
+
+A reflection matrix has a determinant of $-1$, which means it reverses the
+handedness of the coordinate system. This flips the winding order of every
+triangle: what was counter-clockwise becomes clockwise, and vice versa.
+
+If the main scene pipeline uses `CULLMODE_BACK` with
+`FRONTFACE_COUNTER_CLOCKWISE`, every reflected triangle appears back-facing
+and gets culled — the reflection texture ends up empty. The fix is to create
+a separate pipeline variant for the reflection pass with `FRONTFACE_CLOCKWISE`:
+
+```c
+/* Main scene pipeline — standard CCW front face. */
+pi.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+pi.rasterizer_state.cull_mode  = SDL_GPU_CULLMODE_BACK;
+scene_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+
+/* Reflected variant — CW front face compensates for the winding flip. */
+pi.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
+scene_pipeline_refl = SDL_CreateGPUGraphicsPipeline(device, &pi);
+```
+
+The same applies to the skybox pipeline (which uses `CULLMODE_FRONT` to
+render from inside the cube). Every pipeline bound during the reflection
+pass must use the reversed front-face convention.
+
 ### Pass 2 — Reflection
 
 The reflection pass renders the scene from the mirrored camera into an
@@ -190,7 +223,8 @@ offscreen color texture. Key details:
 - The camera position is reflected across the water plane
 - The view matrix uses the reflected position and inverted pitch
 - The projection matrix uses oblique near-plane clipping
-- Front-face winding is reversed (the mirror flip changes triangle winding)
+- Front-face winding is reversed (the mirror flip changes triangle winding),
+  so reflected pipelines use `FRONTFACE_CLOCKWISE` to compensate
 - Rendered objects: boat, rocks, skybox — NOT the water surface or floor
 - The shadow map from Pass 1 is available for shadow testing in the
   reflection
@@ -288,7 +322,7 @@ Run the lesson:
 |----------|-------------------|-----------------|
 | Surface shape | Flat only | Any orientation |
 | Reflection quality | Pixel-perfect | Limited by screen data |
-| Off-screen objects | Fully visible | Missing |
+| Offscreen objects | Fully visible | Missing |
 | Cost | Extra scene render | Fullscreen ray march |
 | Setup complexity | Moderate | Complex (G-buffer + ray march) |
 | Multiple reflectors | One pass per plane | Single pass for all |
@@ -299,7 +333,7 @@ anything neither technique can resolve.
 
 ## AI skill
 
-The [Planar Reflections skill](../../.claude/skills/forge-planar-reflections/SKILL.md)
+The [Planar Reflections skill](../../../.claude/skills/forge-planar-reflections/SKILL.md)
 provides a ready-to-use template for adding planar reflections to any
 SDL GPU project.
 
@@ -315,6 +349,17 @@ horizontal water surface. Extensions to explore:
   fallback when SSR rays exit the screen
 
 ## Further reading
+
+### In-repo math lessons
+
+- [Math Lesson 02 — Coordinate Spaces](../../math/02-coordinate-spaces/)
+  — transformations between spaces, essential for understanding mirrored cameras
+- [Math Lesson 05 — Matrices](../../math/05-matrices/)
+  — reflection matrices and view transformations
+- [Math Lesson 01 — Vectors](../../math/01-vectors/)
+  — dot products and the Fresnel formula
+
+### External references
 
 - [Eric Lengyel — "Oblique View Frustum Depth Projection and Clipping"
   (Journal of Game Development, 2005)](http://www.terathon.com/lengyel/Lengyel-Oblique.pdf)

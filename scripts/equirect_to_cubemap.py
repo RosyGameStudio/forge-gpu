@@ -232,9 +232,18 @@ def convert(input_path, output_dir, size):
             sys.exit("HDR input requires imageio — install with: pip install imageio")
         print(f"Loading HDR: {input_path}")
         source = iio.imread(input_path).astype(np.float32)
+        # Normalize channels: ensure 3-channel (H, W, 3) output
         if source.ndim == 2:
+            # Grayscale (H, W) → broadcast to (H, W, 3)
             source = np.stack([source] * 3, axis=-1)
-        elif source.shape[2] == 4:
+        elif source.shape[2] == 1:
+            # Single channel (H, W, 1) → broadcast to (H, W, 3)
+            source = np.broadcast_to(source, (source.shape[0], source.shape[1], 3))
+        elif source.shape[2] == 2:
+            # Two channels (H, W, 2) → take first, broadcast to (H, W, 3)
+            source = np.stack([source[:, :, 0]] * 3, axis=-1)
+        elif source.shape[2] >= 3:
+            # Three or more channels → take first three
             source = source[:, :, :3]
         print(f"  Source size: {source.shape[1]}x{source.shape[0]} (HDR float)")
     else:

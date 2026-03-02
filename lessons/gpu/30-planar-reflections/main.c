@@ -82,9 +82,9 @@
 #define PITCH_CLAMP        1.5f
 
 /* Camera initial position — elevated, looking at the boat. */
-#define CAM_START_X         8.0f
-#define CAM_START_Y         5.0f
-#define CAM_START_Z         12.0f
+#define CAM_START_X         6.0f
+#define CAM_START_Y         3.0f
+#define CAM_START_Z         8.0f
 #define CAM_START_YAW_DEG   30.0f
 #define CAM_START_PITCH_DEG -10.0f
 
@@ -112,7 +112,7 @@
 
 /* Water surface. */
 #define WATER_LEVEL       0.0f
-#define WATER_HALF_SIZE   30.0f
+#define WATER_HALF_SIZE   60.0f
 #define WATER_TINT_R      0.05f
 #define WATER_TINT_G      0.15f
 #define WATER_TINT_B      0.20f
@@ -121,7 +121,7 @@
 
 /* Sandy floor (below water). */
 #define FLOOR_Y            -2.0f
-#define FLOOR_HALF_SIZE     30.0f
+#define FLOOR_HALF_SIZE     60.0f
 #define FLOOR_COLOR_R       0.76f
 #define FLOOR_COLOR_G       0.70f
 #define FLOOR_COLOR_B       0.50f
@@ -159,12 +159,12 @@
 #define OBLIQUE_EPSILON 1e-6f
 
 /* Rock placement scale — the rocks glTF has transforms that need scaling. */
-#define ROCK_SCALE 6.6f
+#define ROCK_SCALE 0.66f
 
 /* Boat placement — position the boat in open water, away from the cliffs. */
-#define BOAT_POS_X    5.0f
+#define BOAT_POS_X    3.0f
 #define BOAT_POS_Y    0.3f
-#define BOAT_POS_Z    5.0f
+#define BOAT_POS_Z    3.0f
 
 /* ── Lesson-local math: reflection matrix ────────────────────────────── */
 
@@ -1515,7 +1515,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
         SDL_GPUColorTargetDescription color_desc;
         SDL_zero(color_desc);
-        color_desc.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+        color_desc.format = swapchain_format;
 
         SDL_GPUGraphicsPipelineCreateInfo pi;
         SDL_zero(pi);
@@ -1585,7 +1585,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
         SDL_GPUColorTargetDescription color_desc;
         SDL_zero(color_desc);
-        color_desc.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+        color_desc.format = swapchain_format;
 
         SDL_GPUGraphicsPipelineCreateInfo pi;
         SDL_zero(pi);
@@ -1786,7 +1786,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_GPUTextureCreateInfo ti;
         SDL_zero(ti);
         ti.type                = SDL_GPU_TEXTURETYPE_2D;
-        ti.format              = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+        ti.format              = swapchain_format;
         ti.width               = WINDOW_WIDTH;
         ti.height              = WINDOW_HEIGHT;
         ti.layer_count_or_depth = 1;

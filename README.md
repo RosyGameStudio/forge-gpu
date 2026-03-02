@@ -515,7 +515,10 @@ forge-gpu/
 │       ├── 24-gobo-spotlight/
 │       ├── 25-shader-noise/
 │       ├── 26-procedural-sky/
-│       └── 27-ssao/
+│       ├── 27-ssao/
+│       ├── 28-ui-rendering/
+│       ├── 29-screen-space-reflections/
+│       └── 30-planar-reflections/
 ├── common/
 │   ├── math/              Math library (vectors, matrices, quaternions)
 │   │   ├── forge_math.h   All math operations (header-only)
