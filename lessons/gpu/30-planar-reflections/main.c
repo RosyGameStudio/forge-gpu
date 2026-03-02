@@ -158,6 +158,9 @@
 /* Oblique near-plane epsilon — skip modification if dot product is near zero. */
 #define OBLIQUE_EPSILON 1e-6f
 
+/* Quad geometry — two triangles (6 indices). */
+#define QUAD_INDEX_COUNT 6
+
 /* Rock placement scale — the rocks glTF has transforms that need scaling. */
 #define ROCK_SCALE 0.66f
 
@@ -941,6 +944,12 @@ static bool upload_model_to_gpu(SDL_GPUDevice *device, ModelData *model)
         }
 
         if (src->indices && src->index_count > 0) {
+            if (src->index_stride != 2 && src->index_stride != 4) {
+                SDL_Log("Unsupported index stride %u for primitive %d",
+                        (unsigned)src->index_stride, i);
+                free_model_gpu(device, model);
+                return false;
+            }
             Uint32 ib_size = src->index_count * src->index_stride;
             dst->index_buffer = upload_gpu_buffer(
                 device, SDL_GPU_BUFFERUSAGE_INDEX, src->indices, ib_size);
@@ -1046,6 +1055,11 @@ static void draw_model_shadow(
         const ForgeGltfMesh *mesh = &scene->meshes[node->mesh_index];
         for (int pi = 0; pi < mesh->primitive_count; pi++) {
             int prim_idx = mesh->first_primitive + pi;
+            if (prim_idx < 0 || prim_idx >= model->primitive_count) {
+                SDL_Log("Skipping invalid primitive index %d (count=%d)",
+                        prim_idx, model->primitive_count);
+                continue;
+            }
             const GpuPrimitive *gpu_prim = &model->primitives[prim_idx];
 
             if (!gpu_prim->vertex_buffer || !gpu_prim->index_buffer)
@@ -1096,6 +1110,11 @@ static void draw_model_scene(
         const ForgeGltfMesh *mesh = &scene->meshes[node->mesh_index];
         for (int pi = 0; pi < mesh->primitive_count; pi++) {
             int prim_idx = mesh->first_primitive + pi;
+            if (prim_idx < 0 || prim_idx >= model->primitive_count) {
+                SDL_Log("Skipping invalid primitive index %d (count=%d)",
+                        prim_idx, model->primitive_count);
+                continue;
+            }
             const GpuPrimitive *gpu_prim = &model->primitives[prim_idx];
 
             if (!gpu_prim->vertex_buffer || !gpu_prim->index_buffer)
@@ -1220,7 +1239,7 @@ static void draw_floor(
     SDL_GPUBufferBinding ib = { state->floor_ib, 0 };
     SDL_BindGPUIndexBuffer(pass, &ib, SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
-    SDL_DrawGPUIndexedPrimitives(pass, 6, 1, 0, 0, 0);
+    SDL_DrawGPUIndexedPrimitives(pass, QUAD_INDEX_COUNT, 1, 0, 0, 0);
 }
 
 /* ── Helper: draw the skybox ────────────────────────────────────────── */
@@ -1964,24 +1983,36 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     mat4 rocks_placement = mat4_scale(
         vec3_create(ROCK_SCALE, ROCK_SCALE, ROCK_SCALE));
 
-    /* ── Mirrored camera for reflection pass ───────────────────────── */
-    /* Mirror the camera position across the water plane Y = WATER_LEVEL. */
-    vec3 reflected_cam = state->cam_position;
-    reflected_cam.y = 2.0f * WATER_LEVEL - reflected_cam.y;
+    /* ── Underwater guard ─────────────────────────────────────────── */
+    /* Planar reflections are only valid when the camera is above the
+     * water plane.  When the camera is submerged, the reflection matrix
+     * mirrors it above the surface and the oblique clip plane clips the
+     * wrong half-space, producing inverted/broken output.  The standard
+     * approach is to skip the reflection and water passes entirely when
+     * the camera is below the water level — the main scene pass still
+     * renders correctly on its own.  A production engine would switch
+     * to an underwater rendering mode (caustics, fog, tinted color). */
+    bool camera_above_water = state->cam_position.y > WATER_LEVEL;
 
-    /* Build the mirrored view matrix using reflection matrix. */
-    mat4 reflect_mat = mat4_reflect(0.0f, 1.0f, 0.0f, -WATER_LEVEL);
-    mat4 reflected_view = mat4_multiply(view, reflect_mat);
+    /* ── Mirrored camera for reflection pass ───────────────────────── */
+    /* Mirror the camera position across the water plane Y = WATER_LEVEL.
+     * Only computed when the camera is above water. */
+    vec3 reflected_cam = state->cam_position;
+    mat4 reflected_view = view;
+    if (camera_above_water) {
+        reflected_cam.y = 2.0f * WATER_LEVEL - reflected_cam.y;
+
+        /* Build the mirrored view matrix using reflection matrix. */
+        mat4 reflect_mat = mat4_reflect(0.0f, 1.0f, 0.0f, -WATER_LEVEL);
+        reflected_view = mat4_multiply(view, reflect_mat);
+    }
 
     /* Apply oblique near-plane clipping: the clip plane is the water
      * surface in view space.  The water plane equation in world space
-     * is (0, 1, 0, -WATER_LEVEL).  We transform it to view space. */
-    {
-        /* Transform water plane to reflected view space.
-         * For a plane (n, d), the view-space plane is:
-         *   n_view = (V^-T) * (n, d)
-         * Since the reflected view is already set up, we transform the
-         * water plane normal through the reflected view matrix transpose. */
+     * is (0, 1, 0, -WATER_LEVEL).  We transform it to view space.
+     * Only needed when the camera is above water. */
+    mat4 reflected_vp = mat4_multiply(proj, reflected_view);
+    if (camera_above_water) {
         mat4 view_inv_transpose = mat4_transpose(mat4_inverse(reflected_view));
         float pw[4] = { 0.0f, 1.0f, 0.0f, -WATER_LEVEL };
         vec4 clip_plane_view;
@@ -2003,7 +2034,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                             view_inv_transpose.m[15] * pw[3];
 
         mat4 oblique_proj = mat4_oblique_near_plane(proj, clip_plane_view);
-        mat4 reflected_vp = mat4_multiply(oblique_proj, reflected_view);
+        reflected_vp = mat4_multiply(oblique_proj, reflected_view);
+    }
+    {
 
         /* ── Acquire swapchain ─────────────────────────────────────────── */
         SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(state->device);
@@ -2068,14 +2101,14 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 SDL_GPUBufferBinding ib = { state->floor_ib, 0 };
                 SDL_BindGPUIndexBuffer(shadow_pass, &ib,
                                        SDL_GPU_INDEXELEMENTSIZE_16BIT);
-                SDL_DrawGPUIndexedPrimitives(shadow_pass, 6, 1, 0, 0, 0);
+                SDL_DrawGPUIndexedPrimitives(shadow_pass, QUAD_INDEX_COUNT, 1, 0, 0, 0);
             }
 
             SDL_EndGPURenderPass(shadow_pass);
         }
 
-        /* ══ PASS 2: Reflection pass ═══════════════════════════════════ */
-        {
+        /* ══ PASS 2: Reflection pass (skipped when camera is underwater) ═ */
+        if (camera_above_water) {
             SDL_GPUColorTargetInfo refl_ct;
             SDL_zero(refl_ct);
             refl_ct.texture     = state->reflection_color;
@@ -2161,8 +2194,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             SDL_EndGPURenderPass(main_pass);
         }
 
-        /* ══ PASS 4: Water pass (alpha-blended, to swapchain) ═════════ */
-        {
+        /* ══ PASS 4: Water pass (skipped when camera is underwater) ════ */
+        if (camera_above_water) {
             SDL_GPUColorTargetInfo water_ct;
             SDL_zero(water_ct);
             water_ct.texture  = swapchain_tex;
@@ -2224,7 +2257,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             SDL_BindGPUIndexBuffer(water_pass, &ib,
                                    SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
-            SDL_DrawGPUIndexedPrimitives(water_pass, 6, 1, 0, 0, 0);
+            SDL_DrawGPUIndexedPrimitives(water_pass, QUAD_INDEX_COUNT, 1, 0, 0, 0);
 
             SDL_EndGPURenderPass(water_pass);
         }

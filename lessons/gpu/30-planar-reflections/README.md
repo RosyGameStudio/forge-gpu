@@ -265,6 +265,60 @@ screen_uv.y = 1.0 - screen_uv.y;
 The Y-flip accounts for the difference between clip-space coordinates
 (Y-up) and texture coordinates (V-down in Vulkan/Metal).
 
+### Underwater camera guard
+
+![Underwater Camera Guard](assets/underwater_camera_guard.png)
+
+Planar reflections assume the camera is on the reflecting side of the
+plane — above the water surface. When the camera dips below the water
+level, three things break simultaneously:
+
+1. **Mirrored camera flips to the wrong side.** The reflection matrix
+   mirrors the camera across the water plane. An above-water camera at
+   Y = 3 produces a reflected camera at Y = −3 (below the surface,
+   looking up). But an underwater camera at Y = −1 mirrors to Y = 1
+   (above the surface, looking down) — the reflection shows the scene
+   from *above* the water, which is the opposite of what you want.
+
+2. **Oblique near-plane clips the wrong half-space.** The oblique
+   clipping method replaces the near plane with the water surface to
+   prevent geometry below the water from leaking into the reflection.
+   When the reflected camera is above the water, this clips everything
+   below Y = 0 — which is now the *visible* geometry, not the leaked
+   geometry. The reflection texture ends up nearly empty.
+
+3. **Fresnel produces inverted results.** The water surface normal
+   points up `(0, 1, 0)`. When the camera is below the surface, the
+   view direction points upward, making `N · V` negative. The Fresnel
+   formula produces values outside `[0, 1]`, causing incorrect blending.
+
+The standard solution is to **skip the reflection and water passes
+entirely** when the camera is below the water level:
+
+```c
+bool camera_above_water = cam_position.y > WATER_LEVEL;
+
+/* Pass 2: Reflection — only when above water. */
+if (camera_above_water) {
+    /* ... render reflected scene ... */
+}
+
+/* Pass 3: Main scene — always renders. */
+/* ... render boat, rocks, floor, skybox ... */
+
+/* Pass 4: Water overlay — only when above water. */
+if (camera_above_water) {
+    /* ... render water quad with Fresnel blending ... */
+}
+```
+
+When the camera is underwater, the main scene pass still renders the
+floor, boat, rocks, and skybox normally — the viewer simply sees the
+scene without the water surface overlay. A production engine would
+enhance this with underwater-specific effects: depth-based fog,
+caustic light patterns projected onto the floor, color absorption
+tinting, and a refracted view of the surface from below.
+
 ## Scene setup
 
 The scene contains five visual elements:
@@ -283,6 +337,14 @@ The HDR skybox was converted from an equirectangular `.hdr` image using
 ```bash
 python scripts/equirect_to_cubemap.py assets/citrus_orchard_puresky_2k.hdr assets/skybox/ --size 512
 ```
+
+### Asset credits
+
+| Asset | Author | License |
+|-------|--------|---------|
+| [Boat 3D Low-Poly](https://sketchfab.com/3d-models/boat-3d-low-poly-cc4e4619d8994b71b1f9230033cd1947) | shevchenkomr29 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| [Low Poly Rock Cliffs](https://skfb.ly/oQVzB) | navebackwards | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| [Citrus Orchard Pure Sky](https://polyhaven.com/a/citrus_orchard_puresky) | Jarod Guest (photography), Poly Haven (processing) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 ## Shaders
 

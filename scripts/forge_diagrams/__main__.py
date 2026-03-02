@@ -103,6 +103,7 @@ from .gpu_diagrams import (
     diagram_time_of_day_colors,
     diagram_tone_map_comparison,
     diagram_undersampling,
+    diagram_underwater_camera_guard,
     diagram_unit_circle,
     diagram_uv_mapping,
     diagram_water_layers,
@@ -426,6 +427,7 @@ DIAGRAMS = {
         ("water_layers.png", diagram_water_layers),
         ("render_pipeline.png", diagram_planar_render_pipeline),
         ("screen_space_projection.png", diagram_screen_space_projection),
+        ("underwater_camera_guard.png", diagram_underwater_camera_guard),
     ],
     "ui/01": [
         ("ttf_file_structure.png", diagram_ttf_file_structure),

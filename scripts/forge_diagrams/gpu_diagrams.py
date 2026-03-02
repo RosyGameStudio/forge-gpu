@@ -9469,7 +9469,7 @@ def diagram_composite_modes():
 # ---------------------------------------------------------------------------
 
 
-def _ssr_draw_pass_box(ax, x, y, w, h, title, number, color, stroke):
+def _ssr_draw_pass_box(ax, x, y, w, h, title, number, color, stroke, fontsize=12):
     """Draw a rounded pass box with a numbered title."""
     rect = FancyBboxPatch(
         (x, y),
@@ -9488,7 +9488,7 @@ def _ssr_draw_pass_box(ax, x, y, w, h, title, number, color, stroke):
         y + h * 0.65,
         f"{number}. {title}",
         color=STYLE["text"],
-        fontsize=12,
+        fontsize=fontsize,
         fontweight="bold",
         ha="center",
         va="center",
@@ -11733,35 +11733,13 @@ def diagram_water_layers():
 # ---------------------------------------------------------------------------
 
 
+# Planar reflections uses the same drawing helpers as SSR.
+# _pr_draw_pass_box uses fontsize=11 instead of the SSR default 12.
 def _pr_draw_pass_box(ax, x, y, w, h, title, number, color, stroke):
-    """Draw a rounded pass box with a numbered title."""
-    rect = FancyBboxPatch(
-        (x, y),
-        w,
-        h,
-        boxstyle="round,pad=0.12",
-        linewidth=2.5,
-        edgecolor=color,
-        facecolor=STYLE["surface"],
-        alpha=0.9,
-        zorder=3,
-    )
-    ax.add_patch(rect)
-    ax.text(
-        x + w / 2,
-        y + h * 0.65,
-        f"{number}. {title}",
-        color=STYLE["text"],
-        fontsize=11,
-        fontweight="bold",
-        ha="center",
-        va="center",
-        path_effects=stroke,
-        zorder=4,
-    )
+    """Draw a rounded pass box with a numbered title (fontsize=11)."""
+    _ssr_draw_pass_box(ax, x, y, w, h, title, number, color, stroke, fontsize=11)
 
 
-# Planar reflections uses the same drawing helpers as SSR
 _pr_draw_texture_tag = _ssr_draw_texture_tag
 _pr_draw_arrow = _ssr_draw_arrow
 
@@ -12024,9 +12002,9 @@ def diagram_planar_render_pipeline():
 def diagram_frustum_plane_extraction():
     """Clip-space cube with 6 labeled frustum planes.
 
-    Shows the normalized device coordinate cube [-1,1]^3 with each face
-    labeled as a frustum plane (left, right, top, bottom, near, far) and
-    the corresponding clip-space inequalities.
+    Shows clip-space frustum bounds with each face labeled as a frustum
+    plane (left, right, top, bottom, near, far) and the corresponding
+    inequalities (x, y in [-w, w], z in [0, w] for Vulkan/D3D).
     """
     stroke = [pe.withStroke(linewidth=2.5, foreground=STYLE["bg"])]
     stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
@@ -12373,3 +12351,391 @@ def diagram_screen_space_projection():
 
     fig.tight_layout(rect=(0, 0.02, 1, 0.93))
     save(fig, "gpu/30-planar-reflections", "screen_space_projection.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/30-planar-reflections — underwater_camera_guard.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_underwater_camera_guard():
+    """Side-view showing why planar reflections break underwater.
+
+    Left half: camera above water — valid reflection with mirrored camera
+    below the surface. Right half: camera below water — mirrored camera
+    above, oblique clip and Fresnel both fail.
+    """
+    fig = plt.figure(figsize=(12, 6), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    setup_axes(ax, xlim=(-0.5, 13.5), ylim=(-4.5, 5.5))
+    ax.set_aspect("equal")
+
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+    stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
+
+    water_color = "#2288aa"
+    underwater_color = "#0d3d5c"
+    valid_color = STYLE["accent3"]  # green
+    broken_color = STYLE["accent2"]  # orange/red
+
+    # --- Water surface line across the full width ---
+    ax.axhline(y=0, color=water_color, lw=3, zorder=3)
+    ax.fill_between(
+        [-0.5, 13.5],
+        -4.5,
+        0,
+        color=underwater_color,
+        alpha=0.25,
+        zorder=1,
+    )
+    ax.text(
+        6.75,
+        0.25,
+        "Water Plane  (Y = 0)",
+        color=water_color,
+        fontsize=10,
+        fontweight="bold",
+        ha="center",
+        va="bottom",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # --- Dividing line between the two halves ---
+    ax.axvline(x=6.75, color=STYLE["grid"], lw=1, ls="--", zorder=2)
+
+    # =====================================================================
+    # LEFT HALF: Camera above water (valid)
+    # =====================================================================
+    cam_x, cam_y = 3.0, 3.5
+    refl_x, refl_y = 3.0, -3.5  # mirrored across Y=0
+
+    # Camera icon (above water)
+    ax.plot(cam_x, cam_y, "s", color=valid_color, ms=14, zorder=6)
+    ax.text(
+        cam_x,
+        cam_y + 0.6,
+        "Camera",
+        color=valid_color,
+        fontsize=10,
+        fontweight="bold",
+        ha="center",
+        va="bottom",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax.text(
+        cam_x,
+        cam_y - 0.5,
+        "Y = 3",
+        color=valid_color,
+        fontsize=8,
+        ha="center",
+        va="top",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    # Reflected camera (below water)
+    ax.plot(refl_x, refl_y, "s", color=valid_color, ms=12, alpha=0.5, zorder=6)
+    ax.text(
+        refl_x,
+        refl_y - 0.6,
+        "Reflected\nCamera",
+        color=valid_color,
+        fontsize=9,
+        alpha=0.7,
+        ha="center",
+        va="top",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+    ax.text(
+        refl_x,
+        refl_y + 0.5,
+        "Y = \u22123",
+        color=valid_color,
+        fontsize=8,
+        alpha=0.7,
+        ha="center",
+        va="bottom",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    # Mirror line between camera and reflection
+    ax.plot(
+        [cam_x, refl_x],
+        [cam_y, refl_y],
+        "--",
+        color=valid_color,
+        lw=1.5,
+        alpha=0.4,
+        zorder=3,
+    )
+
+    # Oblique clip region (hatched area below water on left)
+    ax.fill_between(
+        [0.5, 5.5],
+        -4.5,
+        0,
+        color=valid_color,
+        alpha=0.08,
+        zorder=1,
+        hatch="//",
+    )
+    ax.text(
+        1.0,
+        -2.5,
+        "Clipped\n(correct)",
+        color=valid_color,
+        fontsize=8,
+        alpha=0.6,
+        ha="left",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    # Check mark
+    ax.text(
+        3.0,
+        5.0,
+        "\u2713  Valid",
+        color=valid_color,
+        fontsize=14,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Scene object above water (on the left side)
+    rect_left = FancyBboxPatch(
+        (1.2, 1.0),
+        1.4,
+        1.8,
+        boxstyle="round,pad=0.1",
+        facecolor=STYLE["surface"],
+        edgecolor=STYLE["text_dim"],
+        lw=1.5,
+        zorder=4,
+    )
+    ax.add_patch(rect_left)
+    ax.text(
+        1.9,
+        1.9,
+        "Scene",
+        color=STYLE["text"],
+        fontsize=9,
+        ha="center",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    # View ray from camera to scene
+    ax.annotate(
+        "",
+        xy=(2.6, 2.0),
+        xytext=(cam_x, cam_y),
+        arrowprops={
+            "arrowstyle": "->,head_width=0.2,head_length=0.1",
+            "color": STYLE["accent1"],
+            "lw": 1.5,
+        },
+        zorder=4,
+    )
+
+    # Reflected view ray (from reflected camera up through water to scene)
+    ax.annotate(
+        "",
+        xy=(2.6, 1.0),
+        xytext=(refl_x, refl_y),
+        arrowprops={
+            "arrowstyle": "->,head_width=0.2,head_length=0.1",
+            "color": STYLE["accent1"],
+            "lw": 1.5,
+            "alpha": 0.4,
+            "linestyle": "--",
+        },
+        zorder=3,
+    )
+
+    # =====================================================================
+    # RIGHT HALF: Camera below water (broken)
+    # =====================================================================
+    cam2_x, cam2_y = 10.0, -2.0
+    refl2_x, refl2_y = 10.0, 2.0  # mirrored to above water
+
+    # Camera icon (below water)
+    ax.plot(cam2_x, cam2_y, "s", color=broken_color, ms=14, zorder=6)
+    ax.text(
+        cam2_x,
+        cam2_y - 0.6,
+        "Camera",
+        color=broken_color,
+        fontsize=10,
+        fontweight="bold",
+        ha="center",
+        va="top",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax.text(
+        cam2_x,
+        cam2_y + 0.5,
+        "Y = \u22122",
+        color=broken_color,
+        fontsize=8,
+        ha="center",
+        va="bottom",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    # Reflected camera (above water — wrong!)
+    ax.plot(refl2_x, refl2_y, "s", color=broken_color, ms=12, alpha=0.5, zorder=6)
+    ax.text(
+        refl2_x,
+        refl2_y + 0.6,
+        "Reflected\nCamera",
+        color=broken_color,
+        fontsize=9,
+        alpha=0.7,
+        ha="center",
+        va="bottom",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+    ax.text(
+        refl2_x,
+        refl2_y - 0.5,
+        "Y = 2",
+        color=broken_color,
+        fontsize=8,
+        alpha=0.7,
+        ha="center",
+        va="top",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    # Mirror line
+    ax.plot(
+        [cam2_x, refl2_x],
+        [cam2_y, refl2_y],
+        "--",
+        color=broken_color,
+        lw=1.5,
+        alpha=0.4,
+        zorder=3,
+    )
+
+    # Oblique clip region (above water — clipping the wrong side!)
+    ax.fill_between(
+        [7.5, 12.5],
+        0,
+        5.0,
+        color=broken_color,
+        alpha=0.08,
+        zorder=1,
+        hatch="xx",
+    )
+    ax.text(
+        12.0,
+        2.5,
+        "Clipped\n(wrong!)",
+        color=broken_color,
+        fontsize=8,
+        alpha=0.8,
+        ha="center",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    # X mark
+    ax.text(
+        10.0,
+        5.0,
+        "\u2717  Broken",
+        color=broken_color,
+        fontsize=14,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Scene object (on right side, above water — but gets clipped)
+    rect_right = FancyBboxPatch(
+        (8.2, 1.0),
+        1.4,
+        1.8,
+        boxstyle="round,pad=0.1",
+        facecolor=STYLE["surface"],
+        edgecolor=broken_color,
+        lw=1.5,
+        ls="--",
+        alpha=0.4,
+        zorder=4,
+    )
+    ax.add_patch(rect_right)
+    ax.text(
+        8.9,
+        1.9,
+        "Scene",
+        color=broken_color,
+        fontsize=9,
+        ha="center",
+        va="center",
+        alpha=0.5,
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    # --- Annotations at the bottom ---
+    notes = [
+        (
+            3.0,
+            -4.2,
+            "Reflected camera below surface\n"
+            "Oblique clip removes underwater geometry\n"
+            "Fresnel: N\u00b7V > 0 \u2192 correct blend",
+            valid_color,
+        ),
+        (
+            10.0,
+            -4.2,
+            "Reflected camera above surface\n"
+            "Oblique clip removes above-water geometry\n"
+            "Fresnel: N\u00b7V < 0 \u2192 inverted output",
+            broken_color,
+        ),
+    ]
+    for nx, ny, text, color in notes:
+        ax.text(
+            nx,
+            ny,
+            text,
+            color=color,
+            fontsize=8,
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+
+    fig.suptitle(
+        "Underwater Camera Guard — Why Planar Reflections Require an Above-Water Camera",
+        color=STYLE["text"],
+        fontsize=13,
+        fontweight="bold",
+        y=0.97,
+    )
+
+    fig.tight_layout(rect=(0, 0.02, 1, 0.93))
+    save(fig, "gpu/30-planar-reflections", "underwater_camera_guard.png")

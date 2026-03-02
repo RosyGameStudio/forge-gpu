@@ -122,7 +122,7 @@ def sample_equirect_float(source, u, v):
     Same algorithm as sample_equirect but operates on float data and
     returns a float array (no clamping to uint8).  Used for HDR sources.
     """
-    h, w, c = source.shape
+    h, w, _c = source.shape
 
     px = u * w - 0.5
     py = v * h - 0.5
@@ -236,15 +236,18 @@ def convert(input_path, output_dir, size):
         if source.ndim == 2:
             # Grayscale (H, W) → broadcast to (H, W, 3)
             source = np.stack([source] * 3, axis=-1)
-        elif source.shape[2] == 1:
-            # Single channel (H, W, 1) → broadcast to (H, W, 3)
-            source = np.broadcast_to(source, (source.shape[0], source.shape[1], 3))
-        elif source.shape[2] == 2:
-            # Two channels (H, W, 2) → take first, broadcast to (H, W, 3)
-            source = np.stack([source[:, :, 0]] * 3, axis=-1)
-        elif source.shape[2] >= 3:
-            # Three or more channels → take first three
-            source = source[:, :, :3]
+        elif source.ndim == 3:
+            if source.shape[2] == 1:
+                # Single channel (H, W, 1) → broadcast to (H, W, 3)
+                source = np.broadcast_to(source, (source.shape[0], source.shape[1], 3))
+            elif source.shape[2] == 2:
+                # Two channels (H, W, 2) → take first, broadcast to (H, W, 3)
+                source = np.stack([source[:, :, 0]] * 3, axis=-1)
+            elif source.shape[2] >= 3:
+                # Three or more channels → take first three
+                source = source[:, :, :3]
+        else:
+            sys.exit(f"Unsupported HDR image rank: {source.ndim}")
         print(f"  Source size: {source.shape[1]}x{source.shape[0]} (HDR float)")
     else:
         print(f"Loading: {input_path}")
@@ -278,7 +281,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert equirectangular panorama to cube map faces."
     )
-    parser.add_argument("input", help="Path to equirectangular image (JPG/PNG/HDR)")
+    parser.add_argument("input", help="Path to equirectangular image (JPG/PNG/HDR/EXR)")
     parser.add_argument("output_dir", help="Output directory for face PNGs")
     parser.add_argument(
         "--size",
