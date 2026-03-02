@@ -161,8 +161,10 @@
 /* Rock placement scale — the rocks glTF has transforms that need scaling. */
 #define ROCK_SCALE 6.6f
 
-/* Boat placement. */
-#define BOAT_OFFSET_Y  0.3f
+/* Boat placement — position the boat in open water, away from the cliffs. */
+#define BOAT_POS_X    5.0f
+#define BOAT_POS_Y    0.3f
+#define BOAT_POS_Z    5.0f
 
 /* ── Lesson-local math: reflection matrix ────────────────────────────── */
 
@@ -326,10 +328,12 @@ typedef struct app_state {
     SDL_GPUDevice *device;  /* GPU device for all rendering */
 
     /* Pipelines. */
-    SDL_GPUGraphicsPipeline *scene_pipeline;    /* Blinn-Phong + shadow        */
-    SDL_GPUGraphicsPipeline *shadow_pipeline;   /* depth-only shadow pass      */
-    SDL_GPUGraphicsPipeline *skybox_pipeline;   /* environment cube map        */
-    SDL_GPUGraphicsPipeline *water_pipeline;    /* alpha-blended water surface */
+    SDL_GPUGraphicsPipeline *scene_pipeline;       /* Blinn-Phong + shadow        */
+    SDL_GPUGraphicsPipeline *scene_pipeline_refl;  /* same, CW front face for reflection */
+    SDL_GPUGraphicsPipeline *shadow_pipeline;      /* depth-only shadow pass      */
+    SDL_GPUGraphicsPipeline *skybox_pipeline;      /* environment cube map        */
+    SDL_GPUGraphicsPipeline *skybox_pipeline_refl; /* same, CW front face for reflection */
+    SDL_GPUGraphicsPipeline *water_pipeline;       /* alpha-blended water surface */
 
     /* Render targets. */
     SDL_GPUTexture *reflection_color;  /* offscreen reflection texture */
@@ -1534,10 +1538,21 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.target_info.has_depth_stencil_target   = true;
 
         state->scene_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+        if (!state->scene_pipeline) {
+            SDL_ReleaseGPUShader(device, vert);
+            SDL_ReleaseGPUShader(device, frag);
+            SDL_Log("Failed to create scene pipeline: %s", SDL_GetError());
+            goto init_fail;
+        }
+
+        /* Reflected variant: flip front face so back-face culling works
+         * correctly when the reflection matrix reverses triangle winding. */
+        pi.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
+        state->scene_pipeline_refl = SDL_CreateGPUGraphicsPipeline(device, &pi);
         SDL_ReleaseGPUShader(device, vert);
         SDL_ReleaseGPUShader(device, frag);
-        if (!state->scene_pipeline) {
-            SDL_Log("Failed to create scene pipeline: %s", SDL_GetError());
+        if (!state->scene_pipeline_refl) {
+            SDL_Log("Failed to create scene_pipeline_refl: %s", SDL_GetError());
             goto init_fail;
         }
     }
@@ -1593,10 +1608,20 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.target_info.has_depth_stencil_target   = true;
 
         state->skybox_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+        if (!state->skybox_pipeline) {
+            SDL_ReleaseGPUShader(device, vert);
+            SDL_ReleaseGPUShader(device, frag);
+            SDL_Log("Failed to create skybox pipeline: %s", SDL_GetError());
+            goto init_fail;
+        }
+
+        /* Reflected variant: flip front face for correct culling in reflection. */
+        pi.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
+        state->skybox_pipeline_refl = SDL_CreateGPUGraphicsPipeline(device, &pi);
         SDL_ReleaseGPUShader(device, vert);
         SDL_ReleaseGPUShader(device, frag);
-        if (!state->skybox_pipeline) {
-            SDL_Log("Failed to create skybox pipeline: %s", SDL_GetError());
+        if (!state->skybox_pipeline_refl) {
+            SDL_Log("Failed to create skybox_pipeline_refl: %s", SDL_GetError());
             goto init_fail;
         }
     }
@@ -1935,7 +1960,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     /* ── Model placement matrices ──────────────────────────────────── */
     mat4 boat_placement = mat4_translate(
-        vec3_create(0.0f, BOAT_OFFSET_Y, 0.0f));
+        vec3_create(BOAT_POS_X, BOAT_POS_Y, BOAT_POS_Z));
     mat4 rocks_placement = mat4_scale(
         vec3_create(ROCK_SCALE, ROCK_SCALE, ROCK_SCALE));
 
@@ -2076,16 +2101,19 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 return SDL_APP_FAILURE;
             }
 
-            /* Draw reflected scene: boat, rocks — NOT water, NOT floor. */
-            SDL_BindGPUGraphicsPipeline(refl_pass, state->scene_pipeline);
+            /* Draw reflected scene: boat, rocks — NOT water, NOT floor.
+             * Use the reflected-variant pipelines which flip the front face
+             * to CLOCKWISE, compensating for the winding reversal caused by
+             * the reflection matrix (det = -1). */
+            SDL_BindGPUGraphicsPipeline(refl_pass, state->scene_pipeline_refl);
 
             draw_model_scene(refl_pass, cmd, &state->boat, state,
                              &boat_placement, &reflected_vp, &reflected_cam);
             draw_model_scene(refl_pass, cmd, &state->rocks, state,
                              &rocks_placement, &reflected_vp, &reflected_cam);
 
-            /* Draw skybox in reflection. */
-            SDL_BindGPUGraphicsPipeline(refl_pass, state->skybox_pipeline);
+            /* Draw skybox in reflection (also needs flipped winding). */
+            SDL_BindGPUGraphicsPipeline(refl_pass, state->skybox_pipeline_refl);
             draw_skybox(refl_pass, cmd, state, &reflected_view, &proj);
 
             SDL_EndGPURenderPass(refl_pass);
@@ -2245,8 +2273,12 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->shadow_pipeline);
     if (state->scene_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->scene_pipeline);
+    if (state->scene_pipeline_refl)
+        SDL_ReleaseGPUGraphicsPipeline(state->device, state->scene_pipeline_refl);
     if (state->skybox_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->skybox_pipeline);
+    if (state->skybox_pipeline_refl)
+        SDL_ReleaseGPUGraphicsPipeline(state->device, state->skybox_pipeline_refl);
     if (state->water_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(state->device, state->water_pipeline);
 
