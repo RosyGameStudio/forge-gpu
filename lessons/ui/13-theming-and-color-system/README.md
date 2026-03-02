@@ -637,8 +637,8 @@ WCAG validation results.
 
 - [UI Lesson 12 — Font Scaling and Spacing](../12-font-scaling-and-spacing/)
   covers the scale factor and spacing system that works alongside theming
-- [UI Lesson 05 — Text Rendering](../05-text-rendering/) explains how glyph
-  colors are applied via vertex color, which the theme now controls
+- [UI Lesson 05 — Immediate-Mode Basics](../05-immediate-mode-basics/) explains
+  how glyph colors are applied via vertex color, which the theme now controls
 - [UI Lesson 08 — Layout](../08-layout/) covers the layout system whose
   spacing defaults complement the theme's color defaults
 - [Math Lesson 01 — Vectors](../../math/01-vectors/) provides the float

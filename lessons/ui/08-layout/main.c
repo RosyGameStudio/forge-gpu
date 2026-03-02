@@ -68,6 +68,17 @@
 #define BUTTON_ROW_H     34.0f   /* height of the horizontal button row */
 #define BUTTON_SPACING   10.0f   /* horizontal gap between buttons */
 
+/* ── Label colors (RGBA, float) ─────────────────────────────────────────── */
+#define TITLE_LABEL_R   0.70f  /* soft blue-white for title text */
+#define TITLE_LABEL_G   0.80f
+#define TITLE_LABEL_B   0.90f
+#define TITLE_LABEL_A   1.00f
+
+#define STATUS_LABEL_R  0.90f  /* warm yellow for status text */
+#define STATUS_LABEL_G  0.90f
+#define STATUS_LABEL_B  0.60f
+#define STATUS_LABEL_A  1.00f
+
 /* ── Background clear color (dark slate, same as lessons 05-07) ──────────── */
 #define BG_CLEAR_R      0.08f
 #define BG_CLEAR_G      0.08f
@@ -181,7 +192,8 @@ static void declare_settings_panel_layout(ForgeUiContext *ctx,
 
     /* Title label */
     forge_ui_ctx_label_colored_layout(ctx, "Settings", LABEL_HEIGHT,
-                              0.70f, 0.80f, 0.90f, 1.00f);
+                              TITLE_LABEL_R, TITLE_LABEL_G,
+                              TITLE_LABEL_B, TITLE_LABEL_A);
 
     /* Three checkboxes stacked vertically (return value = toggled this
      * frame; we don't need per-frame toggle info in this demo because
@@ -251,7 +263,8 @@ static void declare_settings_panel_manual(ForgeUiContext *ctx,
         float text_y = cy + (LABEL_HEIGHT - ctx->atlas->pixel_height) * 0.5f
                        + ascender_px;
         forge_ui_ctx_label_colored(ctx, "Settings", cx, text_y,
-                           0.70f, 0.80f, 0.90f, 1.00f);
+                           TITLE_LABEL_R, TITLE_LABEL_G,
+                           TITLE_LABEL_B, TITLE_LABEL_A);
         cy += LABEL_HEIGHT + WIDGET_SPACING;
     }
 
@@ -544,7 +557,8 @@ int main(int argc, char *argv[])
 
             forge_ui_ctx_label_colored(&ctx, status_buf,
                                PANEL_X, PANEL_Y + PANEL_H + STATUS_LABEL_GAP + ascender_px,
-                               0.90f, 0.90f, 0.60f, 1.00f);
+                               STATUS_LABEL_R, STATUS_LABEL_G,
+                               STATUS_LABEL_B, STATUS_LABEL_A);
         }
 
         forge_ui_ctx_end(&ctx);

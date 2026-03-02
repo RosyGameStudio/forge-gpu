@@ -239,6 +239,60 @@ static void test_validate_null_theme(void)
     ASSERT_EQ_INT(result, -1);
 }
 
+/* ── Test: luminance returns 0 for NaN inputs ─────────────────────────── */
+
+static void test_relative_luminance_nan(void)
+{
+    TEST("relative_luminance: NaN inputs return 0 (not NaN)");
+    float lum_r = forge_ui_theme_relative_luminance(NAN, 0.5f, 0.5f);
+    float lum_g = forge_ui_theme_relative_luminance(0.5f, NAN, 0.5f);
+    float lum_b = forge_ui_theme_relative_luminance(0.5f, 0.5f, NAN);
+    ASSERT_NEAR(lum_r, 0.0f, 0.001f);
+    ASSERT_NEAR(lum_g, 0.0f, 0.001f);
+    ASSERT_NEAR(lum_b, 0.0f, 0.001f);
+}
+
+static void test_relative_luminance_inf(void)
+{
+    TEST("relative_luminance: Infinity inputs return 0 (not Inf)");
+    float lum_pos = forge_ui_theme_relative_luminance(INFINITY, 0.5f, 0.5f);
+    float lum_neg = forge_ui_theme_relative_luminance(-INFINITY, 0.5f, 0.5f);
+    ASSERT_NEAR(lum_pos, 0.0f, 0.001f);
+    ASSERT_NEAR(lum_neg, 0.0f, 0.001f);
+}
+
+static void test_contrast_ratio_nan(void)
+{
+    TEST("contrast_ratio: NaN input treated as black (luminance 0)");
+    /* NaN red channel -> luminance returns 0 (black).
+     * Black vs white -> ratio ~21:1.  The key property: the result is
+     * a finite, valid number — not NaN or Inf. */
+    float ratio = forge_ui_theme_contrast_ratio(NAN, 0.0f, 0.0f,
+                                                 1.0f, 1.0f, 1.0f);
+    ASSERT_TRUE(isfinite(ratio));
+    ASSERT_NEAR(ratio, 21.0f, 0.1f);
+}
+
+static void test_contrast_ratio_inf(void)
+{
+    TEST("contrast_ratio: Infinity input treated as black (luminance 0)");
+    /* Infinity red channel -> luminance returns 0 (black).
+     * Black vs white -> ratio ~21:1. */
+    float ratio = forge_ui_theme_contrast_ratio(INFINITY, 0.0f, 0.0f,
+                                                 1.0f, 1.0f, 1.0f);
+    ASSERT_TRUE(isfinite(ratio));
+    ASSERT_NEAR(ratio, 21.0f, 0.1f);
+}
+
+static void test_validate_nan_theme_fails(void)
+{
+    TEST("validate: theme with NaN color channel reports failures");
+    ForgeUiTheme bad = forge_ui_theme_default();
+    bad.text.r = NAN;
+    int failures = forge_ui_theme_validate(&bad);
+    ASSERT_TRUE(failures > 0);
+}
+
 /* ── main ────────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
@@ -252,6 +306,13 @@ int main(int argc, char *argv[])
     }
 
     SDL_Log("=== UI Theme Contrast Tests ===");
+
+    /* NaN/Inf guards */
+    test_relative_luminance_nan();
+    test_relative_luminance_inf();
+    test_contrast_ratio_nan();
+    test_contrast_ratio_inf();
+    test_validate_nan_theme_fails();
 
     test_relative_luminance_black();
     test_relative_luminance_white();

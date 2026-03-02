@@ -125,6 +125,12 @@ static inline ForgeUiTheme forge_ui_theme_default(void)
  * The returned value is in [0, 1], where 0 is black and 1 is white. */
 static inline float forge_ui_theme_relative_luminance(float r, float g, float b)
 {
+    /* Reject non-finite inputs: NaN comparisons always return false,
+     * so NaN would bypass the clamp logic and propagate through the
+     * sRGB linearization, producing NaN luminance that silently passes
+     * contrast validation (NaN < threshold is false). */
+    if (!isfinite(r) || !isfinite(g) || !isfinite(b)) return 0.0f;
+
     /* Clamp inputs to valid sRGB range [0, 1] to prevent undefined
      * behavior from powf with negative bases or out-of-range values. */
     if (r < 0.0f) r = 0.0f; else if (r > 1.0f) r = 1.0f;
@@ -152,6 +158,11 @@ static inline float forge_ui_theme_contrast_ratio(float r1, float g1, float b1,
 {
     float l1 = forge_ui_theme_relative_luminance(r1, g1, b1);
     float l2 = forge_ui_theme_relative_luminance(r2, g2, b2);
+
+    /* If either luminance is non-finite (should not happen after the
+     * guard in relative_luminance, but defensive), return 0 so the
+     * caller treats the pair as failing contrast validation. */
+    if (!isfinite(l1) || !isfinite(l2)) return 0.0f;
 
     /* Ensure l1 >= l2 (lighter on top) */
     if (l2 > l1) {

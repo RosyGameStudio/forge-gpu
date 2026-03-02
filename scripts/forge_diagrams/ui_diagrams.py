@@ -10106,6 +10106,25 @@ def diagram_scaled_dimensions_formula():
 
 LESSON_13_PATH = "ui/13-theming-and-color-system"
 
+# Shared hex palette for all Lesson 13 diagrams.  Each key is a theme slot
+# name; the value is the canonical hex color for the default dark theme.
+THEME_SLOTS = {
+    "bg": "#1a1a2e",
+    "surface": "#252545",
+    "surface_hot": "#3f3f55",
+    "surface_active": "#181838",
+    "title_bar": "#323250",
+    "title_bar_text": "#e0e0f0",
+    "text": "#e0e0f0",
+    "text_dim": "#8888aa",
+    "accent": "#4fc3f7",
+    "accent_hot": "#5fd3ff",
+    "border": "#2a2a4a",
+    "border_focused": "#4fc3f7",
+    "scrollbar_track": "#0d0d1b",
+    "cursor": "#4fc3f7",
+}
+
 
 def diagram_theme_color_slots():
     """Palette card with 14 colored rects grouped into 4 categories:
@@ -10128,44 +10147,44 @@ def diagram_theme_color_slots():
         path_effects=stroke,
     )
 
-    # Define color slots grouped by category
+    # Define color slots grouped by category (hex values from THEME_SLOTS)
     categories = [
         (
             "Backgrounds",
             STYLE["accent1"],
             [
-                ("bg", "#1a1a2e"),
-                ("surface", "#252545"),
-                ("surface_hot", "#3f3f55"),
-                ("surface_active", "#181838"),
-                ("title_bar", "#323250"),
+                ("bg", THEME_SLOTS["bg"]),
+                ("surface", THEME_SLOTS["surface"]),
+                ("surface_hot", THEME_SLOTS["surface_hot"]),
+                ("surface_active", THEME_SLOTS["surface_active"]),
+                ("title_bar", THEME_SLOTS["title_bar"]),
             ],
         ),
         (
             "Text",
             STYLE["accent3"],
             [
-                ("title_bar_text", "#e0e0f0"),
-                ("text", "#e0e0f0"),
-                ("text_dim", "#8888aa"),
+                ("title_bar_text", THEME_SLOTS["title_bar_text"]),
+                ("text", THEME_SLOTS["text"]),
+                ("text_dim", THEME_SLOTS["text_dim"]),
             ],
         ),
         (
             "Accents",
             STYLE["accent2"],
             [
-                ("accent", "#4fc3f7"),
-                ("accent_hot", "#5fd3ff"),
+                ("accent", THEME_SLOTS["accent"]),
+                ("accent_hot", THEME_SLOTS["accent_hot"]),
             ],
         ),
         (
             "Chrome",
             STYLE["accent4"],
             [
-                ("border", "#2a2a4a"),
-                ("border_focused", "#4fc3f7"),
-                ("scrollbar_track", "#0d0d1b"),
-                ("cursor", "#4fc3f7"),
+                ("border", THEME_SLOTS["border"]),
+                ("border_focused", THEME_SLOTS["border_focused"]),
+                ("scrollbar_track", THEME_SLOTS["scrollbar_track"]),
+                ("cursor", THEME_SLOTS["cursor"]),
             ],
         ),
     ]
@@ -10360,13 +10379,13 @@ def diagram_contrast_ratio_scale():
         w = 20.0 / n_segments
         # Color ramp: dark red -> yellow -> green
         t = (ratio - 1.0) / 20.0
-        if t < 0.225:
+        if t < 0.175:
             # 1:1 to 4.5:1 — red to orange
-            frac = t / 0.225
+            frac = t / 0.175
             r, g, b = 0.6 + 0.3 * frac, 0.15 + 0.55 * frac, 0.1
         elif t < 0.3:
             # 4.5:1 to 7:1 — orange to yellow
-            frac = (t - 0.225) / 0.075
+            frac = (t - 0.175) / 0.125
             r, g, b = 0.9, 0.7 + 0.2 * frac, 0.1 + 0.2 * frac
         else:
             # 7:1 to 21:1 — yellow to green
@@ -10763,26 +10782,39 @@ def diagram_adjacent_pair_matrix():
         darker = min(l1, l2)
         return (lighter + 0.05) / (darker + 0.05)
 
-    # Define the 17 tested pairs
+    # Define the 17 tested pairs (hex values from THEME_SLOTS)
+    S = THEME_SLOTS
     pairs = [
-        ("text", "#e0e0f0", "bg", "#1a1a2e"),
-        ("text", "#e0e0f0", "surface", "#252545"),
-        ("text_dim", "#8888aa", "bg", "#1a1a2e"),
-        ("text_dim", "#8888aa", "surface", "#252545"),
-        ("accent", "#4fc3f7", "bg", "#1a1a2e"),
-        ("accent", "#4fc3f7", "surface", "#252545"),
-        ("accent_hot", "#5fd3ff", "bg", "#1a1a2e"),
-        ("accent_hot", "#5fd3ff", "surface", "#252545"),
-        ("title_bar_text", "#e0e0f0", "title_bar", "#323250"),
-        ("text", "#e0e0f0", "surface_hot", "#3f3f55"),
-        ("text", "#e0e0f0", "surface_active", "#181838"),
-        ("accent", "#4fc3f7", "surface_hot", "#3f3f55"),
-        ("accent", "#4fc3f7", "surface_active", "#181838"),
-        ("text_dim", "#8888aa", "surface_hot", "#3f3f55"),
-        ("cursor", "#4fc3f7", "bg", "#1a1a2e"),
-        ("text", "#e0e0f0", "scrollbar_track", "#0d0d1b"),
-        ("border_focused", "#4fc3f7", "surface", "#252545"),
+        ("text", S["text"], "bg", S["bg"]),
+        ("text", S["text"], "surface", S["surface"]),
+        ("text_dim", S["text_dim"], "bg", S["bg"]),
+        ("text_dim", S["text_dim"], "surface", S["surface"]),
+        ("accent", S["accent"], "bg", S["bg"]),
+        ("accent", S["accent"], "surface", S["surface"]),
+        ("accent_hot", S["accent_hot"], "bg", S["bg"]),
+        ("accent_hot", S["accent_hot"], "surface", S["surface"]),
+        ("title_bar_text", S["title_bar_text"], "title_bar", S["title_bar"]),
+        ("text", S["text"], "surface_hot", S["surface_hot"]),
+        ("text", S["text"], "surface_active", S["surface_active"]),
+        ("accent", S["accent"], "surface_hot", S["surface_hot"]),
+        ("accent", S["accent"], "surface_active", S["surface_active"]),
+        ("text_dim", S["text_dim"], "surface_hot", S["surface_hot"]),
+        ("cursor", S["cursor"], "bg", S["bg"]),
+        ("text", S["text"], "scrollbar_track", S["scrollbar_track"]),
+        ("border_focused", S["border_focused"], "surface", S["surface"]),
     ]
+
+    # Non-text UI component pairs use the WCAG 3:1 threshold instead of 4.5:1.
+    # These are borders, scrollbar elements, and accent indicators that are not
+    # used to render readable text.
+    _NON_TEXT_PAIRS = {
+        ("accent_hot", "surface_hot"),
+        ("border", "bg"),
+        ("border_focused", "surface"),
+        ("accent", "scrollbar_track"),
+        ("accent_hot", "scrollbar_track"),
+        ("surface_hot", "scrollbar_track"),
+    }
 
     # Column positions
     col_x = [0.5, 3.0, 5.5, 8.5, 10.5]
@@ -10814,7 +10846,9 @@ def diagram_adjacent_pair_matrix():
     for i, (fg_name, fg_hex, bg_name, bg_hex) in enumerate(pairs):
         y = header_y - 1.0 - i * row_h
         ratio = contrast_ratio(fg_hex, bg_hex)
-        passes = ratio >= 4.5
+        is_non_text = (fg_name, bg_name) in _NON_TEXT_PAIRS
+        threshold = 3.0 if is_non_text else 4.5
+        passes = ratio >= threshold
         status_text = "PASS" if passes else "FAIL"
         status_color = STYLE["accent3"] if passes else STYLE["accent2"]
 

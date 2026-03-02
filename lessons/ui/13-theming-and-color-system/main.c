@@ -66,6 +66,13 @@
 /* Maximum number of validation pairs to check */
 #define MAX_VALIDATION_PAIRS  20
 
+/* Expected pair count from build_validation_pairs().  This MUST match the
+ * number of pairs in forge_ui_theme_validate() so the two tables stay in
+ * sync.  If you add a pair to either list, update this constant and the
+ * other list.  The runtime assertion in render_frame_bad_theme() will
+ * catch any mismatch. */
+#define EXPECTED_VALIDATION_PAIR_COUNT  17
+
 /* Bad theme failure label colors -- red for FAIL, green for PASS.
  * These are applied to the result labels so users can immediately
  * distinguish passing and failing contrast checks. */
@@ -237,9 +244,11 @@ static bool render_frame_palette(ForgeRasterBuffer *fb,
         for (int s = 0; s < grp->count; s++) {
             float swatch_x = MARGIN + (float)s * (SWATCH_SIZE + SWATCH_GAP);
 
-            /* Draw the colored swatch rectangle.  We use the internal
-             * rect emitter because there is no public "draw colored rect"
-             * API -- the lesson includes the header directly. */
+            /* Draw the colored swatch rectangle.  We deliberately use
+             * internal emitters here because the public API has no
+             * "draw colored rect" primitive -- adding one just for this
+             * lesson would be over-engineering.  The lesson already
+             * includes forge_ui_ctx.h which exposes these symbols. */
             ForgeUiRect swatch_rect = {
                 swatch_x, swatch_y, SWATCH_SIZE, SWATCH_SIZE
             };
@@ -552,6 +561,14 @@ static bool render_frame_bad_theme(ForgeRasterBuffer *fb,
     ValidationPair pairs[MAX_VALIDATION_PAIRS];
     int pair_count = build_validation_pairs(&bad, pairs,
                                              MAX_VALIDATION_PAIRS);
+
+    /* Sanity check: our local pair table must stay in sync with the
+     * canonical validator in forge_ui_theme_validate().  If someone adds
+     * a pair to one list but not the other, this will fire and the
+     * mismatch can be fixed before it ships. */
+    SDL_assert(pair_count == EXPECTED_VALIDATION_PAIR_COUNT &&
+               "build_validation_pairs pair count drifted from "
+               "EXPECTED_VALIDATION_PAIR_COUNT -- update both lists");
 
     float row_y = MARGIN + 2.0f * LABEL_HEIGHT + SWATCH_GAP;
 

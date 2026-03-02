@@ -837,10 +837,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     if (forge_ui_wctx_window_begin(&state->ui_wctx,
                                     "UI Demo", &state->demo_window)) {
 
-        /* Title label. */
+        /* Title label (accent color from theme). */
         forge_ui_ctx_label_colored_layout(&state->ui_ctx, "Hello, GPU UI!",
                                   LABEL_HEIGHT,
-                                  0.310f, 0.765f, 0.969f, 1.00f);
+                                  state->ui_ctx.theme.accent.r,
+                                  state->ui_ctx.theme.accent.g,
+                                  state->ui_ctx.theme.accent.b,
+                                  state->ui_ctx.theme.accent.a);
 
         /* Click counter label -- shows how many times the button has
          * been pressed, demonstrating persistent widget state. */
@@ -849,7 +852,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                      "Clicks: %d", state->click_count);
         forge_ui_ctx_label_colored_layout(&state->ui_ctx, click_label,
                                   LABEL_HEIGHT,
-                                  0.533f, 0.533f, 0.667f, 1.00f);
+                                  state->ui_ctx.theme.text_dim.r,
+                                  state->ui_ctx.theme.text_dim.g,
+                                  state->ui_ctx.theme.text_dim.b,
+                                  state->ui_ctx.theme.text_dim.a);
 
         /* Button: increments click counter on each press. */
         if (forge_ui_ctx_button_layout(&state->ui_ctx,
@@ -875,7 +881,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                      "Value: %.2f", (double)state->slider_value);
         forge_ui_ctx_label_colored_layout(&state->ui_ctx, slider_label,
                                   LABEL_HEIGHT,
-                                  0.533f, 0.533f, 0.667f, 1.00f);
+                                  state->ui_ctx.theme.text_dim.r,
+                                  state->ui_ctx.theme.text_dim.g,
+                                  state->ui_ctx.theme.text_dim.b,
+                                  state->ui_ctx.theme.text_dim.a);
 
         /* Text input: editable single-line field with blinking cursor. */
         ForgeUiRect ti_rect = forge_ui_ctx_layout_next(&state->ui_ctx,

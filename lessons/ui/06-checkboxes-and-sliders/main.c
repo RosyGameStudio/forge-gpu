@@ -67,6 +67,22 @@
 #define SL_MAX         100.0f   /* maximum volume */
 #define SL_INITIAL      50.0f   /* initial volume value */
 
+/* ── Label colors (RGBA, float) ─────────────────────────────────────────── */
+#define TITLE_LABEL_R   0.70f  /* soft blue-white for title text */
+#define TITLE_LABEL_G   0.80f
+#define TITLE_LABEL_B   0.90f
+#define TITLE_LABEL_A   1.00f
+
+#define AUX_LABEL_R     0.75f  /* muted grey for auxiliary labels (e.g. "Volume:") */
+#define AUX_LABEL_G     0.75f
+#define AUX_LABEL_B     0.80f
+#define AUX_LABEL_A     1.00f
+
+#define STATUS_LABEL_R  0.90f  /* warm yellow for status text */
+#define STATUS_LABEL_G  0.90f
+#define STATUS_LABEL_B  0.60f
+#define STATUS_LABEL_A  1.00f
+
 /* ── Background clear color (dark slate, same as lesson 05) ──────────────── */
 #define BG_CLEAR_R      0.08f
 #define BG_CLEAR_G      0.08f
@@ -325,7 +341,8 @@ int main(int argc, char *argv[])
         /* Title label */
         forge_ui_ctx_label_colored(&ctx, "Checkboxes & Sliders",
                            MARGIN, MARGIN + ascender_px,
-                           0.70f, 0.80f, 0.90f, 1.00f);
+                           TITLE_LABEL_R, TITLE_LABEL_G,
+                           TITLE_LABEL_B, TITLE_LABEL_A);
 
         /* Checkbox: "Enable Audio" */
         bool cb_toggled = forge_ui_ctx_checkbox(
@@ -333,7 +350,8 @@ int main(int argc, char *argv[])
 
         /* Slider name label: "Volume:" */
         forge_ui_ctx_label_colored(&ctx, "Volume:", MARGIN, sl_label_y,
-                           0.75f, 0.75f, 0.80f, 1.00f);
+                           AUX_LABEL_R, AUX_LABEL_G,
+                           AUX_LABEL_B, AUX_LABEL_A);
 
         /* Slider: volume control */
         bool sl_changed = forge_ui_ctx_slider(
@@ -348,7 +366,8 @@ int main(int argc, char *argv[])
                            sl_rect.x + sl_rect.w + SL_VALUE_GAP,
                            sl_rect.y + (sl_rect.h - atlas.pixel_height) * 0.5f
                                + ascender_px,
-                           0.75f, 0.75f, 0.80f, 1.00f);
+                           AUX_LABEL_R, AUX_LABEL_G,
+                           AUX_LABEL_B, AUX_LABEL_A);
 
         /* Status label */
         const char *status = "Hover and click to interact";
@@ -364,7 +383,8 @@ int main(int argc, char *argv[])
         }
 
         forge_ui_ctx_label_colored(&ctx, status, MARGIN, status_y + ascender_px,
-                           0.90f, 0.90f, 0.60f, 1.00f);
+                           STATUS_LABEL_R, STATUS_LABEL_G,
+                           STATUS_LABEL_B, STATUS_LABEL_A);
 
         /* End frame: finalize hot/active transitions */
         forge_ui_ctx_end(&ctx);

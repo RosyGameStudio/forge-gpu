@@ -104,6 +104,12 @@
 
 #define CHECKBOX_COUNT      5
 
+/* ── Label colors (RGBA, float) ─────────────────────────────────────────── */
+#define INFO_LABEL_R    0.80f  /* light blue-grey for informational content text */
+#define INFO_LABEL_G    0.85f
+#define INFO_LABEL_B    0.90f
+#define INFO_LABEL_A    1.00f
+
 /* ── Background clear color (dark slate) ─────────────────────────────────── */
 #define BG_CLEAR_R      0.08f
 #define BG_CLEAR_G      0.08f
@@ -223,22 +229,26 @@ static void declare_windows(ForgeUiWindowContext *wctx,
         SDL_snprintf(buf, sizeof(buf), "V-Sync: %s",
                      checkboxes[0] ? "ON" : "OFF");
         forge_ui_ctx_label_colored_layout(ctx, buf, LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
 
         SDL_snprintf(buf, sizeof(buf), "Fullscreen: %s",
                      checkboxes[1] ? "ON" : "OFF");
         forge_ui_ctx_label_colored_layout(ctx, buf, LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
 
         SDL_snprintf(buf, sizeof(buf), "AA: %s",
                      checkboxes[2] ? "ON" : "OFF");
         forge_ui_ctx_label_colored_layout(ctx, buf, LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
 
         SDL_snprintf(buf, sizeof(buf), "Slider: %.0f",
                      (double)*slider_val);
         forge_ui_ctx_label_colored_layout(ctx, buf, LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
 
         forge_ui_wctx_window_end(wctx);
     }
@@ -248,40 +258,52 @@ static void declare_windows(ForgeUiWindowContext *wctx,
                                     info_win)) {
         forge_ui_ctx_label_colored_layout(ctx, "Welcome to forge-gpu!",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "This is UI Lesson 10.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "Windows can be dragged",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "by their title bar.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "Click to bring to front.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "Collapse with the toggle.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "Z-order controls overlap.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "Scroll for more content.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "Input respects z-order.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "Panels become windows.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "The final container.",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_ctx_label_colored_layout(ctx, "Build amazing UIs!",
                                    LABEL_HEIGHT,
-                                   0.80f, 0.85f, 0.90f, 1.00f);
+                                   INFO_LABEL_R, INFO_LABEL_G,
+                                   INFO_LABEL_B, INFO_LABEL_A);
         forge_ui_wctx_window_end(wctx);
     }
 }

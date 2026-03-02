@@ -1366,6 +1366,13 @@ static inline void forge_ui_ctx_label_colored(ForgeUiContext *ctx,
 {
     if (!ctx || !text || !ctx->atlas) return;
     if (!isfinite(x) || !isfinite(y)) return;
+    if (!isfinite(r) || !isfinite(g) || !isfinite(b) || !isfinite(a)) return;
+
+    /* Clamp to valid [0, 1] range to prevent invalid vertex color data */
+    if (r < 0.0f) r = 0.0f; else if (r > 1.0f) r = 1.0f;
+    if (g < 0.0f) g = 0.0f; else if (g > 1.0f) g = 1.0f;
+    if (b < 0.0f) b = 0.0f; else if (b > 1.0f) b = 1.0f;
+    if (a < 0.0f) a = 0.0f; else if (a > 1.0f) a = 1.0f;
 
     ForgeUiTextOpts opts = { 0.0f, FORGE_UI_TEXT_ALIGN_LEFT, r, g, b, a };
     ForgeUiTextLayout layout;
@@ -1383,6 +1390,30 @@ static inline void forge_ui_ctx_label(ForgeUiContext *ctx,
     forge_ui_ctx_label_colored(ctx, text, x, y,
                                ctx->theme.text.r, ctx->theme.text.g,
                                ctx->theme.text.b, ctx->theme.text.a);
+}
+
+/* ── Internal: interaction-state color selection ─────────────────────── */
+
+/* Return the surface color for a widget's current interaction state.
+ * Centralizes the active/hot/normal branching repeated in button,
+ * checkbox, and text input widgets. */
+static inline ForgeUiColor forge_ui__surface_color(const ForgeUiContext *ctx,
+                                                    Uint32 id)
+{
+    if (ctx->active == id) return ctx->theme.surface_active;
+    if (ctx->hot    == id) return ctx->theme.surface_hot;
+    return ctx->theme.surface;
+}
+
+/* Return the accent color for a widget's current interaction state.
+ * Used by slider thumbs and scrollbar thumbs where the color series
+ * is accent (active) → accent_hot (hovered) → surface_hot (idle). */
+static inline ForgeUiColor forge_ui__accent_color(const ForgeUiContext *ctx,
+                                                   Uint32 id)
+{
+    if (ctx->active == id) return ctx->theme.accent;
+    if (ctx->hot    == id) return ctx->theme.accent_hot;
+    return ctx->theme.surface_hot;
 }
 
 static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
@@ -1428,29 +1459,10 @@ static inline bool forge_ui_ctx_button(ForgeUiContext *ctx,
     }
 
     /* ── Choose background color based on state ───────────────────────── */
-    float bg_r, bg_g, bg_b, bg_a;
-    if (ctx->active == id) {
-        /* Pressed state -- darker to give visual feedback */
-        bg_r = ctx->theme.surface_active.r;
-        bg_g = ctx->theme.surface_active.g;
-        bg_b = ctx->theme.surface_active.b;
-        bg_a = ctx->theme.surface_active.a;
-    } else if (ctx->hot == id) {
-        /* Hovered state -- lighter to indicate interactivity */
-        bg_r = ctx->theme.surface_hot.r;
-        bg_g = ctx->theme.surface_hot.g;
-        bg_b = ctx->theme.surface_hot.b;
-        bg_a = ctx->theme.surface_hot.a;
-    } else {
-        /* Normal state */
-        bg_r = ctx->theme.surface.r;
-        bg_g = ctx->theme.surface.g;
-        bg_b = ctx->theme.surface.b;
-        bg_a = ctx->theme.surface.a;
-    }
+    ForgeUiColor bg = forge_ui__surface_color(ctx, id);
 
     /* ── Emit background rectangle ────────────────────────────────────── */
-    forge_ui__emit_rect(ctx, rect, bg_r, bg_g, bg_b, bg_a);
+    forge_ui__emit_rect(ctx, rect, bg.r, bg.g, bg.b, bg.a);
 
     /* ── Extract display text (strip ## suffix if present) ────────────── */
     const char *disp_end = forge_ui__display_end(text);
@@ -1521,17 +1533,7 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
     }
 
     /* ── Box color reflects interaction state ─────────────────────────── */
-    float box_r, box_g, box_b, box_a;
-    if (ctx->active == id) {
-        box_r = ctx->theme.surface_active.r;  box_g = ctx->theme.surface_active.g;
-        box_b = ctx->theme.surface_active.b;  box_a = ctx->theme.surface_active.a;
-    } else if (ctx->hot == id) {
-        box_r = ctx->theme.surface_hot.r;  box_g = ctx->theme.surface_hot.g;
-        box_b = ctx->theme.surface_hot.b;  box_a = ctx->theme.surface_hot.a;
-    } else {
-        box_r = ctx->theme.surface.r;  box_g = ctx->theme.surface.g;
-        box_b = ctx->theme.surface.b;  box_a = ctx->theme.surface.a;
-    }
+    ForgeUiColor box_c = forge_ui__surface_color(ctx, id);
 
     /* ── Compute scaled checkbox dimensions ──────────────────────────── */
     float cb_size = FORGE_UI_SCALED(ctx, ctx->spacing.checkbox_box_size);
@@ -1542,7 +1544,7 @@ static inline bool forge_ui_ctx_checkbox(ForgeUiContext *ctx,
     ForgeUiRect box_rect = { box_x, box_y, cb_size, cb_size };
 
     /* ── Outer box — border with hover feedback via box color ────────── */
-    forge_ui__emit_rect(ctx, box_rect, box_r, box_g, box_b, box_a);
+    forge_ui__emit_rect(ctx, box_rect, box_c.r, box_c.g, box_c.b, box_c.a);
 
     /* ── Inner fill — solid rect rather than a glyph keeps the renderer
      *    purely quad-based with no dedicated checkmark in the atlas ──── */
@@ -1678,17 +1680,7 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
                         ctx->theme.border.b, ctx->theme.border.a);
 
     /* ── Choose thumb color based on state ────────────────────────────── */
-    float th_r, th_g, th_b, th_a;
-    if (ctx->active == id) {
-        th_r = ctx->theme.accent.r;      th_g = ctx->theme.accent.g;
-        th_b = ctx->theme.accent.b;      th_a = ctx->theme.accent.a;
-    } else if (ctx->hot == id) {
-        th_r = ctx->theme.accent_hot.r;  th_g = ctx->theme.accent_hot.g;
-        th_b = ctx->theme.accent_hot.b;  th_a = ctx->theme.accent_hot.a;
-    } else {
-        th_r = ctx->theme.surface_hot.r; th_g = ctx->theme.surface_hot.g;
-        th_b = ctx->theme.surface_hot.b; th_a = ctx->theme.surface_hot.a;
-    }
+    ForgeUiColor th_c = forge_ui__accent_color(ctx, id);
 
     /* ── Emit thumb rectangle ─────────────────────────────────────────── */
     /* The thumb center is at track_x + t * track_w.  Subtract half the
@@ -1698,7 +1690,7 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
     float thumb_y = rect.y + (rect.h - sl_thumb_h) * 0.5f;
     ForgeUiRect thumb_rect = { thumb_x, thumb_y,
                                sl_thumb_w, sl_thumb_h };
-    forge_ui__emit_rect(ctx, thumb_rect, th_r, th_g, th_b, th_a);
+    forge_ui__emit_rect(ctx, thumb_rect, th_c.r, th_c.g, th_c.b, th_c.a);
 
     return changed;
 }
@@ -2484,23 +2476,13 @@ static inline void forge_ui_ctx_panel_end(ForgeUiContext *ctx)
     }
 
     /* ── Choose thumb color by state ──────────────────────────────────── */
-    float th_r, th_g, th_b, th_a;
-    if (ctx->active == sb_id) {
-        th_r = ctx->theme.accent.r;      th_g = ctx->theme.accent.g;
-        th_b = ctx->theme.accent.b;      th_a = ctx->theme.accent.a;
-    } else if (ctx->hot == sb_id) {
-        th_r = ctx->theme.accent_hot.r;  th_g = ctx->theme.accent_hot.g;
-        th_b = ctx->theme.accent_hot.b;  th_a = ctx->theme.accent_hot.a;
-    } else {
-        th_r = ctx->theme.surface_hot.r; th_g = ctx->theme.surface_hot.g;
-        th_b = ctx->theme.surface_hot.b; th_a = ctx->theme.surface_hot.a;
-    }
+    ForgeUiColor th_c = forge_ui__accent_color(ctx, sb_id);
 
     /* Recompute thumb_y after potential drag update */
     t = (max_scroll > 0.0f) ? *scroll_y / max_scroll : 0.0f;
     thumb_y = track_y + t * thumb_range;
     thumb_rect = (ForgeUiRect){ track_x, thumb_y, track_w, thumb_h };
-    forge_ui__emit_rect(ctx, thumb_rect, th_r, th_g, th_b, th_a);
+    forge_ui__emit_rect(ctx, thumb_rect, th_c.r, th_c.g, th_c.b, th_c.a);
 
     /* ── Pop the ID scope pushed by panel_begin ────────────────────────── */
     forge_ui_pop_id(ctx);
