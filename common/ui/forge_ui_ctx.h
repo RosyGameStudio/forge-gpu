@@ -107,7 +107,7 @@
 /* General widget padding.  Used as the default inset inside widget
  * backgrounds (button text from edges, etc.) and as the base value for
  * ForgeUiSpacing.widget_padding. */
-#define FORGE_UI_WIDGET_PADDING   8.0f
+#define FORGE_UI_WIDGET_PADDING  10.0f
 
 /* Box outline colors by state — brighter than panel BG so the unchecked
  * box is clearly visible against the panel body.  (RGBA floats in [0, 1]) */
@@ -179,7 +179,7 @@
  * edge so characters are readable near the border.  The cursor bar is
  * thin (2 px) to mimic a standard text insertion caret.  The border is
  * 1 px to provide a focused-state indicator without obscuring content. */
-#define FORGE_UI_TI_PADDING       6.0f   /* left padding in pixels before text starts */
+#define FORGE_UI_TI_PADDING       8.0f   /* left padding in pixels before text starts */
 #define FORGE_UI_TI_CURSOR_WIDTH  2.0f   /* cursor bar width in pixels */
 #define FORGE_UI_TI_BORDER_WIDTH  1.0f   /* focused border edge width in pixels */
 
@@ -228,8 +228,8 @@
 /* ── Panel style ───────────────────────────────────────────────────────── */
 
 /* Title bar height and content padding (pixels) */
-#define FORGE_UI_PANEL_TITLE_HEIGHT    30.0f
-#define FORGE_UI_PANEL_PADDING         10.0f
+#define FORGE_UI_PANEL_TITLE_HEIGHT    36.0f
+#define FORGE_UI_PANEL_PADDING         12.0f
 
 /* Panel background RGBA — dark navy, lighter than app bg for contrast */
 #define FORGE_UI_PANEL_BG_R     0.118f
@@ -280,7 +280,7 @@
 /* ── Panel content layout ──────────────────────────────────────────────── */
 
 /* Vertical spacing between child widgets inside a panel (pixels) */
-#define FORGE_UI_PANEL_CONTENT_SPACING  8.0f
+#define FORGE_UI_PANEL_CONTENT_SPACING 10.0f
 
 /* ── Scroll speed ──────────────────────────────────────────────────────── */
 
@@ -354,15 +354,15 @@ typedef struct ForgeUiLayout {
  * #define constants remain as the default base values; widgets read
  * from this struct (scaled) at draw time rather than the defines. */
 typedef struct ForgeUiSpacing {
-    float widget_padding;      /* px (unscaled, >0): inset inside widget backgrounds (default 8.0) */
-    float item_spacing;        /* px (unscaled, >=0): vertical or horizontal gap between consecutive widgets (default 8.0) */
-    float panel_padding;       /* px (unscaled, >=0): inset inside panel content areas (default 10.0) */
-    float title_bar_height;    /* px (unscaled, >0): panel/window title bar height (default 30.0) */
+    float widget_padding;      /* px (unscaled, >0): inset inside widget backgrounds (default 10.0) */
+    float item_spacing;        /* px (unscaled, >=0): vertical or horizontal gap between consecutive widgets (default 10.0) */
+    float panel_padding;       /* px (unscaled, >=0): inset inside panel content areas (default 12.0) */
+    float title_bar_height;    /* px (unscaled, >0): panel/window title bar height (default 36.0) */
     float checkbox_box_size;   /* px (unscaled, >0): checkbox square side length (default 18.0) */
     float slider_thumb_width;  /* px (unscaled, >0): slider thumb rectangle width (default 12.0) */
     float slider_thumb_height; /* px (unscaled, >0): slider thumb rectangle height (default 22.0) */
     float slider_track_height; /* px (unscaled, >0): slider thin track bar height (default 4.0) */
-    float text_input_padding;  /* px (unscaled, >=0): left padding before text in text input (default 6.0) */
+    float text_input_padding;  /* px (unscaled, >=0): left padding before text in text input (default 8.0) */
     float scrollbar_width;     /* px (unscaled, >0): scrollbar track width (default 10.0) */
 } ForgeUiSpacing;
 
@@ -1280,15 +1280,15 @@ static inline bool forge_ui_ctx_init(ForgeUiContext *ctx,
     /* Default spacing values (unscaled).  These match the original
      * hardcoded defines so existing applications look identical at
      * scale 1.0. */
-    ctx->spacing.widget_padding      = FORGE_UI_WIDGET_PADDING;         /* 8.0 */
-    ctx->spacing.item_spacing        = FORGE_UI_PANEL_CONTENT_SPACING; /* 8.0 */
-    ctx->spacing.panel_padding       = FORGE_UI_PANEL_PADDING;         /* 10.0 */
-    ctx->spacing.title_bar_height    = FORGE_UI_PANEL_TITLE_HEIGHT;    /* 30.0 */
+    ctx->spacing.widget_padding      = FORGE_UI_WIDGET_PADDING;         /* 10.0 */
+    ctx->spacing.item_spacing        = FORGE_UI_PANEL_CONTENT_SPACING; /* 10.0 */
+    ctx->spacing.panel_padding       = FORGE_UI_PANEL_PADDING;         /* 12.0 */
+    ctx->spacing.title_bar_height    = FORGE_UI_PANEL_TITLE_HEIGHT;    /* 36.0 */
     ctx->spacing.checkbox_box_size   = FORGE_UI_CB_BOX_SIZE;           /* 18.0 */
     ctx->spacing.slider_thumb_width  = FORGE_UI_SL_THUMB_WIDTH;        /* 12.0 */
     ctx->spacing.slider_thumb_height = FORGE_UI_SL_THUMB_HEIGHT;       /* 22.0 */
     ctx->spacing.slider_track_height = FORGE_UI_SL_TRACK_HEIGHT;       /* 4.0 */
-    ctx->spacing.text_input_padding  = FORGE_UI_TI_PADDING;            /* 6.0 */
+    ctx->spacing.text_input_padding  = FORGE_UI_TI_PADDING;            /* 8.0 */
     ctx->spacing.scrollbar_width     = FORGE_UI_SCROLLBAR_WIDTH;       /* 10.0 */
 
     return true;

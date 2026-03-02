@@ -132,15 +132,15 @@ Ten fields replace the hardcoded `#define` constants:
 
 ```c
 typedef struct ForgeUiSpacing {
-    float widget_padding;      /* inset inside widget backgrounds (8.0) */
-    float item_spacing;        /* gap between consecutive widgets (8.0) */
-    float panel_padding;       /* inset inside panel content areas (10.0) */
-    float title_bar_height;    /* panel/window title bar height (30.0) */
+    float widget_padding;      /* inset inside widget backgrounds (10.0) */
+    float item_spacing;        /* gap between consecutive widgets (10.0) */
+    float panel_padding;       /* inset inside panel content areas (12.0) */
+    float title_bar_height;    /* panel/window title bar height (36.0) */
     float checkbox_box_size;   /* checkbox square side length (18.0) */
     float slider_thumb_width;  /* slider thumb width (12.0) */
     float slider_thumb_height; /* slider thumb height (22.0) */
     float slider_track_height; /* slider thin track bar height (4.0) */
-    float text_input_padding;  /* left padding in text input (6.0) */
+    float text_input_padding;  /* left padding in text input (8.0) */
     float scrollbar_width;     /* scrollbar track width (10.0) */
 } ForgeUiSpacing;
 ```
@@ -150,12 +150,12 @@ original hardcoded defaults.  The application can override any field:
 
 ```c
 /* Spacious theme — double padding and spacing */
-ctx.spacing.widget_padding = 16.0f;
-ctx.spacing.item_spacing   = 16.0f;
+ctx.spacing.widget_padding = 20.0f;
+ctx.spacing.item_spacing   = 20.0f;
 
 /* Compact theme — halve them */
-ctx.spacing.widget_padding = 4.0f;
-ctx.spacing.item_spacing   = 4.0f;
+ctx.spacing.widget_padding = 5.0f;
+ctx.spacing.item_spacing   = 5.0f;
 ```
 
 ### Atlas rebuild at different scales
@@ -206,13 +206,13 @@ Every widget function was refactored to read from `ctx->spacing` at draw time:
 | Widget | Before | After |
 |--------|--------|-------|
 | Checkbox box size | `FORGE_UI_CB_BOX_SIZE` (18.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.checkbox_box_size)` |
-| Checkbox label gap | `FORGE_UI_CB_LABEL_GAP` (8.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.widget_padding)` |
+| Checkbox label gap | `FORGE_UI_CB_LABEL_GAP` (10.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.widget_padding)` |
 | Slider thumb width | `FORGE_UI_SL_THUMB_WIDTH` (12.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.slider_thumb_width)` |
 | Slider thumb height | `FORGE_UI_SL_THUMB_HEIGHT` (22.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.slider_thumb_height)` |
 | Slider track height | `FORGE_UI_SL_TRACK_HEIGHT` (4.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.slider_track_height)` |
-| Text input padding | `FORGE_UI_TI_PADDING` (6.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.text_input_padding)` |
-| Panel title height | `FORGE_UI_PANEL_TITLE_HEIGHT` (30.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.title_bar_height)` |
-| Panel padding | `FORGE_UI_PANEL_PADDING` (10.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.panel_padding)` |
+| Text input padding | `FORGE_UI_TI_PADDING` (8.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.text_input_padding)` |
+| Panel title height | `FORGE_UI_PANEL_TITLE_HEIGHT` (36.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.title_bar_height)` |
+| Panel padding | `FORGE_UI_PANEL_PADDING` (12.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.panel_padding)` |
 | Scrollbar width | `FORGE_UI_SCROLLBAR_WIDTH` (10.0) | `FORGE_UI_SCALED(ctx, ctx->spacing.scrollbar_width)` |
 
 The original `#define` constants remain as documentation and as the default
