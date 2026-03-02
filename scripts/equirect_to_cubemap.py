@@ -322,6 +322,15 @@ def main():
             return 1
         # Load once and reuse for both validation and conversion.
         preloaded_hdr = iio.imread(args.input).astype(np.float32)
+        if preloaded_hdr.ndim < 2:
+            print(
+                f"Unsupported HDR image rank: {preloaded_hdr.ndim}",
+                file=sys.stderr,
+            )
+            return 1
+        if preloaded_hdr.shape[0] == 0 or preloaded_hdr.shape[1] == 0:
+            print("HDR image has invalid dimensions", file=sys.stderr)
+            return 1
         ratio = preloaded_hdr.shape[1] / preloaded_hdr.shape[0]
         dims_str = f"{preloaded_hdr.shape[1]}x{preloaded_hdr.shape[0]}"
     else:

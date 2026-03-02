@@ -12016,25 +12016,28 @@ def diagram_frustum_plane_extraction():
     ax.set_aspect("equal")
     ax.axis("off")
 
-    # Simple isometric projection of a cube
-    # Cube vertices in 3D: (x, y, z) with range [-1, 1]
-    # Simple iso: screen_x = x + z*0.5, screen_y = y + z*0.35
+    # Simple isometric projection of a frustum volume.
+    # Vulkan/D3D convention: x,y in [-1, 1], z in [0, 1].
+    # The iso mapping remaps z from [0,1] to [-1,1] for visual centering.
+    # Simple iso: screen_x = x + z'*0.5, screen_y = y + z'*0.35
     iso_x_fact = 0.5
     iso_y_fact = 0.35
     s = 1.3  # scale factor
 
     def iso(x, y, z):
-        sx = (x + z * iso_x_fact) * s + 1.0
-        sy = (y + z * iso_y_fact) * s + 1.0
+        # Remap z from [0,1] to [-1,1] for centered isometric layout
+        z_centered = z * 2.0 - 1.0
+        sx = (x + z_centered * iso_x_fact) * s + 1.0
+        sy = (y + z_centered * iso_y_fact) * s + 1.0
         return (sx, sy)
 
-    # Back face (z=-1)
-    b0 = iso(-1, -1, -1)
-    b1 = iso(1, -1, -1)
-    b2 = iso(1, 1, -1)
-    b3 = iso(-1, 1, -1)
+    # Near face (z=0)
+    b0 = iso(-1, -1, 0)
+    b1 = iso(1, -1, 0)
+    b2 = iso(1, 1, 0)
+    b3 = iso(-1, 1, 0)
 
-    # Front face (z=1)
+    # Far face (z=1)
     f0 = iso(-1, -1, 1)
     f1 = iso(1, -1, 1)
     f2 = iso(1, 1, 1)
@@ -12076,12 +12079,12 @@ def diagram_frustum_plane_extraction():
 
     # Face labels with clip-space inequalities
     planes = [
-        ("Near", iso(0, 0, 1), STYLE["accent1"], "0 \u2264 z"),
-        ("Far", iso(0, 0, -1), STYLE["accent4"], "z \u2264 w"),
-        ("Right", iso(1, 0, 0), STYLE["accent2"], "x \u2264 w"),
-        ("Left", iso(-1, 0.3, 0.3), STYLE["accent3"], "\u2212w \u2264 x"),
-        ("Top", iso(0, 1, 0), STYLE["warn"], "y \u2264 w"),
-        ("Bottom", iso(0, -1, 0), STYLE["text_dim"], "\u2212w \u2264 y"),
+        ("Near", iso(0, 0, 0), STYLE["accent1"], "0 \u2264 z"),
+        ("Far", iso(0, 0, 1), STYLE["accent4"], "z \u2264 w"),
+        ("Right", iso(1, 0, 0.5), STYLE["accent2"], "x \u2264 w"),
+        ("Left", iso(-1, 0.3, 0.65), STYLE["accent3"], "\u2212w \u2264 x"),
+        ("Top", iso(0, 1, 0.5), STYLE["warn"], "y \u2264 w"),
+        ("Bottom", iso(0, -1, 0.5), STYLE["text_dim"], "\u2212w \u2264 y"),
     ]
 
     for name, pos, color, ineq in planes:
@@ -12369,6 +12372,9 @@ def diagram_underwater_camera_guard():
     ax = fig.add_subplot(111)
     setup_axes(ax, xlim=(-0.5, 13.5), ylim=(-4.5, 5.5))
     ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.grid(False)
 
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
     stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]

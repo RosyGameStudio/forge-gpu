@@ -221,7 +221,8 @@ The reflection pass renders the scene from the mirrored camera into an
 offscreen color texture. Key details:
 
 - The camera position is reflected across the water plane
-- The view matrix uses the reflected position and inverted pitch
+- The reflected view is built by applying the reflection matrix to the
+  camera's view transform
 - The projection matrix uses oblique near-plane clipping
 - Front-face winding is reversed (the mirror flip changes triangle winding),
   so reflected pipelines use `FRONTFACE_CLOCKWISE` to compensate
