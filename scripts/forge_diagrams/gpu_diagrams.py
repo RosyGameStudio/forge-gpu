@@ -11103,7 +11103,7 @@ def diagram_reflection_camera():
     ax.text(
         -2.0,
         -5.5,
-        "Reflection matrix:\nM = I \u2212 2\u22c5n\u2297n",
+        "For plane Y=0:  y\u2032 = \u2212y\nGeneral plane ax+by+cz+d=0:\np\u2032 = p \u2212 2(n\u22c5p + d)n",
         color=STYLE["text"],
         fontsize=10,
         fontfamily="monospace",
@@ -12130,7 +12130,7 @@ def diagram_frustum_plane_extraction():
     # Arrow from note to near plane
     ax.annotate(
         "",
-        xy=iso(0, -0.3, 1),
+        xy=iso(0, -0.3, 0),
         xytext=(3.0, -0.9),
         arrowprops={
             "arrowstyle": "->",
