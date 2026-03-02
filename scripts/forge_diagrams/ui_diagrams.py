@@ -10225,12 +10225,19 @@ def diagram_theme_color_slots():
             )
             ax.add_patch(rect)
 
-            # Decide text color based on luminance
+            # Decide text color based on WCAG relative luminance.
+            # Linearize sRGB channels first (IEC 61966-2-1), matching the
+            # math used by forge_ui_theme_relative_luminance() and the
+            # contrast-ratio diagram so all luminance decisions are consistent.
             r_val = int(hexval[1:3], 16) / 255.0
             g_val = int(hexval[3:5], 16) / 255.0
             b_val = int(hexval[5:7], 16) / 255.0
-            lum = 0.2126 * r_val + 0.7152 * g_val + 0.0722 * b_val
-            txt_col = "#000000" if lum > 0.4 else "#ffffff"
+
+            def _lin(c: float) -> float:
+                return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+            lum = 0.2126 * _lin(r_val) + 0.7152 * _lin(g_val) + 0.0722 * _lin(b_val)
+            txt_col = "#000000" if lum > 0.179 else "#ffffff"
 
             ax.text(
                 x + swatch_w / 2,
