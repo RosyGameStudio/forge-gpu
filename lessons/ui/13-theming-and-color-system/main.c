@@ -35,7 +35,10 @@
 #define FONT_PATH          "assets/fonts/liberation_mono/LiberationMono-Regular.ttf"
 #define FONT_PX            18.0f /* font rasterization height in pixels */
 #define SWATCH_SIZE        40.0f /* color swatch square side length */
-#define SWATCH_GAP         10.0f /* horizontal gap between swatches */
+#define SWATCH_PITCH      150.0f /* horizontal distance between swatch left edges —
+                                  * wide enough for the longest slot name
+                                  * ("scrollbar_track", ~15 chars × ~11px) */
+#define SWATCH_VGAP        10.0f /* vertical gap between swatch rows */
 #define SWATCH_LABEL_GAP    6.0f /* vertical gap between swatch and its label */
 #define MARGIN             20.0f /* outer margin from framebuffer edges */
 #define LABEL_HEIGHT       24.0f /* default label row height for text lines */
@@ -51,7 +54,7 @@
 
 /* Panel layout constants */
 #define GROUP_TITLE_HEIGHT 28.0f  /* height allocated for group title labels */
-#define SWATCH_ROW_HEIGHT  (SWATCH_SIZE + SWATCH_LABEL_GAP + LABEL_HEIGHT + SWATCH_GAP)
+#define SWATCH_ROW_HEIGHT  (SWATCH_SIZE + SWATCH_LABEL_GAP + LABEL_HEIGHT + SWATCH_VGAP)
 
 /* Widget showcase constants */
 #define WIDGET_ROW_HEIGHT  28.0f  /* height for checkbox/slider rows */
@@ -156,11 +159,11 @@ static void build_swatch_groups(const ForgeUiTheme *theme,
     /* Group 3: Borders / Chrome */
     groups[3].title = "Borders / Chrome";
     groups[3].count = 5;
-    groups[3].swatches[0] = (SwatchInfo){ "border",          theme->border };
-    groups[3].swatches[1] = (SwatchInfo){ "border_focused",  theme->border_focused };
-    groups[3].swatches[2] = (SwatchInfo){ "title_bar",       theme->title_bar };
-    groups[3].swatches[3] = (SwatchInfo){ "scrollbar_track", theme->scrollbar_track };
-    groups[3].swatches[4] = (SwatchInfo){ "cursor",          theme->cursor };
+    groups[3].swatches[0] = (SwatchInfo){ "border",       theme->border };
+    groups[3].swatches[1] = (SwatchInfo){ "brdr_focused", theme->border_focused };
+    groups[3].swatches[2] = (SwatchInfo){ "title_bar",    theme->title_bar };
+    groups[3].swatches[3] = (SwatchInfo){ "sb_track",     theme->scrollbar_track };
+    groups[3].swatches[4] = (SwatchInfo){ "cursor",       theme->cursor };
 }
 
 /* ── Render helper: rasterize and write BMP ────────────────────────────── */
@@ -229,7 +232,7 @@ static bool render_frame_palette(ForgeRasterBuffer *fb,
 
     /* Draw each swatch group: a title label followed by a row of colored
      * rectangles, each annotated with the slot name and hex color value. */
-    float group_y = MARGIN + LABEL_HEIGHT + SWATCH_GAP;
+    float group_y = MARGIN + LABEL_HEIGHT + SWATCH_VGAP;
 
     for (int g = 0; g < SWATCH_GROUP_COUNT; g++) {
         const SwatchGroup *grp = &groups[g];
@@ -242,7 +245,7 @@ static bool render_frame_palette(ForgeRasterBuffer *fb,
         float swatch_y = group_y + GROUP_TITLE_HEIGHT;
 
         for (int s = 0; s < grp->count; s++) {
-            float swatch_x = MARGIN + (float)s * (SWATCH_SIZE + SWATCH_GAP);
+            float swatch_x = MARGIN + (float)s * SWATCH_PITCH;
 
             /* Draw the colored swatch rectangle.  We deliberately use
              * internal emitters here because the public API has no
@@ -318,7 +321,7 @@ static bool render_frame_widgets(ForgeRasterBuffer *fb,
     /* Panel containing the widget demo.  The panel draws its own title bar,
      * background, and scrollable content area using theme colors. */
     float panel_x = MARGIN;
-    float panel_y = MARGIN + LABEL_HEIGHT + SWATCH_GAP;
+    float panel_y = MARGIN + LABEL_HEIGHT + SWATCH_VGAP;
     float panel_w = (float)FRAME_W - 2.0f * MARGIN;
     float panel_h = (float)FRAME_H - panel_y - MARGIN;
     ForgeUiRect panel_rect = { panel_x, panel_y, panel_w, panel_h };
@@ -565,12 +568,20 @@ static bool render_frame_bad_theme(ForgeRasterBuffer *fb,
     /* Sanity check: our local pair table must stay in sync with the
      * canonical validator in forge_ui_theme_validate().  If someone adds
      * a pair to one list but not the other, this will fire and the
-     * mismatch can be fixed before it ships. */
+     * mismatch can be fixed before it ships.
+     * SDL_assert is stripped in release builds, so also log and cap at
+     * runtime to keep the lesson correct in all configurations. */
     SDL_assert(pair_count == EXPECTED_VALIDATION_PAIR_COUNT &&
                "build_validation_pairs pair count drifted from "
                "EXPECTED_VALIDATION_PAIR_COUNT -- update both lists");
+    if (pair_count != EXPECTED_VALIDATION_PAIR_COUNT) {
+        SDL_Log("WARNING: pair_count %d != EXPECTED %d — table drift",
+                pair_count, EXPECTED_VALIDATION_PAIR_COUNT);
+        if (pair_count > EXPECTED_VALIDATION_PAIR_COUNT)
+            pair_count = EXPECTED_VALIDATION_PAIR_COUNT;
+    }
 
-    float row_y = MARGIN + 2.0f * LABEL_HEIGHT + SWATCH_GAP;
+    float row_y = MARGIN + 2.0f * LABEL_HEIGHT + SWATCH_VGAP;
 
     for (int i = 0; i < pair_count; i++) {
         float ratio = forge_ui_theme_contrast_ratio(

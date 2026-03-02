@@ -1594,11 +1594,11 @@ static inline bool forge_ui_ctx_slider(ForgeUiContext *ctx,
     if (!isfinite(rect.x) || !isfinite(rect.y) ||
         !isfinite(rect.w) || !isfinite(rect.h)) return false;
     if (!isfinite(min_val) || !isfinite(max_val)) return false;
+    if (!(max_val > min_val)) return false;  /* also rejects equal */
     /* Sanitize *value: NaN/Inf would poison the thumb position and
      * propagate into vertex data.  Clamp to min_val as a safe default. */
     if (!isfinite(*value)) *value = min_val;
     Uint32 id = forge_ui_hash_id(ctx, label);
-    if (!(max_val > min_val)) return false;  /* also rejects equal */
 
     bool changed = false;
 

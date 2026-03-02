@@ -10374,7 +10374,7 @@ def diagram_contrast_ratio_scale():
     bar_h = 0.8
     n_segments = 200
     for i in range(n_segments):
-        ratio = 1.0 + (21.0 - 1.0) * i / n_segments
+        ratio = 1.0 + (21.0 - 1.0) * i / (n_segments - 1)
         x = 1.0 + (ratio - 1.0) * (20.0 / 20.0)
         w = 20.0 / n_segments
         # Color ramp: dark red -> yellow -> green
@@ -11030,20 +11030,20 @@ def diagram_before_after_theming():
 
     struct_lines = [
         ("typedef struct {", STYLE["accent3"]),
-        ("    SDL_Color bg;", STYLE["accent1"]),
-        ("    SDL_Color surface;", STYLE["accent1"]),
-        ("    SDL_Color surface_hot;", STYLE["accent1"]),
-        ("    SDL_Color surface_active;", STYLE["accent1"]),
-        ("    SDL_Color title_bar;", STYLE["accent1"]),
-        ("    SDL_Color title_bar_text;", STYLE["accent3"]),
-        ("    SDL_Color text;", STYLE["accent3"]),
-        ("    SDL_Color text_dim;", STYLE["accent3"]),
-        ("    SDL_Color accent;", STYLE["accent2"]),
-        ("    SDL_Color accent_hot;", STYLE["accent2"]),
-        ("    SDL_Color border;", STYLE["accent4"]),
-        ("    SDL_Color border_focused;", STYLE["accent4"]),
-        ("    SDL_Color scrollbar_track;", STYLE["accent4"]),
-        ("    SDL_Color cursor;", STYLE["accent4"]),
+        ("    ForgeUiColor bg;", STYLE["accent1"]),
+        ("    ForgeUiColor surface;", STYLE["accent1"]),
+        ("    ForgeUiColor surface_hot;", STYLE["accent1"]),
+        ("    ForgeUiColor surface_active;", STYLE["accent1"]),
+        ("    ForgeUiColor title_bar;", STYLE["accent1"]),
+        ("    ForgeUiColor title_bar_text;", STYLE["accent3"]),
+        ("    ForgeUiColor text;", STYLE["accent3"]),
+        ("    ForgeUiColor text_dim;", STYLE["accent3"]),
+        ("    ForgeUiColor accent;", STYLE["accent2"]),
+        ("    ForgeUiColor accent_hot;", STYLE["accent2"]),
+        ("    ForgeUiColor border;", STYLE["accent4"]),
+        ("    ForgeUiColor border_focused;", STYLE["accent4"]),
+        ("    ForgeUiColor scrollbar_track;", STYLE["accent4"]),
+        ("    ForgeUiColor cursor;", STYLE["accent4"]),
         ("} ForgeUiTheme;", STYLE["accent3"]),
     ]
 

@@ -489,6 +489,13 @@ static void test_end_null_ctx(void)
 
 /* ── forge_ui_ctx_label tests ───────────────────────────────────────────── */
 
+#define LABEL_TEST_X      10.0f   /* label x position for all label tests */
+#define LABEL_TEST_Y      30.0f   /* label y position for all label tests */
+#define LABEL_TEST_R       1.0f   /* label color red   (white) */
+#define LABEL_TEST_G       1.0f   /* label color green (white) */
+#define LABEL_TEST_B       1.0f   /* label color blue  (white) */
+#define LABEL_TEST_A       1.0f   /* label color alpha (opaque) */
+
 static void test_label_emits_vertices(void)
 {
     TEST("ctx_label: emits vertices for text");
@@ -498,7 +505,9 @@ static void test_label_emits_vertices(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
 
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_label_colored(&ctx, "AB", 10.0f, 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "AB", LABEL_TEST_X, LABEL_TEST_Y,
+                               LABEL_TEST_R, LABEL_TEST_G, LABEL_TEST_B,
+                               LABEL_TEST_A);
 
     /* 2 visible glyphs -> 2*4 = 8 vertices, 2*6 = 12 indices */
     ASSERT_EQ_INT(ctx.vertex_count, 8);
@@ -517,7 +526,9 @@ static void test_label_empty_string(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
 
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_label_colored(&ctx, "", 10.0f, 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "", LABEL_TEST_X, LABEL_TEST_Y,
+                               LABEL_TEST_R, LABEL_TEST_G, LABEL_TEST_B,
+                               LABEL_TEST_A);
 
     ASSERT_EQ_INT(ctx.vertex_count, 0);
     ASSERT_EQ_INT(ctx.index_count, 0);
@@ -535,7 +546,9 @@ static void test_label_null_text(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
 
     forge_ui_ctx_begin(&ctx, 0.0f, 0.0f, false);
-    forge_ui_ctx_label_colored(&ctx, NULL, 10.0f, 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, NULL, LABEL_TEST_X, LABEL_TEST_Y,
+                               LABEL_TEST_R, LABEL_TEST_G, LABEL_TEST_B,
+                               LABEL_TEST_A);
     ASSERT_EQ_INT(ctx.vertex_count, 0);
 
     forge_ui_ctx_end(&ctx);
@@ -545,7 +558,9 @@ static void test_label_null_text(void)
 static void test_label_null_ctx(void)
 {
     TEST("ctx_label: NULL ctx does not crash");
-    forge_ui_ctx_label_colored(NULL, "Hello", 10.0f, 30.0f, 1, 1, 1, 1);
+    forge_ui_ctx_label_colored(NULL, "Hello", LABEL_TEST_X, LABEL_TEST_Y,
+                               LABEL_TEST_R, LABEL_TEST_G, LABEL_TEST_B,
+                               LABEL_TEST_A);
     ASSERT_TRUE(true);
 }
 
@@ -6205,9 +6220,6 @@ static void test_ascender_px_nan_pixel_height(void)
 
 /* ── label_colored RGBA NaN/Inf validation ─────────────────────────────── */
 
-#define TEST_LABEL_COLOR_X   10.0f
-#define TEST_LABEL_COLOR_Y   30.0f
-
 static void test_label_colored_nan_r_rejected(void)
 {
     TEST("label_colored: NaN red channel produces no vertices");
@@ -6216,8 +6228,8 @@ static void test_label_colored_nan_r_rejected(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     int before = ctx.vertex_count;
-    forge_ui_ctx_label_colored(&ctx, "Test", TEST_LABEL_COLOR_X,
-                               TEST_LABEL_COLOR_Y, NAN, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "Test", LABEL_TEST_X,
+                               LABEL_TEST_Y, NAN, 1, 1, 1);
     ASSERT_EQ_INT(ctx.vertex_count, before);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -6231,8 +6243,8 @@ static void test_label_colored_nan_g_rejected(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     int before = ctx.vertex_count;
-    forge_ui_ctx_label_colored(&ctx, "Test", TEST_LABEL_COLOR_X,
-                               TEST_LABEL_COLOR_Y, 1, NAN, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "Test", LABEL_TEST_X,
+                               LABEL_TEST_Y, 1, NAN, 1, 1);
     ASSERT_EQ_INT(ctx.vertex_count, before);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -6246,8 +6258,8 @@ static void test_label_colored_nan_b_rejected(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     int before = ctx.vertex_count;
-    forge_ui_ctx_label_colored(&ctx, "Test", TEST_LABEL_COLOR_X,
-                               TEST_LABEL_COLOR_Y, 1, 1, NAN, 1);
+    forge_ui_ctx_label_colored(&ctx, "Test", LABEL_TEST_X,
+                               LABEL_TEST_Y, 1, 1, NAN, 1);
     ASSERT_EQ_INT(ctx.vertex_count, before);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -6261,8 +6273,8 @@ static void test_label_colored_nan_a_rejected(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     int before = ctx.vertex_count;
-    forge_ui_ctx_label_colored(&ctx, "Test", TEST_LABEL_COLOR_X,
-                               TEST_LABEL_COLOR_Y, 1, 1, 1, NAN);
+    forge_ui_ctx_label_colored(&ctx, "Test", LABEL_TEST_X,
+                               LABEL_TEST_Y, 1, 1, 1, NAN);
     ASSERT_EQ_INT(ctx.vertex_count, before);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -6276,8 +6288,8 @@ static void test_label_colored_inf_r_rejected(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     int before = ctx.vertex_count;
-    forge_ui_ctx_label_colored(&ctx, "Test", TEST_LABEL_COLOR_X,
-                               TEST_LABEL_COLOR_Y, INFINITY, 1, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "Test", LABEL_TEST_X,
+                               LABEL_TEST_Y, INFINITY, 1, 1, 1);
     ASSERT_EQ_INT(ctx.vertex_count, before);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -6291,8 +6303,8 @@ static void test_label_colored_inf_neg_g_rejected(void)
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
     int before = ctx.vertex_count;
-    forge_ui_ctx_label_colored(&ctx, "Test", TEST_LABEL_COLOR_X,
-                               TEST_LABEL_COLOR_Y, 1, -INFINITY, 1, 1);
+    forge_ui_ctx_label_colored(&ctx, "Test", LABEL_TEST_X,
+                               LABEL_TEST_Y, 1, -INFINITY, 1, 1);
     ASSERT_EQ_INT(ctx.vertex_count, before);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
@@ -6305,12 +6317,18 @@ static void test_label_colored_out_of_range_clamped(void)
     ForgeUiContext ctx;
     ASSERT_TRUE(forge_ui_ctx_init(&ctx, &test_atlas));
     forge_ui_ctx_begin(&ctx, 0, 0, false);
-    forge_ui_ctx_label_colored(&ctx, "AB", TEST_LABEL_COLOR_X,
-                               TEST_LABEL_COLOR_Y, 2.0f, -0.5f, 1.5f, 1.0f);
+    forge_ui_ctx_label_colored(&ctx, "AB", LABEL_TEST_X,
+                               LABEL_TEST_Y, 2.0f, -0.5f, 1.5f, 1.0f);
     /* Out-of-range but finite values are clamped — vertices should be emitted.
      * "AB" = 2 visible glyphs -> 2*4 = 8 vertices */
     ASSERT_TRUE(ctx.vertex_count > 0);
     ASSERT_EQ_INT(ctx.vertex_count, 8);
+    /* Verify channels are clamped to [0, 1] in the emitted vertex data.
+     * Input was (2.0, -0.5, 1.5, 1.0) → expect (1.0, 0.0, 1.0, 1.0). */
+    ASSERT_NEAR(ctx.vertices[0].r, 1.0f, 0.001f);
+    ASSERT_NEAR(ctx.vertices[0].g, 0.0f, 0.001f);
+    ASSERT_NEAR(ctx.vertices[0].b, 1.0f, 0.001f);
+    ASSERT_NEAR(ctx.vertices[0].a, 1.0f, 0.001f);
     forge_ui_ctx_end(&ctx);
     forge_ui_ctx_free(&ctx);
 }
