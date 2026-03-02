@@ -170,6 +170,10 @@ HDR, post-processing, and UI rendering.
 <a href="lessons/gpu/29-screen-space-reflections/"><img src="lessons/gpu/29-screen-space-reflections/assets/screenshot.png" width="200" alt="Screen-Space Reflections" /></a><br />
 <b>29</b> — Screen-Space Reflections
 </td>
+<td align="center">
+<a href="lessons/gpu/30-planar-reflections/"><img src="lessons/gpu/30-planar-reflections/assets/screenshot.png" width="200" alt="Planar Reflections" /></a><br />
+<b>30</b> — Planar Reflections
+</td>
 </tr>
 </table>
 

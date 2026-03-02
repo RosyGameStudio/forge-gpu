@@ -32,6 +32,14 @@ try:
 except ImportError:
     sys.exit("Missing dependency: Pillow — install with: pip install Pillow")
 
+# Optional: imageio for HDR (.hdr / .exr) support.
+try:
+    import imageio.v3 as iio
+
+    _HAS_IMAGEIO = True
+except ImportError:
+    _HAS_IMAGEIO = False
+
 # Face order matching SDL_GPUCubeMapFace enum
 FACES = ["px", "nx", "py", "ny", "pz", "nz"]
 
@@ -108,6 +116,47 @@ def direction_to_equirect_uv(dirs):
     return u, v
 
 
+def sample_equirect_float(source, u, v):
+    """Bilinear sample an equirectangular image stored as float32.
+
+    Same algorithm as sample_equirect but operates on float data and
+    returns a float array (no clamping to uint8).  Used for HDR sources.
+    """
+    h, w, c = source.shape
+
+    px = u * w - 0.5
+    py = v * h - 0.5
+
+    x0 = np.floor(px).astype(np.int32)
+    y0 = np.floor(py).astype(np.int32)
+    x1 = x0 + 1
+    y1 = y0 + 1
+
+    fx = (px - x0).astype(np.float32)
+    fy = (py - y0).astype(np.float32)
+
+    x0 = x0 % w
+    x1 = x1 % w
+    y0 = np.clip(y0, 0, h - 1)
+    y1 = np.clip(y1, 0, h - 1)
+
+    p00 = source[y0, x0]
+    p10 = source[y0, x1]
+    p01 = source[y1, x0]
+    p11 = source[y1, x1]
+
+    fx = fx[..., np.newaxis]
+    fy = fy[..., np.newaxis]
+    result = (
+        p00 * (1 - fx) * (1 - fy)
+        + p10 * fx * (1 - fy)
+        + p01 * (1 - fx) * fy
+        + p11 * fx * fy
+    )
+
+    return result
+
+
 def sample_equirect(source, u, v):
     """Bilinear sample the equirectangular image at (u, v) coordinates.
 
@@ -154,12 +203,45 @@ def sample_equirect(source, u, v):
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
+def _is_hdr(path):
+    """Return True if the file is an HDR format (Radiance .hdr or OpenEXR)."""
+    ext = os.path.splitext(path)[1].lower()
+    return ext in (".hdr", ".exr")
+
+
+def _tone_map_reinhard(hdr, exposure=1.0):
+    """Apply Reinhard tone mapping and sRGB gamma to an HDR float array.
+
+    Returns a uint8 array suitable for saving as PNG.
+    """
+    # Apply exposure
+    hdr = hdr * exposure
+    # Reinhard: L / (1 + L)
+    mapped = hdr / (1.0 + hdr)
+    # sRGB gamma (simplified pow 1/2.2)
+    mapped = np.power(np.clip(mapped, 0.0, 1.0), 1.0 / 2.2)
+    return np.clip(mapped * 255.0, 0, 255).astype(np.uint8)
+
+
 def convert(input_path, output_dir, size):
     """Convert an equirectangular image to 6 cube map face PNGs."""
-    print(f"Loading: {input_path}")
-    img = Image.open(input_path).convert("RGB")
-    source = np.array(img)
-    print(f"  Source size: {img.width}x{img.height}")
+    is_hdr = _is_hdr(input_path)
+
+    if is_hdr:
+        if not _HAS_IMAGEIO:
+            sys.exit("HDR input requires imageio — install with: pip install imageio")
+        print(f"Loading HDR: {input_path}")
+        source = iio.imread(input_path).astype(np.float32)
+        if source.ndim == 2:
+            source = np.stack([source] * 3, axis=-1)
+        elif source.shape[2] == 4:
+            source = source[:, :, :3]
+        print(f"  Source size: {source.shape[1]}x{source.shape[0]} (HDR float)")
+    else:
+        print(f"Loading: {input_path}")
+        img = Image.open(input_path).convert("RGB")
+        source = np.array(img)
+        print(f"  Source size: {img.width}x{img.height}")
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -168,7 +250,12 @@ def convert(input_path, output_dir, size):
 
         dirs = face_directions(face, size)
         u, v = direction_to_equirect_uv(dirs)
-        pixels = sample_equirect(source, u, v)
+
+        if is_hdr:
+            pixels_float = sample_equirect_float(source, u, v)
+            pixels = _tone_map_reinhard(pixels_float, exposure=1.0)
+        else:
+            pixels = sample_equirect(source, u, v)
 
         face_img = Image.fromarray(pixels)
         out_path = os.path.join(output_dir, f"{face}.png")
@@ -182,7 +269,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert equirectangular panorama to cube map faces."
     )
-    parser.add_argument("input", help="Path to equirectangular image (JPG/PNG)")
+    parser.add_argument("input", help="Path to equirectangular image (JPG/PNG/HDR)")
     parser.add_argument("output_dir", help="Output directory for face PNGs")
     parser.add_argument(
         "--size",
@@ -204,16 +291,29 @@ def main():
 
     # Validate that the input image has an approximately 2:1 aspect ratio
     # (expected for equirectangular projections).
-    img = Image.open(args.input)
-    ratio = img.width / img.height
+    if _is_hdr(args.input):
+        if not _HAS_IMAGEIO:
+            print(
+                "HDR input requires imageio — install with: pip install imageio",
+                file=sys.stderr,
+            )
+            return 1
+        probe = iio.imread(args.input)
+        ratio = probe.shape[1] / probe.shape[0]
+        dims_str = f"{probe.shape[1]}x{probe.shape[0]}"
+    else:
+        img = Image.open(args.input)
+        ratio = img.width / img.height
+        dims_str = f"{img.width}x{img.height}"
+        img.close()
+
     if abs(ratio - 2.0) > 0.02:
         print(
             f"Input image aspect ratio is {ratio:.3f}:1, expected ~2:1 "
-            f"for equirectangular projection ({img.width}x{img.height})",
+            f"for equirectangular projection ({dims_str})",
             file=sys.stderr,
         )
         return 1
-    img.close()
 
     convert(args.input, args.output_dir, args.size)
     return 0
