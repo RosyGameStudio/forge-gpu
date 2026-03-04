@@ -202,30 +202,55 @@ and the parent-child multiplication produces the correct final pose.
 
 ![Path following](assets/path_following.png)
 
-The truck follows a closed path defined by waypoints, where each waypoint
-specifies a position and a facing direction (yaw angle converted to a
-quaternion). Between waypoints:
+The truck follows a closed rectangular track defined by waypoints. Each
+waypoint stores a position and a yaw angle (the direction the truck should
+face at that point). The 90-degree corners include arc midpoints at 45
+degrees so the truck traces smooth curves rather than sharp right angles.
 
-- **Position** is interpolated with `vec3_lerp` — standard linear
-  interpolation of the three components
-- **Orientation** is interpolated with `quat_slerp` — spherical
-  interpolation that maintains constant angular velocity through turns
+#### Forward-driven movement
 
-The path parameter is a float that advances based on elapsed time and
-wraps back to zero when it exceeds the total path duration, producing
-continuous looping.
+![Forward-driven movement](assets/forward_driven_movement.png)
 
-For smooth curves, the waypoints are placed along an ellipse. The facing
-direction at each waypoint is the tangent to the ellipse at that point,
-ensuring the truck always faces its direction of travel. The tangent of
-an ellipse at angle $\alpha$ is:
+A straightforward approach would interpolate both position and orientation
+between waypoints — `vec3_lerp` for position, `quat_slerp` for
+orientation. This produces visible lateral drift: the truck's position
+follows a straight line between waypoints while its heading rotates
+through the turn, so the truck appears to slide sideways.
 
-```text
-tangent = (-a * sin(alpha), 0, b * cos(alpha))
+Forward-driven movement eliminates this by decoupling position from the
+waypoint data entirely. Each frame, the truck moves a fixed distance in
+the direction it currently faces:
+
+```c
+float fwd_x = sinf(truck_yaw);
+float fwd_z = cosf(truck_yaw);
+truck_pos.x += fwd_x * step;
+truck_pos.z += fwd_z * step;
 ```
 
-where $a$ and $b$ are the semi-major and semi-minor axes. The yaw angle
-is computed from this tangent using `atan2`.
+Because the truck always moves in the direction it points, there is
+no lateral component and no visible sliding — even through tight corners.
+
+#### Arc-length parameterization
+
+![Arc-length parameterization](assets/arc_length_parameterization.png)
+
+Forward-driven movement solves the drift problem, but introduces a new
+one: when should the truck turn? The yaw schedule must advance in sync
+with the truck's actual position along the path, not with elapsed time.
+
+With **uniform parameterization**, each segment gets an equal fraction of
+the parameter range regardless of its physical length. A short corner arc
+and a long straight both receive the same parameter budget. The result is
+that the truck turns too early or too late relative to where it actually
+is on the path.
+
+**Arc-length parameterization** solves this by precomputing the cumulative
+distance to each waypoint. The yaw schedule then advances proportionally
+to distance traveled rather than time elapsed. A long straight gets a
+proportionally larger share of the parameter range, so the truck
+completes the straight before beginning to turn — exactly matching its
+physical position on the track.
 
 ## Animation data structures
 
@@ -377,40 +402,46 @@ always computed before its children's.
 
 ## Path evaluation
 
-The path evaluator advances a float parameter with elapsed time, wraps it
-for looping, and interpolates between the surrounding waypoints:
+The path evaluator takes a distance traveled and returns the interpolated
+yaw angle at that point along the path. It uses precomputed cumulative
+segment lengths for arc-length parameterization:
 
 ```c
 typedef struct PathWaypoint {
-    vec3  position;
-    quat  orientation;  /* facing direction as quaternion */
-    float cumulative_t; /* time to reach this waypoint    */
+    vec3  position;   /* waypoint world position         */
+    float yaw;        /* facing direction (radians)      */
 } PathWaypoint;
 
-static void evaluate_path(const PathWaypoint *waypoints, int count,
-                          float time, vec3 *out_pos, quat *out_rot)
+static float evaluate_path_yaw(float distance,
+                               const float *seg_cumulative)
 {
-    /* Wrap time for looping. */
-    float duration = waypoints[count - 1].cumulative_t;
-    time = fmodf(time, duration);
+    /* Find which segment contains this distance. */
+    int seg = 0;
+    while (seg < WAYPOINT_COUNT - 1 &&
+           distance >= seg_cumulative[seg])
+        seg++;
 
-    /* Find bracketing waypoints (binary search or linear scan). */
-    int i = 0;
-    while (i < count - 1 && waypoints[i + 1].cumulative_t <= time)
-        i++;
+    /* Compute local interpolation factor within the segment. */
+    float seg_start = (seg > 0) ? seg_cumulative[seg - 1] : 0.0f;
+    float seg_len   = seg_cumulative[seg] - seg_start;
+    float frac      = (seg_len > 1e-6f)
+                    ? (distance - seg_start) / seg_len : 0.0f;
 
-    float t0 = waypoints[i].cumulative_t;
-    float t1 = waypoints[i + 1].cumulative_t;
-    float t  = (time - t0) / (t1 - t0);
-
-    *out_pos = vec3_lerp(waypoints[i].position, waypoints[i + 1].position, t);
-    *out_rot = quat_slerp(waypoints[i].orientation, waypoints[i + 1].orientation, t);
+    /* Slerp between the two endpoint yaw angles via quaternions
+     * to handle the 0/2π wrap-around correctly. */
+    int i0 = seg;
+    int i1 = (seg + 1) % WAYPOINT_COUNT;
+    quat q0 = quat_from_euler(0, waypoints[i0].yaw, 0);
+    quat q1 = quat_from_euler(0, waypoints[i1].yaw, 0);
+    quat qr = quat_slerp(q0, q1, frac);
+    return 2.0f * atan2f(qr.y, qr.w);
 }
 ```
 
-Position uses `vec3_lerp` because linear interpolation of positions
-produces straight-line segments between waypoints. Orientation uses
-`quat_slerp` to maintain constant angular velocity through each turn.
+The cumulative segment lengths are precomputed once at initialization by
+summing the distances between consecutive waypoints. This array maps
+distance traveled to the correct segment, giving arc-length
+parameterization without per-frame recomputation.
 
 ## Per-frame animation update
 
@@ -434,11 +465,15 @@ for (int c = 0; c < clip->channel_count; c++) {
             quat_from_floats(&ch->values[(key + 1) * 4]), t);
 }
 
-/* 3. Evaluate path — set root placement. */
-vec3 truck_pos;
-quat truck_rot;
-evaluate_path(waypoints, waypoint_count, path_time, &truck_pos, &truck_rot);
-/* Apply to the truck body node's translation and rotation. */
+/* 3. Forward-driven path following. */
+float step = TRUCK_DRIVE_SPEED * delta_time;
+path_distance += step;
+if (path_distance >= total_path_len)
+    path_distance -= total_path_len;
+
+truck_yaw = evaluate_path_yaw(path_distance, seg_cumulative);
+truck_pos.x += sinf(truck_yaw) * step;
+truck_pos.z += cosf(truck_yaw) * step;
 
 /* 4. Rebuild hierarchy — propagate all changes. */
 rebuild_hierarchy(scene.nodes, scene.node_count,
@@ -449,9 +484,12 @@ rebuild_hierarchy(scene.nodes, scene.node_count,
 
 Steps 2 and 3 operate independently — the glTF keyframes modify wheel
 node rotations while the path animation modifies the truck body's
-placement. Step 4 composes them through the hierarchy multiplication.
-Step 5 uses the resulting world transforms directly as model matrices for
-rendering.
+placement. In step 3, `path_distance` tracks how far the truck has
+traveled along the loop (in world units). The yaw is looked up via
+arc-length parameterization, and the truck advances in its heading
+direction. Step 4 composes all transforms through the hierarchy
+multiplication. Step 5 uses the resulting world transforms directly as
+model matrices for rendering.
 
 ## Math
 

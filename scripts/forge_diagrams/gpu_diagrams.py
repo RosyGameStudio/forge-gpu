@@ -14013,3 +14013,478 @@ def diagram_animation_timeline():
 
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     save(fig, "gpu/31-transform-animations", "animation_timeline.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/31-transform-animations — forward_driven_movement.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_forward_driven_movement():
+    """Side-by-side: position interpolation cuts corners vs forward-driven follows the road."""
+    fig = plt.figure(figsize=(10, 5), facecolor=STYLE["bg"])
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
+
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+    stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
+
+    # -- Road geometry: L-shaped 90-degree right turn -----------------------
+    road_cx, road_cy = 2.0, 2.0  # road centerline corner
+    road_hw = 0.8  # half-width
+
+    # Waypoints on the road centerline
+    wp_a = np.array([-2.0, road_cy])  # heading east
+    wp_b = np.array([road_cx, -2.0])  # heading south
+    yaw_a = 0.0  # east
+    yaw_b = -np.pi / 2  # south
+
+    def draw_road_and_waypoints(ax):
+        """Draw the L-shaped road and waypoint markers."""
+        # Horizontal arm
+        rect_h = Rectangle(
+            (-4.5, road_cy - road_hw),
+            4.5 + road_cx + road_hw,
+            2 * road_hw,
+            facecolor=STYLE["surface"],
+            alpha=0.4,
+            zorder=0,
+        )
+        ax.add_patch(rect_h)
+        # Vertical arm
+        rect_v = Rectangle(
+            (road_cx - road_hw, -4.5),
+            2 * road_hw,
+            4.5 + road_cy + road_hw,
+            facecolor=STYLE["surface"],
+            alpha=0.4,
+            zorder=0,
+        )
+        ax.add_patch(rect_v)
+        # Road edge lines
+        edges = [
+            ([-4.5, road_cx - road_hw], [road_cy + road_hw, road_cy + road_hw]),
+            ([-4.5, road_cx - road_hw], [road_cy - road_hw, road_cy - road_hw]),
+            ([road_cx + road_hw, road_cx + road_hw], [-4.5, road_cy - road_hw]),
+            ([road_cx - road_hw, road_cx - road_hw], [-4.5, road_cy - road_hw]),
+            (
+                [road_cx + road_hw, road_cx + road_hw],
+                [road_cy + road_hw, road_cy + road_hw],
+            ),
+            (
+                [road_cx - road_hw, road_cx + road_hw],
+                [road_cy + road_hw, road_cy + road_hw],
+            ),
+        ]
+        for ex, ey in edges:
+            ax.plot(ex, ey, color=STYLE["grid"], lw=1, alpha=0.7, zorder=1)
+        # Waypoint markers
+        for wp, label in [(wp_a, "A"), (wp_b, "B")]:
+            ax.plot(*wp, "o", color=STYLE["warn"], ms=8, zorder=6)
+            lx = -0.5 if wp[0] < 0 else 0.5
+            ly = 0.5 if wp[1] > 0 else -0.5
+            ax.text(
+                wp[0] + lx,
+                wp[1] + ly,
+                label,
+                color=STYLE["warn"],
+                fontsize=11,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                path_effects=stroke,
+                zorder=7,
+            )
+
+    def draw_truck(ax, pos, yaw, color):
+        """Draw the truck as a small triangle pointing in the yaw direction."""
+        size = 0.45
+        tri = np.array(
+            [
+                [size, 0],
+                [-size * 0.5, size * 0.35],
+                [-size * 0.5, -size * 0.35],
+            ]
+        )
+        c, s = np.cos(yaw), np.sin(yaw)
+        rot = np.array([[c, -s], [s, c]])
+        tri_rot = tri @ rot.T + pos
+        triangle = Polygon(
+            tri_rot,
+            closed=True,
+            facecolor=color,
+            edgecolor=STYLE["text"],
+            lw=1.5,
+            zorder=8,
+        )
+        ax.add_patch(triangle)
+
+    # -- Left panel: Position Interpolation ----------------------------------
+    setup_axes(ax1, xlim=(-4.5, 4.5), ylim=(-4.5, 4.5))
+    draw_road_and_waypoints(ax1)
+
+    # Dashed interpolation line A → B
+    ax1.plot(
+        [wp_a[0], wp_b[0]],
+        [wp_a[1], wp_b[1]],
+        ls="--",
+        color=STYLE["accent1"],
+        lw=2,
+        zorder=3,
+    )
+
+    # Truck at t=0.35 along the interpolation line
+    t_lerp = 0.35
+    interp_pos = wp_a + t_lerp * (wp_b - wp_a)
+    interp_yaw = yaw_a + t_lerp * (yaw_b - yaw_a)
+    draw_truck(ax1, interp_pos, interp_yaw, STYLE["accent1"])
+
+    # Movement direction (along A→B line)
+    move_dir = wp_b - wp_a
+    move_dir = move_dir / np.linalg.norm(move_dir)
+
+    # Heading direction (where the truck faces)
+    head_dir = np.array([np.cos(interp_yaw), np.sin(interp_yaw)])
+
+    # Lateral drift = component of movement perpendicular to heading
+    lateral = move_dir - np.dot(move_dir, head_dir) * head_dir
+    drift_scale = 2.0
+
+    ax1.annotate(
+        "",
+        xy=(
+            interp_pos[0] + lateral[0] * drift_scale,
+            interp_pos[1] + lateral[1] * drift_scale,
+        ),
+        xytext=interp_pos,
+        arrowprops={
+            "arrowstyle": "->,head_width=0.2,head_length=0.12",
+            "color": STYLE["accent2"],
+            "lw": 2.5,
+            "ls": "--",
+        },
+        zorder=9,
+    )
+    ax1.text(
+        interp_pos[0] + lateral[0] * drift_scale * 1.1 - 0.7,
+        interp_pos[1] + lateral[1] * drift_scale * 1.1 + 0.1,
+        "lateral\ndrift",
+        color=STYLE["accent2"],
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=10,
+    )
+
+    # Heading arrow
+    ax1.annotate(
+        "",
+        xy=(interp_pos[0] + head_dir[0] * 1.3, interp_pos[1] + head_dir[1] * 1.3),
+        xytext=interp_pos,
+        arrowprops={
+            "arrowstyle": "->,head_width=0.2,head_length=0.12",
+            "color": STYLE["accent3"],
+            "lw": 2,
+        },
+        zorder=9,
+    )
+    ax1.text(
+        interp_pos[0] + head_dir[0] * 1.7,
+        interp_pos[1] + head_dir[1] * 1.7 + 0.3,
+        "heading",
+        color=STYLE["accent3"],
+        fontsize=8,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=10,
+    )
+
+    ax1.text(
+        -2.5,
+        -3.5,
+        "lerp(A, B, t) cuts\nthrough the corner",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="center",
+        va="center",
+        style="italic",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    ax1.set_title(
+        "Position Interpolation",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        pad=12,
+    )
+
+    # -- Right panel: Forward-Driven Movement --------------------------------
+    setup_axes(ax2, xlim=(-4.5, 4.5), ylim=(-4.5, 4.5))
+    draw_road_and_waypoints(ax2)
+
+    # Simulate forward-driven path
+    n_steps = 200
+    total_dist = np.linalg.norm(wp_b - wp_a)
+    step_dist = total_dist / n_steps
+    fwd_path = [wp_a.copy()]
+    pos = wp_a.copy()
+
+    for i in range(1, n_steps + 1):
+        t = i / n_steps
+        yaw = yaw_a + t * (yaw_b - yaw_a)
+        hd = np.array([np.cos(yaw), np.sin(yaw)])
+        pos = pos + hd * step_dist
+        fwd_path.append(pos.copy())
+
+    fwd_path = np.array(fwd_path)
+    ax2.plot(
+        fwd_path[:, 0],
+        fwd_path[:, 1],
+        color=STYLE["accent3"],
+        lw=2.5,
+        zorder=3,
+    )
+
+    # Truck at similar progress along the forward-driven path
+    t_idx = int(0.35 * n_steps)
+    truck_pos = fwd_path[t_idx]
+    truck_yaw = yaw_a + 0.35 * (yaw_b - yaw_a)
+    draw_truck(ax2, truck_pos, truck_yaw, STYLE["accent3"])
+
+    # Forward arrow (movement = heading)
+    fwd_dir = np.array([np.cos(truck_yaw), np.sin(truck_yaw)])
+    ax2.annotate(
+        "",
+        xy=(truck_pos[0] + fwd_dir[0] * 1.3, truck_pos[1] + fwd_dir[1] * 1.3),
+        xytext=truck_pos,
+        arrowprops={
+            "arrowstyle": "->,head_width=0.2,head_length=0.12",
+            "color": STYLE["accent3"],
+            "lw": 2.5,
+        },
+        zorder=9,
+    )
+    ax2.text(
+        truck_pos[0] + fwd_dir[0] * 1.8,
+        truck_pos[1] + fwd_dir[1] * 1.8 + 0.3,
+        "forward",
+        color=STYLE["accent3"],
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=10,
+    )
+
+    ax2.text(
+        -2.5,
+        -3.5,
+        "Always moves in\nthe heading direction",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="center",
+        va="center",
+        style="italic",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    ax2.set_title(
+        "Forward-Driven Movement",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        pad=12,
+    )
+
+    fig.tight_layout()
+    save(fig, "gpu/31-transform-animations", "forward_driven_movement.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/31-transform-animations — arc_length_parameterization.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_arc_length_parameterization():
+    """Side-by-side: uniform parameterization vs arc-length parameterization.
+
+    Shows how uniform parameter spacing misaligns yaw changes with actual
+    position, while arc-length spacing keeps them synchronized.
+    """
+    fig = plt.figure(figsize=(10, 5), facecolor=STYLE["bg"])
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
+
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+    stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
+
+    # Simplified path: 3 segments of different lengths
+    # Short corner arc → Long straight → Short corner arc
+    waypoints = np.array(
+        [
+            [-3.5, 3.0],  # A (start of corner)
+            [-1.0, 3.5],  # B (end of corner, start of long straight)
+            [3.5, 3.5],  # C (end of straight, start of corner)
+            [3.5, 0.5],  # D (end of corner)
+        ]
+    )
+    labels = ["A", "B", "C", "D"]
+    seg_lengths = np.array(
+        [np.linalg.norm(waypoints[i + 1] - waypoints[i]) for i in range(3)]
+    )
+    total_len = seg_lengths.sum()
+
+    # Road path (polyline)
+    def draw_path_and_waypoints(ax):
+        ax.plot(
+            waypoints[:, 0],
+            waypoints[:, 1],
+            color=STYLE["text_dim"],
+            lw=1.5,
+            ls="--",
+            alpha=0.4,
+            zorder=1,
+        )
+        for i, (wp, lbl) in enumerate(zip(waypoints, labels)):
+            ax.plot(*wp, "o", color=STYLE["warn"], ms=7, zorder=6)
+            oy = 0.5 if i < 2 else -0.5
+            ax.text(
+                wp[0],
+                wp[1] + oy,
+                lbl,
+                color=STYLE["warn"],
+                fontsize=10,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                path_effects=stroke,
+                zorder=7,
+            )
+
+    def point_on_path(dist):
+        """Return (x, y) at the given distance along the polyline."""
+        d = 0.0
+        for i in range(len(waypoints) - 1):
+            seg_len = seg_lengths[i]
+            if d + seg_len >= dist:
+                t = (dist - d) / seg_len if seg_len > 1e-9 else 0.0
+                return waypoints[i] + t * (waypoints[i + 1] - waypoints[i])
+            d += seg_len
+        return waypoints[-1].copy()
+
+    # Number of sample dots to show
+    n_dots = 9
+
+    # -- Left panel: Uniform Parameterization --------------------------------
+    setup_axes(ax1, xlim=(-4.5, 4.5), ylim=(-1.5, 5.5), aspect="equal")
+    draw_path_and_waypoints(ax1)
+
+    # Uniform: equal parameter intervals → equal fractions of segment count
+    # Each segment gets equal parameter range regardless of length
+    seg_count = len(waypoints) - 1
+    for i in range(n_dots):
+        # Uniform parameter: evenly space across the parameter range
+        u = i / (n_dots - 1)  # 0..1
+        # Map to segment + local t (each segment gets 1/seg_count of parameter)
+        seg_param = u * seg_count
+        seg_idx = min(int(seg_param), seg_count - 1)
+        local_t = seg_param - seg_idx
+        pos = waypoints[seg_idx] + local_t * (
+            waypoints[seg_idx + 1] - waypoints[seg_idx]
+        )
+        color = STYLE["accent1"] if i % 2 == 0 else STYLE["accent4"]
+        ax1.plot(*pos, "o", color=color, ms=6, zorder=5)
+
+    # Show segment length annotations
+    for i in range(seg_count):
+        mid = (waypoints[i] + waypoints[i + 1]) / 2
+        ax1.text(
+            mid[0],
+            mid[1] - 0.7,
+            f"L={seg_lengths[i]:.1f}",
+            color=STYLE["text_dim"],
+            fontsize=7,
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+
+    # Annotation: bunched on short, spread on long
+    ax1.text(
+        0.0,
+        -0.8,
+        "Equal parameter intervals\n→ bunched on short segments,\n  spread on long segments",
+        color=STYLE["accent1"],
+        fontsize=8,
+        ha="center",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    ax1.set_title(
+        "Uniform Parameterization",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        pad=12,
+    )
+
+    # -- Right panel: Arc-Length Parameterization -----------------------------
+    setup_axes(ax2, xlim=(-4.5, 4.5), ylim=(-1.5, 5.5), aspect="equal")
+    draw_path_and_waypoints(ax2)
+
+    # Arc-length: equal distance intervals along the actual path
+    for i in range(n_dots):
+        dist = i / (n_dots - 1) * total_len
+        pos = point_on_path(dist)
+        color = STYLE["accent3"] if i % 2 == 0 else STYLE["accent4"]
+        ax2.plot(*pos, "o", color=color, ms=6, zorder=5)
+
+    # Show segment length annotations
+    for i in range(seg_count):
+        mid = (waypoints[i] + waypoints[i + 1]) / 2
+        ax2.text(
+            mid[0],
+            mid[1] - 0.7,
+            f"L={seg_lengths[i]:.1f}",
+            color=STYLE["text_dim"],
+            fontsize=7,
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+
+    # Annotation: evenly spaced
+    ax2.text(
+        0.0,
+        -0.8,
+        "Equal distance intervals\n→ evenly spaced regardless\n  of segment length",
+        color=STYLE["accent3"],
+        fontsize=8,
+        ha="center",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    ax2.set_title(
+        "Arc-Length Parameterization",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        pad=12,
+    )
+
+    fig.tight_layout()
+    save(fig, "gpu/31-transform-animations", "arc_length_parameterization.png")
