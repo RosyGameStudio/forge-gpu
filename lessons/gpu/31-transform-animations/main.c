@@ -78,10 +78,10 @@
 
 /* Camera initial position — elevated, looking down at the track. */
 #define CAM_START_X         0.0f
-#define CAM_START_Y         15.0f
-#define CAM_START_Z         30.0f
-#define CAM_START_YAW_DEG   180.0f
-#define CAM_START_PITCH_DEG -20.0f
+#define CAM_START_Y         20.0f
+#define CAM_START_Z         45.0f
+#define CAM_START_YAW_DEG   0.0f
+#define CAM_START_PITCH_DEG -25.0f
 
 /* Directional light — sun from behind-right, pointing into the scene. */
 #define LIGHT_DIR_X     -0.4f
@@ -100,13 +100,13 @@
 /* Shadow map. */
 #define SHADOW_MAP_SIZE   2048
 #define SHADOW_DEPTH_FMT  SDL_GPU_TEXTUREFORMAT_D32_FLOAT
-#define SHADOW_ORTHO_SIZE 40.0f
+#define SHADOW_ORTHO_SIZE 50.0f
 #define SHADOW_NEAR       0.1f
 #define SHADOW_FAR        100.0f
 #define LIGHT_DISTANCE    40.0f
 
 /* Ground plane. */
-#define GROUND_Y          0.0f
+#define GROUND_Y         -0.05f
 #define GROUND_HALF_SIZE  60.0f
 #define GROUND_SHININESS  16.0f
 #define GROUND_SPECULAR   0.1f
@@ -159,7 +159,7 @@
 /* Animation playback. */
 #define ANIM_SPEED         1.0f
 #define PATH_SPEED         0.04f
-#define TRUCK_Y            0.5f
+#define TRUCK_Y            0.0f
 #define KEYFRAME_EPSILON   1e-7f
 #define MAX_ANIM_CHANNELS  8
 #define ANIM_NAME_SIZE     64
@@ -185,7 +185,7 @@
 #define TRUCK_NODE_COUNT        6
 
 /* Path waypoint count. */
-#define PATH_WAYPOINT_COUNT 8
+#define PATH_WAYPOINT_COUNT 12
 
 /* ── Uniform structures ─────────────────────────────────────────────── */
 
@@ -280,17 +280,71 @@ typedef struct ModelData {
     int            material_count;  /* number of materials in the array        */
 } ModelData;
 
-/* ── Path waypoints (elliptical loop around the track) ──────────────── */
+/* ── Modular track layout ───────────────────────────────────────────── */
+/* Build a rectangular loop from the modular track pieces.
+ *
+ *                         Top (start/finish)
+ *            ┌──────────────────────────────────┐
+ *            │  TL corner      15m       TR corner │
+ *            │                                     │
+ *     Left   │  30m                         30m    │ Right
+ *     side   │  straight                  straight │ side
+ *            │                                     │
+ *            │  BL corner      15m       BR corner │
+ *            └──────────────────────────────────┘
+ *                        Bottom straight
+ *
+ * Corner arm length: 7.5 units (half of 15m corner piece).
+ * Corner positions: (±15, 0, ±22.5).
+ * Right/left straights: 30m along Z, centered at (±15, 0, 0).
+ * Top/bottom straights: 15m along X, centered at (0, 0, ±22.5).
+ */
+
+/* Track mesh indices (from the track glTF model). */
+#define TRACK_MESH_CORNER_15  3   /* 90-degree corner, 15x15m        */
+#define TRACK_MESH_LINE_15    5   /* straight road, 15m              */
+#define TRACK_MESH_LINE_30    6   /* straight road, 30m              */
+#define TRACK_MESH_START_FIN  7   /* start/finish line, 15m          */
+
+/* Track layout geometry.  The 15x15m corner mesh origin is offset 1.16
+ * from its geometric center (bounds X[-8.66,6.34], Z[-6.34,8.66]).
+ * Corner inner arm extent is 6.34 — so corners sit at CX/CZ such that
+ * 6.34 reaches the straight piece ends (7.5 for 15m, 15 for 30m).
+ * Straight pieces are then pushed outward by the same 1.16 offset so
+ * their road centers align with the corner road centers. */
+#define TRACK_CX      13.84f      /* corner X offset from center     */
+#define TRACK_CZ      21.34f      /* corner Z offset from center     */
+#define TRACK_OFFSET   1.16f      /* corner origin-to-center offset  */
+
+/* A track piece — one mesh placed at a custom world transform. */
+typedef struct TrackPiece {
+    int  mesh_index;  /* index into track model's ForgeGltfScene.meshes[] */
+    mat4 transform;   /* world transform for this instance               */
+} TrackPiece;
+
+#define TRACK_PIECE_COUNT 8
+
+/* ── Path waypoints (clockwise loop matching the track layout) ─────── */
 
 static const PathWaypoint PATH_WAYPOINTS[PATH_WAYPOINT_COUNT] = {
-    { {  20.0f, TRUCK_Y,  15.0f },  FORGE_PI * 0.0f  },
-    { {  20.0f, TRUCK_Y, -10.0f },  FORGE_PI * 0.0f  },  /* straight heading -Z */
-    { {  10.0f, TRUCK_Y, -15.0f },  FORGE_PI * 0.5f  },  /* turning left        */
-    { { -15.0f, TRUCK_Y, -15.0f },  FORGE_PI * 0.5f  },  /* straight heading -X */
-    { { -23.0f, TRUCK_Y, -10.0f },  FORGE_PI * 1.0f  },  /* turning             */
-    { { -23.0f, TRUCK_Y,  10.0f },  FORGE_PI * 1.0f  },  /* straight heading +Z */
-    { { -15.0f, TRUCK_Y,  16.0f },  FORGE_PI * 1.5f  },  /* turning             */
-    { {  10.0f, TRUCK_Y,  16.0f },  FORGE_PI * 1.5f  },  /* straight heading +X */
+    /* The truck model faces +Z at yaw=0, so:
+     *   yaw = π/2  → heading +X   yaw = π    → heading -Z
+     *   yaw = -π/2 → heading -X   yaw = 0    → heading +Z
+     *
+     * Track rectangle corners at (±TRACK_CX, ±TRACK_CZ).  Waypoints trace
+     * the road centerline clockwise when viewed from above. */
+    { {  -5.0f, TRUCK_Y,  22.5f },  FORGE_PI *  0.5f },  /* top, heading +X       */
+    { {   5.0f, TRUCK_Y,  22.5f },  FORGE_PI *  0.5f },  /* top-right approach    */
+    { {  15.0f, TRUCK_Y,  14.0f },  FORGE_PI *  1.0f },  /* TR corner, heading -Z */
+    { {  15.0f, TRUCK_Y,   0.0f },  FORGE_PI *  1.0f },  /* right straight        */
+    { {  15.0f, TRUCK_Y, -14.0f },  FORGE_PI *  1.0f },  /* right-bottom approach */
+    { {   5.0f, TRUCK_Y, -22.5f }, -FORGE_PI *  0.5f },  /* BR corner, heading -X */
+    { {  -5.0f, TRUCK_Y, -22.5f }, -FORGE_PI *  0.5f },  /* bottom straight       */
+    { { -15.0f, TRUCK_Y, -14.0f },  FORGE_PI *  0.0f },  /* BL corner, heading +Z */
+    { { -15.0f, TRUCK_Y,   0.0f },  FORGE_PI *  0.0f },  /* left straight         */
+    { { -15.0f, TRUCK_Y,  14.0f },  FORGE_PI *  0.0f },  /* left-top approach     */
+    { {  -8.0f, TRUCK_Y,  22.0f },  FORGE_PI *  0.5f },  /* TL corner, heading +X */
+    { {  -5.0f, TRUCK_Y,  22.5f },  FORGE_PI *  0.5f },  /* back to start         */
 };
 
 /* ── Application state ──────────────────────────────────────────────── */
@@ -319,6 +373,7 @@ typedef struct app_state {
     SDL_GPUTexture *dirt_texture;    /* procedural Perlin noise ground      */
     ModelData truck;                 /* CesiumMilkTruck glTF + GPU data     */
     ModelData track;                 /* modular racetrack glTF + GPU data   */
+    TrackPiece track_pieces[TRACK_PIECE_COUNT]; /* custom layout instances */
 
     /* Floor geometry. */
     SDL_GPUBuffer *floor_vb; /* 4-vertex XZ quad at GROUND_Y               */
@@ -1453,6 +1508,128 @@ static void draw_model_scene(
     }
 }
 
+/* ── Helper: draw one track mesh at a custom transform (shadow) ────── */
+
+static void draw_track_piece_shadow(
+    SDL_GPURenderPass *pass,
+    SDL_GPUCommandBuffer *cmd,
+    const ModelData *model,
+    int mesh_index,
+    const mat4 *world,
+    const mat4 *light_vp)
+{
+    const ForgeGltfScene *scene = &model->scene;
+    if (mesh_index < 0 || mesh_index >= scene->mesh_count)
+        return;
+
+    ShadowVertUniforms vert_u;
+    vert_u.light_mvp = mat4_multiply(*light_vp, *world);
+    SDL_PushGPUVertexUniformData(cmd, 0, &vert_u, sizeof(vert_u));
+
+    const ForgeGltfMesh *mesh = &scene->meshes[mesh_index];
+    for (int pi = 0; pi < mesh->primitive_count; pi++) {
+        int prim_idx = mesh->first_primitive + pi;
+        if (prim_idx < 0 || prim_idx >= model->primitive_count) continue;
+        const GpuPrimitive *gpu_prim = &model->primitives[prim_idx];
+        if (!gpu_prim->vertex_buffer || !gpu_prim->index_buffer) continue;
+
+        SDL_GPUBufferBinding vb = { gpu_prim->vertex_buffer, 0 };
+        SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
+        SDL_GPUBufferBinding ib = { gpu_prim->index_buffer, 0 };
+        SDL_BindGPUIndexBuffer(pass, &ib, gpu_prim->index_type);
+        SDL_DrawGPUIndexedPrimitives(pass, gpu_prim->index_count, 1, 0, 0, 0);
+    }
+}
+
+/* ── Helper: draw one track mesh at a custom transform (scene) ───── */
+
+static void draw_track_piece_scene(
+    SDL_GPURenderPass *pass,
+    SDL_GPUCommandBuffer *cmd,
+    const ModelData *model,
+    const app_state *state,
+    int mesh_index,
+    const mat4 *world,
+    const mat4 *cam_vp,
+    const vec3 *eye_pos)
+{
+    const ForgeGltfScene *scene = &model->scene;
+    if (mesh_index < 0 || mesh_index >= scene->mesh_count)
+        return;
+
+    mat4 mvp = mat4_multiply(*cam_vp, *world);
+    SceneVertUniforms vert_u;
+    vert_u.mvp      = mvp;
+    vert_u.model    = *world;
+    vert_u.light_vp = state->light_vp;
+    SDL_PushGPUVertexUniformData(cmd, 0, &vert_u, sizeof(vert_u));
+
+    const ForgeGltfMesh *mesh = &scene->meshes[mesh_index];
+    for (int pi = 0; pi < mesh->primitive_count; pi++) {
+        int prim_idx = mesh->first_primitive + pi;
+        if (prim_idx < 0 || prim_idx >= model->primitive_count) continue;
+        const GpuPrimitive *gpu_prim = &model->primitives[prim_idx];
+        if (!gpu_prim->vertex_buffer || !gpu_prim->index_buffer) continue;
+
+        SDL_GPUTexture *tex = state->white_texture;
+        SceneFragUniforms frag_u;
+        SDL_zero(frag_u);
+
+        if (gpu_prim->material_index >= 0 &&
+            gpu_prim->material_index < model->material_count) {
+            const GpuMaterial *mat = &model->materials[gpu_prim->material_index];
+            frag_u.base_color[0] = mat->base_color[0];
+            frag_u.base_color[1] = mat->base_color[1];
+            frag_u.base_color[2] = mat->base_color[2];
+            frag_u.base_color[3] = mat->base_color[3];
+            frag_u.has_texture = mat->has_texture ? 1.0f : 0.0f;
+            if (mat->texture) tex = mat->texture;
+        } else {
+            frag_u.base_color[0] = 1.0f;
+            frag_u.base_color[1] = 1.0f;
+            frag_u.base_color[2] = 1.0f;
+            frag_u.base_color[3] = 1.0f;
+            frag_u.has_texture   = 0.0f;
+        }
+
+        frag_u.eye_pos[0]       = eye_pos->x;
+        frag_u.eye_pos[1]       = eye_pos->y;
+        frag_u.eye_pos[2]       = eye_pos->z;
+        frag_u.ambient          = MATERIAL_AMBIENT;
+        frag_u.shininess        = MATERIAL_SHININESS;
+        frag_u.specular_str     = MATERIAL_SPECULAR_STR;
+        frag_u.light_dir[0]     = LIGHT_DIR_X;
+        frag_u.light_dir[1]     = LIGHT_DIR_Y;
+        frag_u.light_dir[2]     = LIGHT_DIR_Z;
+        frag_u.light_dir[3]     = 0.0f;
+        frag_u.light_color[0]   = LIGHT_COLOR_R;
+        frag_u.light_color[1]   = LIGHT_COLOR_G;
+        frag_u.light_color[2]   = LIGHT_COLOR_B;
+        frag_u.light_intensity  = LIGHT_INTENSITY;
+        SDL_PushGPUFragmentUniformData(cmd, 0, &frag_u, sizeof(frag_u));
+
+        SDL_GPUTextureSamplerBinding tex_binds[2];
+        tex_binds[0] = (SDL_GPUTextureSamplerBinding){
+            .texture = tex, .sampler = state->sampler };
+        tex_binds[1] = (SDL_GPUTextureSamplerBinding){
+            .texture = state->shadow_depth,
+            .sampler = state->nearest_clamp };
+        SDL_BindGPUFragmentSamplers(pass, 0, tex_binds, 2);
+
+        SDL_GPUBufferBinding vb;
+        SDL_zero(vb);
+        vb.buffer = gpu_prim->vertex_buffer;
+        SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
+
+        SDL_GPUBufferBinding ib;
+        SDL_zero(ib);
+        ib.buffer = gpu_prim->index_buffer;
+        SDL_BindGPUIndexBuffer(pass, &ib, gpu_prim->index_type);
+
+        SDL_DrawGPUIndexedPrimitives(pass, gpu_prim->index_count, 1, 0, 0, 0);
+    }
+}
+
 /* ── Helper: draw the ground plane with dirt texture ───────────────── */
 
 static void draw_floor(
@@ -1709,6 +1886,44 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     state->wheel_state.playing      = true;
     state->path_time                = 0.0f;
 
+    /* ── Build the modular track layout ────────────────────────── */
+    /* Place each piece with a transform: translate to position, then
+     * rotate around Y so the road connections line up.  The corner
+     * mesh has arms extending toward local -X and +Z. */
+    {
+        /* Helper: build translate * rotate_y transform. */
+        #define PIECE(mi, px, pz, angle) \
+            { (mi), mat4_multiply(                           \
+                mat4_translate(vec3_create((px), 0.0f, (pz))),  \
+                mat4_rotate_y(angle)) }
+
+        /* Side straights pushed outward by TRACK_OFFSET so their road
+         * centers align with the corner road centers. */
+        const float sx = TRACK_CX + TRACK_OFFSET; /* side straight X */
+        const float tz = TRACK_CZ + TRACK_OFFSET; /* top/bottom straight Z */
+
+        TrackPiece layout[TRACK_PIECE_COUNT] = {
+            /* Top-right corner  — curve faces inward     */
+            PIECE(TRACK_MESH_CORNER_15,  TRACK_CX,  TRACK_CZ,  FORGE_PI * 0.5f),
+            /* Right straight    — road along Z           */
+            PIECE(TRACK_MESH_LINE_30,    sx,         0.0f,       0.0f),
+            /* Bottom-right corner — curve faces inward   */
+            PIECE(TRACK_MESH_CORNER_15,  TRACK_CX, -TRACK_CZ,  FORGE_PI),
+            /* Bottom straight   — road along X           */
+            PIECE(TRACK_MESH_LINE_15,    0.0f,      -tz,         FORGE_PI * 0.5f),
+            /* Bottom-left corner — curve faces inward    */
+            PIECE(TRACK_MESH_CORNER_15, -TRACK_CX, -TRACK_CZ, -FORGE_PI * 0.5f),
+            /* Left straight     — road along Z           */
+            PIECE(TRACK_MESH_LINE_30,   -sx,         0.0f,       0.0f),
+            /* Top-left corner   — curve faces inward     */
+            PIECE(TRACK_MESH_CORNER_15, -TRACK_CX,  TRACK_CZ,  0.0f),
+            /* Top start/finish  — road along X           */
+            PIECE(TRACK_MESH_START_FIN,  0.0f,       tz,         FORGE_PI * 0.5f),
+        };
+        SDL_memcpy(state->track_pieces, layout, sizeof(layout));
+        #undef PIECE
+    }
+
     /* ── Shadow pipeline (depth-only) ───────────────────────────── */
     {
         SDL_GPUShader *vert = create_shader(device, SDL_GPU_SHADERSTAGE_VERTEX,
@@ -1902,7 +2117,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
             {{  GROUND_HALF_SIZE, GROUND_Y,  GROUND_HALF_SIZE }, { 0,1,0 }, { GROUND_UV_REPEAT, GROUND_UV_REPEAT }},
             {{ -GROUND_HALF_SIZE, GROUND_Y,  GROUND_HALF_SIZE }, { 0,1,0 }, { 0, GROUND_UV_REPEAT }},
         };
-        Uint16 indices[] = { 0, 1, 2, 0, 2, 3 };
+        Uint16 indices[] = { 0, 2, 1, 0, 3, 2 };
 
         state->floor_vb = upload_gpu_buffer(device,
             SDL_GPU_BUFFERUSAGE_VERTEX, verts, sizeof(verts));
@@ -2153,10 +2368,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
      * root to leaves: world = parent_world * local. */
     rebuild_node_transforms(&state->truck.scene);
 
-    /* Track model uses identity placement — its internal transforms
-     * (including Sketchfab coordinate conversion nodes) handle
-     * positioning.  Rebuild its hierarchy once at runtime. */
-    mat4 track_placement = mat4_identity();
+    /* Track uses the custom layout — individual piece transforms are
+     * in state->track_pieces[], set once during AppInit. */
 
     /* ── Camera matrices ───────────────────────────────────────────── */
     quat cam_orient = quat_from_euler(state->cam_yaw, state->cam_pitch, 0.0f);
@@ -2216,9 +2429,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         draw_model_shadow(shadow_pass, cmd, &state->truck,
                           &truck_placement, &state->light_vp);
 
-        /* Shadow for track. */
-        draw_model_shadow(shadow_pass, cmd, &state->track,
-                          &track_placement, &state->light_vp);
+        /* Shadow for track (custom layout — individual pieces). */
+        for (int ti = 0; ti < TRACK_PIECE_COUNT; ti++) {
+            draw_track_piece_shadow(shadow_pass, cmd, &state->track,
+                state->track_pieces[ti].mesh_index,
+                &state->track_pieces[ti].transform,
+                &state->light_vp);
+        }
 
         /* Shadow for floor quad. */
         {
@@ -2271,8 +2488,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
         draw_model_scene(main_pass, cmd, &state->truck, state,
                          &truck_placement, &cam_vp, &state->cam_position);
-        draw_model_scene(main_pass, cmd, &state->track, state,
-                         &track_placement, &cam_vp, &state->cam_position);
+        /* Track (custom layout — individual pieces). */
+        for (int ti = 0; ti < TRACK_PIECE_COUNT; ti++) {
+            draw_track_piece_scene(main_pass, cmd, &state->track, state,
+                state->track_pieces[ti].mesh_index,
+                &state->track_pieces[ti].transform,
+                &cam_vp, &state->cam_position);
+        }
 
         /* Draw skybox. */
         SDL_BindGPUGraphicsPipeline(main_pass, state->skybox_pipeline);
