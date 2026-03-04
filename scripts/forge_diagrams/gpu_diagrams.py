@@ -12753,12 +12753,7 @@ def diagram_underwater_camera_guard():
 
 
 def diagram_keyframe_interpolation():
-    """Keyframe interpolation modes: STEP, LINEAR, and CUBIC.
-
-    Shows a timeline with discrete keyframe markers and three interpolation
-    curves.  Highlights binary search for the two keyframes bracketing a
-    query time *t*.
-    """
+    """Keyframe interpolation modes: STEP, LINEAR, and Catmull-Rom cubic."""
     fig = plt.figure(figsize=(10, 6), facecolor=STYLE["bg"])
     ax = fig.add_subplot(111)
     setup_axes(ax, xlim=(-0.1, 1.65), ylim=(-15, 195), grid=True, aspect=None)
@@ -12833,7 +12828,7 @@ def diagram_keyframe_interpolation():
         v_smooth,
         color=STYLE["accent3"],
         lw=2.0,
-        label="CUBIC",
+        label="CUBIC (Catmull-Rom)",
         alpha=0.85,
         zorder=3,
     )
@@ -12971,12 +12966,7 @@ def diagram_keyframe_interpolation():
 
 
 def diagram_quaternion_slerp():
-    """Visualize SLERP vs NLERP on a unit circle (2-D projection).
-
-    Places two quaternions q0 and q1 on the unit circle, draws the great-arc
-    path (slerp) and the chord (nlerp), and marks interpolated positions
-    at t = 0.0, 0.25, 0.5, 0.75, 1.0.
-    """
+    """SLERP vs NLERP on a unit circle with interpolated positions."""
     fig = plt.figure(figsize=(8, 8), facecolor=STYLE["bg"])
     ax = fig.add_subplot(111)
     setup_axes(ax, xlim=(-1.55, 1.55), ylim=(-1.55, 1.55))
@@ -13153,12 +13143,7 @@ def diagram_quaternion_slerp():
 
 
 def diagram_animation_clip_structure():
-    """glTF animation data layout: clips, channels, samplers, accessors.
-
-    Top: timeline bar with keyframe dots.
-    Middle: two parallel channel tracks.
-    Bottom: data-flow boxes from animation to buffer.
-    """
+    """glTF animation data layout: clips, channels, samplers, accessors."""
     from matplotlib.patches import FancyArrowPatch
 
     fig = plt.figure(figsize=(12, 7), facecolor=STYLE["bg"])
@@ -13380,11 +13365,7 @@ def diagram_animation_clip_structure():
 
 
 def diagram_transform_hierarchy():
-    """CesiumMilkTruck node tree with animated wheel nodes.
-
-    Shows the scene graph hierarchy, transform composition formula, and
-    input arrows for path animation and glTF keyframes.
-    """
+    """CesiumMilkTruck node tree with animated wheel nodes."""
     from matplotlib.patches import FancyArrowPatch
 
     fig = plt.figure(figsize=(10, 8), facecolor=STYLE["bg"])
@@ -13568,11 +13549,7 @@ def diagram_transform_hierarchy():
 
 
 def diagram_path_following():
-    """Top-down view (XZ plane) of the elliptical truck track.
-
-    Shows the ellipse path, numbered waypoints, a truck rectangle between
-    two waypoints, forward direction vector, and alpha annotation.
-    """
+    """Top-down view of the truck track with waypoints and forward vector."""
     fig = plt.figure(figsize=(10, 8), facecolor=STYLE["bg"])
     ax = fig.add_subplot(111)
     setup_axes(ax, xlim=(-6.5, 6.5), ylim=(-5.0, 5.0))
@@ -13762,11 +13739,7 @@ def diagram_path_following():
 
 
 def diagram_animation_timeline():
-    """Two stacked timelines: path animation and wheel animation.
-
-    Shows how both animations run simultaneously at different rates, with
-    fmod wrapping illustrated.
-    """
+    """Stacked timelines showing path and wheel animation looping independently."""
     fig = plt.figure(figsize=(12, 5), facecolor=STYLE["bg"])
     ax = fig.add_subplot(111)
     setup_axes(ax, xlim=(-1.5, 28), ylim=(-2.5, 5.5), grid=False, aspect=None)

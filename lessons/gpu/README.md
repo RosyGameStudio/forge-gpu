@@ -305,7 +305,7 @@ GPU programming has a learning curve, but these lessons make it manageable.
 
 ## What's Next?
 
-After completing the current 28 lessons, you'll have the skills to build
+After completing the current 31 lessons, you'll have the skills to build
 real-time 3D applications with lighting, shadows, post-processing, UI, and
 procedural content. Use the skills to build your own projects, or extend
 the lessons with new techniques.

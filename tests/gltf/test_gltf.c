@@ -42,8 +42,12 @@ static bool vec3_eq(vec3 a, vec3 b)
 
 static bool quat_eq(quat a, quat b)
 {
-    return float_eq(a.w, b.w) && float_eq(a.x, b.x)
-        && float_eq(a.y, b.y) && float_eq(a.z, b.z);
+    /* q and -q represent the same rotation — check both signs. */
+    bool same = float_eq(a.w, b.w) && float_eq(a.x, b.x)
+             && float_eq(a.y, b.y) && float_eq(a.z, b.z);
+    bool flip = float_eq(a.w, -b.w) && float_eq(a.x, -b.x)
+             && float_eq(a.y, -b.y) && float_eq(a.z, -b.z);
+    return same || flip;
 }
 
 #define TEST(name) do { test_count++; SDL_Log("  Testing: %s", (name)); } while (0)

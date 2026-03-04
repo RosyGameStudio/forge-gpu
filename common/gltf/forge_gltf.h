@@ -976,11 +976,11 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
                 const cJSON *rz = cJSON_GetArrayItem(rot, 2);
                 const cJSON *rw = cJSON_GetArrayItem(rot, 3);
                 if (rx && ry && rz && rw) {
-                    gn->rotation = quat_create(
+                    gn->rotation = quat_normalize(quat_create(
                         (float)rw->valuedouble,
                         (float)rx->valuedouble,
                         (float)ry->valuedouble,
-                        (float)rz->valuedouble);
+                        (float)rz->valuedouble));
                 }
             }
 

@@ -1211,9 +1211,17 @@ static void parse_truck_animation(AnimClip *clip, const ForgeGltfScene *scene)
      * copying, because the scene data remains valid for the program's
      * lifetime. */
 
-    const Uint8 *bin = scene->buffers[0].data;
-    if (!bin) {
-        SDL_Log("WARNING: truck binary buffer is NULL, animation will be empty");
+    const Uint8 *bin  = scene->buffers[0].data;
+    Uint32 bin_size   = scene->buffers[0].size;
+
+    /* Minimum buffer size: last offset + 31 quaternions (4 floats × 4 bytes). */
+    const Uint32 min_size = ANIM_ROTATION1_OFFSET
+                          + ANIM_KEYFRAME_COUNT * 4 * sizeof(float);
+
+    if (!bin || bin_size < min_size) {
+        SDL_Log("WARNING: truck binary buffer is %s (size=%u, need=%u), "
+                "animation will be empty",
+                bin ? "too small" : "NULL", bin_size, min_size);
         SDL_memset(clip, 0, sizeof(*clip));
         return;
     }

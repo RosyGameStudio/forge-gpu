@@ -47,7 +47,7 @@ and interpolates between them. The interpolation parameter $t$ describes
 how far we are between the two timestamps:
 
 $$
-t = \frac{\text{current\_time} - \text{key}_{i}}{\text{key}_{i+1} - \text{key}_{i}}
+t = \frac{\text{current time} - \text{key}_{i}}{\text{key}_{i+1} - \text{key}_{i}}
 $$
 
 For translation and scale, standard linear interpolation (lerp) produces
@@ -158,14 +158,12 @@ This is computed with a top-down traversal — visit each node, multiply its
 local transform by its parent's world transform, and store the result. The
 CesiumMilkTruck hierarchy looks like:
 
-```text
-Yup2Zup (root)
-  └── Cesium_Milk_Truck (body mesh)
-        ├── Node (front axle position)
-        │     └── Wheels (front wheel mesh, animated rotation)
-        └── Node.001 (rear axle position)
-              └── Wheels.001 (rear wheel mesh, animated rotation)
-```
+- **Yup2Zup** (root)
+  - **Cesium_Milk_Truck** (body mesh)
+    - **Node** (front axle position)
+      - **Wheels** (front wheel mesh, animated rotation)
+    - **Node.001** (rear axle position)
+      - **Wheels.001** (rear wheel mesh, animated rotation)
 
 When the animation system updates a wheel node's rotation quaternion, the
 hierarchy rebuild propagates that change into the wheel's world transform
