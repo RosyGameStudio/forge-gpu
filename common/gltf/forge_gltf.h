@@ -1001,10 +1001,11 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
                 }
             }
 
-            mat4 T = mat4_translate(gn->translation);
-            mat4 R = quat_to_mat4(gn->rotation);
-            mat4 S = mat4_scale(gn->scale_xyz);
-            gn->local_transform = mat4_multiply(T, mat4_multiply(R, S));
+            mat4 t_mat = mat4_translate(gn->translation);
+            mat4 r_mat = quat_to_mat4(gn->rotation);
+            mat4 s_mat = mat4_scale(gn->scale_xyz);
+            gn->local_transform =
+                mat4_multiply(t_mat, mat4_multiply(r_mat, s_mat));
         }
     }
     scene->node_count = count;

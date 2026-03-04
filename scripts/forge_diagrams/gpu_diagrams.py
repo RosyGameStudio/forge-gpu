@@ -12804,8 +12804,8 @@ def diagram_keyframe_interpolation():
             + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t_arr**3
         )
 
-    t_smooth = np.array([], dtype=float)
-    v_smooth = np.array([], dtype=float)
+    t_segments = []
+    v_segments = []
     for seg_i in range(len(kf_times) - 1):
         # Clamp boundary control points
         i0 = max(seg_i - 1, 0)
@@ -12820,8 +12820,11 @@ def diagram_keyframe_interpolation():
         u = np.linspace(0, 1, n_pts, endpoint=(seg_i == len(kf_times) - 2))
         seg_t = kf_times[seg_i] + u * (kf_times[seg_i + 1] - kf_times[seg_i])
         seg_v = _catmull_rom_segment(p0, p1, p2, p3, u)
-        t_smooth = np.concatenate([t_smooth, seg_t])
-        v_smooth = np.concatenate([v_smooth, seg_v])
+        t_segments.append(seg_t)
+        v_segments.append(seg_v)
+
+    t_smooth = np.concatenate(t_segments)
+    v_smooth = np.concatenate(v_segments)
 
     ax.plot(
         t_smooth,
