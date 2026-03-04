@@ -12839,8 +12839,10 @@ def diagram_keyframe_interpolation():
 
     # --- Binary search highlight ---
     query_t = 0.78
-    # Bracketing keyframes: 0.6 and 1.0
-    idx_lo, idx_hi = 2, 3
+    # Bracketing keyframes via binary search
+    idx_hi = int(np.searchsorted(kf_times, query_t, side="right"))
+    idx_hi = min(max(idx_hi, 1), len(kf_times) - 1)
+    idx_lo = idx_hi - 1
     t_lo, t_hi = kf_times[idx_lo], kf_times[idx_hi]
     v_lo, v_hi = kf_values[idx_lo], kf_values[idx_hi]
 
