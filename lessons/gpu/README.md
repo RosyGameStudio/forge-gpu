@@ -50,6 +50,9 @@ portable C interface.
 | 26 | [Procedural Sky (Hillaire)](26-procedural-sky/) | Atmospheric scattering, Rayleigh/Mie, LUT transmittance | — |
 | 27 | [SSAO](27-ssao/) | Screen-space ambient occlusion, G-buffer, hemisphere sampling | [Blue Noise](../math/14-blue-noise-sequences/) |
 | 28 | [UI Rendering](28-ui-rendering/) | Immediate-mode UI on GPU, font atlas, alpha blending, dynamic buffers | [Vectors](../math/01-vectors/), [Matrices](../math/05-matrices/) |
+| 29 | [Screen-Space Reflections](29-screen-space-reflections/) | SSR ray marching, G-buffer, deferred shading | [Vectors](../math/01-vectors/) |
+| 30 | [Planar Reflections](30-planar-reflections/) | Mirror camera, oblique clipping, Fresnel blending | [Matrices](../math/05-matrices/) |
+| 31 | [Transform Animations](31-transform-animations/) | Keyframe interpolation, quaternion slerp, glTF animation, path following | [Orientation](../math/08-orientation/) |
 
 ## Prerequisites
 
@@ -211,6 +214,9 @@ the same pattern. Use these to build projects quickly:
 - **`/forge-procedural-sky`** — Physically-based procedural atmospheric scattering
 - **`/forge-ssao`** — Screen-space ambient occlusion
 - **`/forge-ui-rendering`** — Immediate-mode UI on GPU with font atlas and dynamic buffers
+- **`/forge-screen-space-reflections`** — Screen-space reflections with ray marching
+- **`/forge-planar-reflections`** — Planar reflections with oblique near-plane clipping
+- **`/forge-transform-animations`** — Keyframe animation from glTF with slerp and path following
 
 **How to use:**
 
