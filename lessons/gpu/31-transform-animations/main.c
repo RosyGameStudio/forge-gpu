@@ -158,7 +158,7 @@
 
 /* Animation playback. */
 #define ANIM_SPEED         1.0f
-#define PATH_SPEED         0.04f
+#define TRUCK_DRIVE_SPEED  8.0f   /* forward movement speed (units/sec)   */
 #define TRUCK_Y            0.0f
 #define KEYFRAME_EPSILON   1e-7f
 #define MAX_ANIM_CHANNELS  8
@@ -185,7 +185,7 @@
 #define TRUCK_NODE_COUNT        6
 
 /* Path waypoint count. */
-#define PATH_WAYPOINT_COUNT 12
+#define PATH_WAYPOINT_COUNT 14
 
 /* ── Uniform structures ─────────────────────────────────────────────── */
 
@@ -332,19 +332,23 @@ static const PathWaypoint PATH_WAYPOINTS[PATH_WAYPOINT_COUNT] = {
      *   yaw = -π/2 → heading -X   yaw = 0    → heading +Z
      *
      * Track rectangle corners at (±TRACK_CX, ±TRACK_CZ).  Waypoints trace
-     * the road centerline clockwise when viewed from above. */
-    { {  -5.0f, TRUCK_Y,  22.5f },  FORGE_PI *  0.5f },  /* top, heading +X       */
-    { {   5.0f, TRUCK_Y,  22.5f },  FORGE_PI *  0.5f },  /* top-right approach    */
-    { {  15.0f, TRUCK_Y,  14.0f },  FORGE_PI *  1.0f },  /* TR corner, heading -Z */
-    { {  15.0f, TRUCK_Y,   0.0f },  FORGE_PI *  1.0f },  /* right straight        */
-    { {  15.0f, TRUCK_Y, -14.0f },  FORGE_PI *  1.0f },  /* right-bottom approach */
-    { {   5.0f, TRUCK_Y, -22.5f }, -FORGE_PI *  0.5f },  /* BR corner, heading -X */
-    { {  -5.0f, TRUCK_Y, -22.5f }, -FORGE_PI *  0.5f },  /* bottom straight       */
-    { { -15.0f, TRUCK_Y, -14.0f },  FORGE_PI *  0.0f },  /* BL corner, heading +Z */
-    { { -15.0f, TRUCK_Y,   0.0f },  FORGE_PI *  0.0f },  /* left straight         */
-    { { -15.0f, TRUCK_Y,  14.0f },  FORGE_PI *  0.0f },  /* left-top approach     */
-    { {  -8.0f, TRUCK_Y,  22.0f },  FORGE_PI *  0.5f },  /* TL corner, heading +X */
-    { {  -5.0f, TRUCK_Y,  22.5f },  FORGE_PI *  0.5f },  /* back to start         */
+     * the road centerline clockwise when viewed from above.  Each 90-degree
+     * corner uses a midpoint on the circular arc (radius 7.5, center at the
+     * inner rectangle corner) to prevent diagonal drift. */
+    { {  -5.0f, TRUCK_Y,  22.5f },  FORGE_PI *  0.5f  },  /* top straight          */
+    { {   5.0f, TRUCK_Y,  22.5f },  FORGE_PI *  0.5f  },  /* approaching TR corner */
+    { {  12.8f, TRUCK_Y,  20.3f },  FORGE_PI *  0.75f },  /* TR arc midpoint       */
+    { {  15.0f, TRUCK_Y,  14.0f },  FORGE_PI *  1.0f  },  /* exiting TR, heading -Z*/
+    { {  15.0f, TRUCK_Y,   0.0f },  FORGE_PI *  1.0f  },  /* right straight        */
+    { {  15.0f, TRUCK_Y, -14.0f },  FORGE_PI *  1.0f  },  /* approaching BR corner */
+    { {  12.8f, TRUCK_Y, -20.3f }, -FORGE_PI *  0.75f },  /* BR arc midpoint       */
+    { {   5.0f, TRUCK_Y, -22.5f }, -FORGE_PI *  0.5f  },  /* exiting BR, heading -X*/
+    { {  -5.0f, TRUCK_Y, -22.5f }, -FORGE_PI *  0.5f  },  /* bottom straight       */
+    { { -12.8f, TRUCK_Y, -20.3f }, -FORGE_PI *  0.25f },  /* BL arc midpoint       */
+    { { -15.0f, TRUCK_Y, -14.0f },  FORGE_PI *  0.0f  },  /* exiting BL, heading +Z*/
+    { { -15.0f, TRUCK_Y,   0.0f },  FORGE_PI *  0.0f  },  /* left straight         */
+    { { -15.0f, TRUCK_Y,  14.0f },  FORGE_PI *  0.0f  },  /* approaching TL corner */
+    { { -12.8f, TRUCK_Y,  20.3f },  FORGE_PI *  0.25f },  /* TL arc midpoint       */
 };
 
 /* ── Application state ──────────────────────────────────────────────── */
@@ -397,7 +401,11 @@ typedef struct app_state {
     /* Animation. */
     AnimClip  wheel_clip;  /* parsed wheel rotation keyframes from glTF    */
     AnimState wheel_state; /* playback state for the wheel animation       */
-    float     path_time;   /* 0..1 fraction along the path loop            */
+    float     path_distance;  /* distance traveled along the path (wraps)  */
+    float     total_path_len; /* total loop perimeter                      */
+    float     seg_cumulative[PATH_WAYPOINT_COUNT]; /* cumulative dist per segment */
+    vec3      truck_pos;   /* current truck world position                 */
+    float     truck_yaw;   /* current truck heading                        */
 
     /* Timing and input. */
     Uint64 last_ticks;     /* performance counter at previous frame        */
@@ -1324,24 +1332,30 @@ static void rebuild_node_transforms(ForgeGltfScene *scene)
 
 /* Returns position and yaw by interpolating between waypoints.
  * path_t is in [0, 1] representing one full loop around the track. */
-static void evaluate_path(float path_t,
-                           vec3 *out_position, float *out_yaw)
+static float evaluate_path_yaw(float distance,
+                                const float *seg_cumulative)
 {
-    /* Map path_t into the waypoint array.  Each segment spans
-     * 1/N of the total path length (uniform parameterization). */
-    float scaled = path_t * (float)PATH_WAYPOINT_COUNT;
-    int seg = (int)scaled;
-    float frac = scaled - (float)seg;
+    /* Find which segment the truck is in based on cumulative distance.
+     * seg_cumulative[i] holds the total distance up to the END of
+     * segment i.  Binary search would work, but with only 14 segments
+     * a linear scan is simpler and fast enough. */
+    int seg = 0;
+    while (seg < PATH_WAYPOINT_COUNT - 1 &&
+           distance >= seg_cumulative[seg])
+        seg++;
 
-    /* Wrap to form a closed loop. */
-    int i0 = seg % PATH_WAYPOINT_COUNT;
+    /* Fractional position within this segment. */
+    float seg_start = (seg > 0) ? seg_cumulative[seg - 1] : 0.0f;
+    float seg_len   = seg_cumulative[seg] - seg_start;
+    float frac      = (seg_len > 1e-6f)
+                    ? (distance - seg_start) / seg_len
+                    : 0.0f;
+
+    int i0 = seg;
     int i1 = (seg + 1) % PATH_WAYPOINT_COUNT;
 
     const PathWaypoint *wp0 = &PATH_WAYPOINTS[i0];
     const PathWaypoint *wp1 = &PATH_WAYPOINTS[i1];
-
-    /* Position: linear interpolation between waypoints. */
-    *out_position = vec3_lerp(wp0->position, wp1->position, frac);
 
     /* Yaw: slerp via quaternions to handle the 0/2pi wrap-around correctly.
      * Build a yaw-only quaternion for each waypoint and slerp between them. */
@@ -1350,9 +1364,7 @@ static void evaluate_path(float path_t,
     quat q1 = quat_from_axis_angle(y_axis, wp1->yaw);
     quat qr = quat_slerp(q0, q1, frac);
 
-    /* Extract the yaw angle from the resulting quaternion.
-     * For a pure Y-axis rotation: yaw = 2 * atan2(q.y, q.w). */
-    *out_yaw = 2.0f * SDL_atan2f(qr.y, qr.w);
+    return 2.0f * SDL_atan2f(qr.y, qr.w);
 }
 
 /* ── Helper: draw a model into the shadow map (depth-only) ─────────── */
@@ -1884,7 +1896,22 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     state->wheel_state.speed        = ANIM_SPEED;
     state->wheel_state.looping      = true;
     state->wheel_state.playing      = true;
-    state->path_time                = 0.0f;
+    /* Precompute cumulative arc lengths for the waypoint loop so the
+     * yaw schedule advances proportionally to distance traveled. */
+    {
+        float cumulative = 0.0f;
+        for (int i = 0; i < PATH_WAYPOINT_COUNT; i++) {
+            int next = (i + 1) % PATH_WAYPOINT_COUNT;
+            vec3 d = vec3_sub(PATH_WAYPOINTS[next].position,
+                              PATH_WAYPOINTS[i].position);
+            cumulative += vec3_length(d);
+            state->seg_cumulative[i] = cumulative;
+        }
+        state->total_path_len = cumulative;
+    }
+    state->path_distance = 0.0f;
+    state->truck_pos     = PATH_WAYPOINTS[0].position;
+    state->truck_yaw     = PATH_WAYPOINTS[0].yaw;
 
     /* ── Build the modular track layout ────────────────────────── */
     /* Place each piece with a transform: translate to position, then
@@ -2346,21 +2373,32 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     /* ── Animation: advance path following ─────────────────────────── */
-    /* The path is parameterized as a fraction [0, 1] looping forever. */
-    state->path_time += dt * PATH_SPEED;
-    if (state->path_time >= 1.0f)
-        state->path_time -= 1.0f;
+    /* The truck always moves forward in its heading direction.  The yaw
+     * schedule uses arc-length parameterization: the yaw advances
+     * proportionally to distance traveled, so the truck turns at exactly
+     * the right position regardless of segment length. */
+    {
+        float step = TRUCK_DRIVE_SPEED * dt;
+        state->path_distance += step;
+        if (state->path_distance >= state->total_path_len)
+            state->path_distance -= state->total_path_len;
 
-    vec3  truck_pos;
-    float truck_yaw;
-    evaluate_path(state->path_time, &truck_pos, &truck_yaw);
+        state->truck_yaw = evaluate_path_yaw(
+            state->path_distance, state->seg_cumulative);
 
-    /* Build the truck's world placement matrix: translate to path
-     * position, then rotate around Y by the path yaw.  This positions
+        float fwd_x = SDL_sinf(state->truck_yaw);
+        float fwd_z = SDL_cosf(state->truck_yaw);
+        state->truck_pos.x += fwd_x * step;
+        state->truck_pos.z += fwd_z * step;
+    }
+    state->truck_pos.y = TRUCK_Y;
+
+    /* Build the truck's world placement matrix: translate to current
+     * position, then rotate around Y by the heading.  This positions
      * the entire truck hierarchy (body + wheels) in the world. */
     mat4 truck_placement = mat4_multiply(
-        mat4_translate(truck_pos),
-        mat4_rotate_y(truck_yaw));
+        mat4_translate(state->truck_pos),
+        mat4_rotate_y(state->truck_yaw));
 
     /* ── Rebuild truck node hierarchy ──────────────────────────────── */
     /* After writing animated rotations and computing the path placement,
