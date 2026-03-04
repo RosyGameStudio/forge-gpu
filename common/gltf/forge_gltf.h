@@ -959,7 +959,8 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
                 const cJSON *t0 = cJSON_GetArrayItem(trans, 0);
                 const cJSON *t1 = cJSON_GetArrayItem(trans, 1);
                 const cJSON *t2 = cJSON_GetArrayItem(trans, 2);
-                if (t0 && t1 && t2) {
+                if (cJSON_IsNumber(t0) && cJSON_IsNumber(t1)
+                    && cJSON_IsNumber(t2)) {
                     gn->translation = vec3_create(
                         (float)t0->valuedouble,
                         (float)t1->valuedouble,
@@ -975,7 +976,8 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
                 const cJSON *ry = cJSON_GetArrayItem(rot, 1);
                 const cJSON *rz = cJSON_GetArrayItem(rot, 2);
                 const cJSON *rw = cJSON_GetArrayItem(rot, 3);
-                if (rx && ry && rz && rw) {
+                if (cJSON_IsNumber(rx) && cJSON_IsNumber(ry)
+                    && cJSON_IsNumber(rz) && cJSON_IsNumber(rw)) {
                     gn->rotation = quat_normalize(quat_create(
                         (float)rw->valuedouble,
                         (float)rx->valuedouble,
@@ -990,7 +992,8 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
                 const cJSON *s0 = cJSON_GetArrayItem(scl, 0);
                 const cJSON *s1 = cJSON_GetArrayItem(scl, 1);
                 const cJSON *s2 = cJSON_GetArrayItem(scl, 2);
-                if (s0 && s1 && s2) {
+                if (cJSON_IsNumber(s0) && cJSON_IsNumber(s1)
+                    && cJSON_IsNumber(s2)) {
                     gn->scale_xyz = vec3_create(
                         (float)s0->valuedouble,
                         (float)s1->valuedouble,

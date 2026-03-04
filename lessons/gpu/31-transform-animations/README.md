@@ -10,7 +10,7 @@ structures, and the way a transform hierarchy composes independent
 animation sources into a single coherent result.
 
 This lesson loads the CesiumMilkTruck glTF model — which ships with a wheel
-rotation animation — and drives it around an elliptical racetrack using
+rotation animation — and drives it around a rectangular track with rounded corners using
 path-following animation. The two animation layers (path placement and
 wheel rotation) compose automatically through the node hierarchy.
 
@@ -95,7 +95,7 @@ before interpolation ensures the shortest path:
 ```c
 float d = quat_dot(a, b);
 if (d < 0.0f) {
-    b = (quat){ -b.x, -b.y, -b.z, -b.w };
+    b = quat_create(-b.w, -b.x, -b.y, -b.z);
     d = -d;
 }
 ```
@@ -380,12 +380,12 @@ static void rebuild_node(ForgeGltfNode *nodes, int index, mat4 parent_world)
     if (n->has_trs) {
         mat4 T = mat4_translate(n->translation);
         mat4 R = quat_to_mat4(n->rotation);
-        mat4 S = mat4_scale_vec3(n->scale_xyz);
-        n->local_transform = mat4_mul(mat4_mul(T, R), S);
+        mat4 S = mat4_scale(n->scale_xyz);
+        n->local_transform = mat4_multiply(mat4_multiply(T, R), S);
     }
 
     /* World = parent * local. */
-    n->world_transform = mat4_mul(parent_world, n->local_transform);
+    n->world_transform = mat4_multiply(parent_world, n->local_transform);
 
     /* Recurse into children. */
     for (int i = 0; i < n->child_count; i++) {
@@ -501,7 +501,7 @@ interpolation. The foundational theory is covered in:
 
 The math library (`common/math/forge_math.h`) provides all required
 functions: `quat_slerp`, `quat_to_mat4`, `quat_from_euler`, `quat_dot`,
-`vec3_lerp`, `mat4_translate`, `mat4_mul`, and `mat4_scale_vec3`.
+`vec3_lerp`, `mat4_translate`, `mat4_multiply`, and `mat4_scale`.
 
 ## Render passes
 
