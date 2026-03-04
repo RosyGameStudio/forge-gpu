@@ -635,6 +635,10 @@ a single unit. Extensions to explore:
 - Additive animation layers — breathing motion on top of locomotion
 - Animation curves with cubic (Hermite) interpolation for smoother
   transitions between keyframes
+- **Anti-aliasing** — the track stripes show visible geometric aliasing
+  at oblique angles. SDL_GPU supports MSAA (`SDL_GPUSampleCount`) via
+  multisample render targets, and post-process techniques like FXAA or
+  TAA can reduce aliasing further
 
 ## Further reading
 

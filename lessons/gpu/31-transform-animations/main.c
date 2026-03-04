@@ -136,7 +136,8 @@
 
 /* Texture. */
 #define BYTES_PER_PIXEL 4
-#define MAX_ANISOTROPY  4
+#define MAX_ANISOTROPY    8
+#define MAX_LOD_UNLIMITED 1000.0f /* Allow all mip levels */
 
 /* Clear color — sky blue. */
 #define CLEAR_R 0.5f
@@ -1829,6 +1830,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         si.address_mode_w    = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
         si.max_anisotropy    = MAX_ANISOTROPY;
         si.enable_anisotropy = true;
+        si.max_lod           = MAX_LOD_UNLIMITED;
         state->sampler = SDL_CreateGPUSampler(device, &si);
         if (!state->sampler) {
             SDL_Log("Failed to create sampler: %s", SDL_GetError());
@@ -1858,6 +1860,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         si.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
         si.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
         si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        si.max_lod        = MAX_LOD_UNLIMITED;
         state->cubemap_sampler = SDL_CreateGPUSampler(device, &si);
         if (!state->cubemap_sampler) {
             SDL_Log("Failed to create cubemap sampler: %s", SDL_GetError());
