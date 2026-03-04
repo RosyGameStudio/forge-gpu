@@ -564,6 +564,8 @@ python scripts/compile_shaders.py 31
 | Asset | Author | License |
 |-------|--------|---------|
 | [CesiumMilkTruck](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CesiumMilkTruck) | Cesium / Khronos Group | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| [Modular Track Roads Free](https://skfb.ly/orLos) | Bedrill | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| [Citrus Orchard Pure Sky](https://polyhaven.com/a/citrus_orchard_puresky) | Jarod Guest (photography), Poly Haven (processing) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 ## Building
 
