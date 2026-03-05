@@ -1021,15 +1021,10 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
         const cJSON *mesh_idx = cJSON_GetObjectItemCaseSensitive(node, "mesh");
         if (cJSON_IsNumber(mesh_idx)) gn->mesh_index = mesh_idx->valueint;
 
-        /* Skin reference (for vertex skinning / skeletal animation). */
+        /* Skin reference — store raw index, validate after skins are parsed. */
         const cJSON *skin_idx = cJSON_GetObjectItemCaseSensitive(node, "skin");
         if (cJSON_IsNumber(skin_idx)) {
-            int si = skin_idx->valueint;
-            if (si >= 0 && si < FORGE_GLTF_MAX_SKINS) {
-                gn->skin_index = si;
-            } else {
-                SDL_Log("forge_gltf: node %d skin index %d out of range", i, si);
-            }
+            gn->skin_index = skin_idx->valueint;
         }
 
         /* Children. */
@@ -1204,7 +1199,13 @@ static bool forge_gltf__parse_skins(const cJSON *root, ForgeGltfScene *scene)
         const cJSON *skel = cJSON_GetObjectItemCaseSensitive(
             skin_obj, "skeleton");
         if (cJSON_IsNumber(skel)) {
-            skin->skeleton = skel->valueint;
+            int sk = skel->valueint;
+            if (sk >= 0 && sk < scene->node_count) {
+                skin->skeleton = sk;
+            } else {
+                SDL_Log("forge_gltf: skin %d skeleton index %d out of range",
+                        i, sk);
+            }
         }
 
         /* Parse joint node indices. */
@@ -1219,11 +1220,11 @@ static bool forge_gltf__parse_skins(const cJSON *root, ForgeGltfScene *scene)
             }
             for (int j = 0; j < jc; j++) {
                 const cJSON *item = cJSON_GetArrayItem(joints_arr, j);
-                int ji = item ? item->valueint : 0;
-                if (ji < 0 || ji >= FORGE_GLTF_MAX_NODES) {
+                int ji = item ? item->valueint : -1;
+                if (ji < 0 || ji >= scene->node_count) {
                     SDL_Log("forge_gltf: skin %d joint %d index %d out of range",
                             i, j, ji);
-                    ji = 0;
+                    ji = -1;
                 }
                 skin->joints[j] = ji;
             }
@@ -1302,6 +1303,18 @@ static bool forge_gltf_load(const char *gltf_path, ForgeGltfScene *scene)
     if (ok) ok = forge_gltf__parse_meshes(root, scene);
     if (ok) ok = forge_gltf__parse_nodes(root, scene);
     if (ok) ok = forge_gltf__parse_skins(root, scene);
+
+    /* Validate node skin references now that skin_count is known. */
+    if (ok) {
+        for (int i = 0; i < scene->node_count; i++) {
+            int si = scene->nodes[i].skin_index;
+            if (si >= scene->skin_count) {
+                SDL_Log("forge_gltf: node %d skin index %d invalid "
+                        "(skin_count=%d)", i, si, scene->skin_count);
+                scene->nodes[i].skin_index = -1;
+            }
+        }
+    }
 
     cJSON_Delete(root);
 

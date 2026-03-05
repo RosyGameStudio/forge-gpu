@@ -817,13 +817,29 @@ static bool parse_animation(AnimClip *clip, const char *gltf_path,
         int kf_count = in_count->valueint;
         if (kf_count <= 0) continue;
 
+        /* Validate output accessor: count must match, componentType FLOAT,
+         * type must match the animation path (VEC3 or VEC4). */
+        const cJSON *out_count = cJSON_GetObjectItemCaseSensitive(
+            out_accessor, "count");
+        const cJSON *out_comp = cJSON_GetObjectItemCaseSensitive(
+            out_accessor, "componentType");
+        const cJSON *out_type = cJSON_GetObjectItemCaseSensitive(
+            out_accessor, "type");
+        if (!cJSON_IsNumber(out_count) || out_count->valueint != kf_count) continue;
+        if (!cJSON_IsNumber(out_comp) || out_comp->valueint != FORGE_GLTF_FLOAT) continue;
+        if (!cJSON_IsString(out_type)) continue;
+        if ((value_components == 3 && SDL_strcmp(out_type->valuestring, "VEC3") != 0)
+            || (value_components == 4 && SDL_strcmp(out_type->valuestring, "VEC4") != 0)) {
+            continue;
+        }
+
         /* Validate buffer bounds for timestamps and values. */
         size_t in_end = (size_t)in_offset + (size_t)kf_count * sizeof(float);
         size_t out_end = (size_t)out_offset
                        + (size_t)kf_count * (size_t)value_components * sizeof(float);
         if (in_end > scene->buffers[in_bi].size
             || out_end > scene->buffers[out_bi].size) {
-            SDL_Log("Animation channel %d: buffer overflow, skipping", ch);
+            SDL_Log("Animation channel %d: buffer overflow, skipping", i);
             continue;
         }
 
