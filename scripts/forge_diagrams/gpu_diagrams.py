@@ -14474,18 +14474,10 @@ def diagram_arc_length_parameterization():
 
 
 def diagram_joint_matrix_pipeline():
-    """Joint matrix formula pipeline showing coordinate space transforms.
-
-    Visualizes the full glTF joint matrix formula:
-        jointMatrix = inverse(meshWorld) × W_j × B_j^{-1}
-
-    Three coordinate spaces flow left to right with labeled transform arrows:
-    Model Space (bind pose) → Joint-Local Space → Animated World Space,
-    plus the final inverse(meshWorld) step back to mesh-local space.
-    """
+    """Joint-matrix pipeline across model, joint-local, world, and mesh-local spaces."""
     fig = plt.figure(figsize=(12, 5.5), facecolor=STYLE["bg"])
     ax = fig.add_subplot(111)
-    setup_axes(ax, xlim=(-0.5, 12.5), ylim=(-1.5, 4.5), grid=False, aspect=None)
+    setup_axes(ax, xlim=(-0.5, 13.0), ylim=(-1.5, 4.5), grid=False, aspect=None)
     ax.set_xticks([])
     ax.set_yticks([])
 

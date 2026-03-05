@@ -1570,7 +1570,7 @@ static void test_cesium_milk_truck(void)
 static void test_cesiumman_skin(void)
 {
     const char *base;
-    char path[512];
+    char path[FORGE_GLTF_PATH_SIZE];
     ForgeGltfScene scene;
     bool ok;
     mat4 identity;
@@ -1610,6 +1610,7 @@ static void test_cesiumman_skin(void)
                             identity.m, sizeof(identity.m)) == 0);
 
     /* Node 2 ("Cesium_Man") has skin_index == 0. */
+    ASSERT_TRUE(scene.node_count > 2);
     ASSERT_INT_EQ(scene.nodes[2].skin_index, 0);
 
     /* The mesh primitive should have skin data. */

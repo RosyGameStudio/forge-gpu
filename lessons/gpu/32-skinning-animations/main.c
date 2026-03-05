@@ -815,6 +815,17 @@ static bool parse_animation(AnimClip *clip, const char *gltf_path,
         if (out_bi < 0 || out_bi >= scene->buffer_count) continue;
 
         int kf_count = in_count->valueint;
+        if (kf_count <= 0) continue;
+
+        /* Validate buffer bounds for timestamps and values. */
+        size_t in_end = (size_t)in_offset + (size_t)kf_count * sizeof(float);
+        size_t out_end = (size_t)out_offset
+                       + (size_t)kf_count * (size_t)value_components * sizeof(float);
+        if (in_end > scene->buffers[in_bi].size
+            || out_end > scene->buffers[out_bi].size) {
+            SDL_Log("Animation channel %d: buffer overflow, skipping", ch);
+            continue;
+        }
 
         AnimChannel *ac = &clip->channels[clip->channel_count];
         ac->target_node    = node_idx->valueint;
@@ -830,7 +841,6 @@ static bool parse_animation(AnimClip *clip, const char *gltf_path,
             if (last_t > max_time) max_time = last_t;
         }
 
-        (void)value_components;
     }
 
     clip->duration = max_time;
@@ -913,6 +923,25 @@ static quat evaluate_quat_channel(const AnimChannel *ch, float t)
     return quat_slerp(qa, qb, alpha);
 }
 
+/* ── World transform: recursive parent-first resolution ────────────── */
+
+static void resolve_world_transform(ForgeGltfNode *nodes, int count,
+                                    bool *computed, int idx)
+{
+    if (idx < 0 || idx >= count || computed[idx]) return;
+
+    ForgeGltfNode *node = &nodes[idx];
+    if (node->parent >= 0 && node->parent < count) {
+        resolve_world_transform(nodes, count, computed, node->parent);
+        node->world_transform = mat4_multiply(
+            nodes[node->parent].world_transform,
+            node->local_transform);
+    } else {
+        node->world_transform = node->local_transform;
+    }
+    computed[idx] = true;
+}
+
 /* ── Animation: evaluate all channels and rebuild hierarchy ─────────── */
 
 static void evaluate_animation(app_state *state, float dt)
@@ -961,15 +990,14 @@ static void evaluate_animation(app_state *state, float dt)
         node->local_transform = mat4_multiply(T, mat4_multiply(R, S));
     }
 
-    /* Rebuild world transforms (parent * local) from root to leaves. */
-    for (int i = 0; i < state->scene.node_count; i++) {
-        ForgeGltfNode *node = &state->scene.nodes[i];
-        if (node->parent >= 0 && node->parent < state->scene.node_count) {
-            node->world_transform = mat4_multiply(
-                state->scene.nodes[node->parent].world_transform,
-                node->local_transform);
-        } else {
-            node->world_transform = node->local_transform;
+    /* Rebuild world transforms — resolve parents before children regardless
+     * of array order.  Uses a computed[] flag to avoid redundant work. */
+    {
+        bool computed[FORGE_GLTF_MAX_NODES] = {false};
+        for (int i = 0; i < state->scene.node_count; i++) {
+            resolve_world_transform(state->scene.nodes,
+                                    state->scene.node_count,
+                                    computed, i);
         }
     }
 
@@ -1608,8 +1636,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
                 if (!SDL_SetWindowRelativeMouseMode(state->window, false)) {
                     SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s",
                             SDL_GetError());
+                } else {
+                    state->mouse_captured = false;
                 }
-                state->mouse_captured = false;
             } else {
                 return SDL_APP_SUCCESS;
             }
@@ -1621,8 +1650,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
             if (!SDL_SetWindowRelativeMouseMode(state->window, true)) {
                 SDL_Log("SDL_SetWindowRelativeMouseMode failed: %s",
                         SDL_GetError());
+            } else {
+                state->mouse_captured = true;
             }
-            state->mouse_captured = true;
         }
         break;
 
@@ -1938,7 +1968,9 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     SDL_GPUDevice *device = state->device;
 
     if (device) {
-        SDL_WaitForGPUIdle(device);
+        if (!SDL_WaitForGPUIdle(device)) {
+            SDL_Log("SDL_WaitForGPUIdle failed: %s", SDL_GetError());
+        }
 
         /* Release GPU primitives. */
         if (state->primitives) {

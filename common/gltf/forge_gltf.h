@@ -885,27 +885,43 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
                         root, scene, weights_acc->valueint,
                         &w_count, &w_comp, &w_num);
 
+                    /* glTF 2.0 allows JOINTS_0 as UNSIGNED_BYTE or
+                     * UNSIGNED_SHORT, and WEIGHTS_0 as FLOAT (or
+                     * UNSIGNED_BYTE/SHORT normalized, not yet supported). */
+                    bool j_valid = (j_comp == FORGE_GLTF_UNSIGNED_SHORT
+                                 || j_comp == FORGE_GLTF_UNSIGNED_BYTE);
+                    bool w_valid = (w_comp == FORGE_GLTF_FLOAT);
+
                     if (j_data && w_data
                         && j_count == vert_count && w_count == vert_count
-                        && j_comp == FORGE_GLTF_UNSIGNED_SHORT
+                        && j_valid
                         && j_num == FORGE_GLTF_JOINTS_PER_VERT
-                        && w_comp == FORGE_GLTF_FLOAT
+                        && w_valid
                         && w_num == FORGE_GLTF_JOINTS_PER_VERT) {
 
-                        /* Allocate and copy joint indices (UNSIGNED_SHORT × 4). */
-                        Uint32 ji_bytes = (Uint32)vert_count
+                        /* Allocate joint indices (always stored as Uint16). */
+                        size_t ji_bytes = (size_t)vert_count
                                         * FORGE_GLTF_JOINTS_PER_VERT
                                         * sizeof(Uint16);
                         gp->joint_indices = (Uint16 *)SDL_malloc(ji_bytes);
 
-                        /* Allocate and copy weights (FLOAT × 4). */
-                        Uint32 wt_bytes = (Uint32)vert_count
+                        /* Allocate weights (FLOAT × 4). */
+                        size_t wt_bytes = (size_t)vert_count
                                         * FORGE_GLTF_JOINTS_PER_VERT
                                         * sizeof(float);
                         gp->weights = (float *)SDL_malloc(wt_bytes);
 
                         if (gp->joint_indices && gp->weights) {
-                            SDL_memcpy(gp->joint_indices, j_data, ji_bytes);
+                            if (j_comp == FORGE_GLTF_UNSIGNED_SHORT) {
+                                SDL_memcpy(gp->joint_indices, j_data, ji_bytes);
+                            } else {
+                                /* Widen UNSIGNED_BYTE → Uint16. */
+                                const Uint8 *src = (const Uint8 *)j_data;
+                                int total = vert_count * FORGE_GLTF_JOINTS_PER_VERT;
+                                for (int k = 0; k < total; k++) {
+                                    gp->joint_indices[k] = (Uint16)src[k];
+                                }
+                            }
                             SDL_memcpy(gp->weights, w_data, wt_bytes);
                             gp->has_skin_data = true;
                         } else {
@@ -914,6 +930,12 @@ static bool forge_gltf__parse_meshes(const cJSON *root, ForgeGltfScene *scene)
                             gp->joint_indices = NULL;
                             gp->weights = NULL;
                         }
+                    } else if (j_data && w_data && !j_valid) {
+                        SDL_Log("forge_gltf: unsupported JOINTS_0 type %d",
+                                j_comp);
+                    } else if (j_data && w_data && !w_valid) {
+                        SDL_Log("forge_gltf: unsupported WEIGHTS_0 type %d",
+                                w_comp);
                     }
                 }
             }
@@ -1001,7 +1023,14 @@ static bool forge_gltf__parse_nodes(const cJSON *root, ForgeGltfScene *scene)
 
         /* Skin reference (for vertex skinning / skeletal animation). */
         const cJSON *skin_idx = cJSON_GetObjectItemCaseSensitive(node, "skin");
-        if (cJSON_IsNumber(skin_idx)) gn->skin_index = skin_idx->valueint;
+        if (cJSON_IsNumber(skin_idx)) {
+            int si = skin_idx->valueint;
+            if (si >= 0 && si < FORGE_GLTF_MAX_SKINS) {
+                gn->skin_index = si;
+            } else {
+                SDL_Log("forge_gltf: node %d skin index %d out of range", i, si);
+            }
+        }
 
         /* Children. */
         const cJSON *children = cJSON_GetObjectItemCaseSensitive(
@@ -1190,7 +1219,13 @@ static bool forge_gltf__parse_skins(const cJSON *root, ForgeGltfScene *scene)
             }
             for (int j = 0; j < jc; j++) {
                 const cJSON *item = cJSON_GetArrayItem(joints_arr, j);
-                skin->joints[j] = item ? item->valueint : 0;
+                int ji = item ? item->valueint : 0;
+                if (ji < 0 || ji >= FORGE_GLTF_MAX_NODES) {
+                    SDL_Log("forge_gltf: skin %d joint %d index %d out of range",
+                            i, j, ji);
+                    ji = 0;
+                }
+                skin->joints[j] = ji;
             }
             skin->joint_count = jc;
         }
@@ -1218,8 +1253,16 @@ static bool forge_gltf__parse_skins(const cJSON *root, ForgeGltfScene *scene)
                                ibm_data + j * 16,
                                16 * sizeof(float));
                 }
+                /* Fill remaining joints with identity if accessor is short. */
+                for (int j = copy_count; j < skin->joint_count; j++) {
+                    skin->inverse_bind_matrices[j] = mat4_identity();
+                }
             } else {
-                SDL_Log("forge_gltf: skin %d has invalid IBM accessor", i);
+                SDL_Log("forge_gltf: skin %d has invalid IBM accessor, "
+                        "using identity matrices", i);
+                for (int j = 0; j < skin->joint_count; j++) {
+                    skin->inverse_bind_matrices[j] = mat4_identity();
+                }
             }
         } else {
             /* Per glTF spec, if inverseBindMatrices is absent, use identity. */

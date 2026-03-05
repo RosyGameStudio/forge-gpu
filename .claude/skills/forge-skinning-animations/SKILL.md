@@ -8,7 +8,7 @@ description: >
 Add vertex skinning to an SDL3 GPU scene using skeletal animation data from
 glTF files. The technique evaluates keyframe channels for translation, rotation
 (slerp), and scale, rebuilds the joint hierarchy, computes joint matrices
-(worldTransform * inverseBindMatrix), and blends up to 4 joint transforms per
+(`inverse(meshWorld) × jointWorld × inverseBindMatrix`), and blends up to 4 joint transforms per
 vertex in the shader. Use this skill when you need animated characters,
 creatures, or any mesh that deforms with a skeleton.
 

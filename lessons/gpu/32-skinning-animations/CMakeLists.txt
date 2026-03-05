@@ -26,7 +26,7 @@ endif()
 # Copy CesiumMan assets next to the executable
 add_custom_command(TARGET 32-skinning-animations POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/CesiumMan
+        ${FORGE_ASSETS_DIR}/models/CesiumMan
         $<TARGET_FILE_DIR:32-skinning-animations>/assets/CesiumMan
     VERBATIM
 )

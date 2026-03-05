@@ -20,7 +20,9 @@ the 19-joint skeleton drives the walk cycle. The shadow on the ground
 deforms in sync with the character, because the shadow pass applies the
 same skin matrix in its vertex shader.
 
-## From rigid transforms to vertex skinning
+## Key concepts
+
+### From rigid transforms to vertex skinning
 
 Lesson 31 animated rigid objects — each mesh moved as a whole unit
 (wheels spin, truck drives). But characters, creatures, and any organic
