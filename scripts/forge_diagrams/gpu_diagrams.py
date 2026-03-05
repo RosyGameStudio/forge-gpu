@@ -14466,3 +14466,164 @@ def diagram_arc_length_parameterization():
 
     fig.tight_layout()
     save(fig, "gpu/31-transform-animations", "arc_length_parameterization.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/32-skinning-animations — joint_matrix_pipeline.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_joint_matrix_pipeline():
+    """Joint matrix formula pipeline showing coordinate space transforms.
+
+    Visualizes the full glTF joint matrix formula:
+        jointMatrix = inverse(meshWorld) × W_j × B_j^{-1}
+
+    Three coordinate spaces flow left to right with labeled transform arrows:
+    Model Space (bind pose) → Joint-Local Space → Animated World Space,
+    plus the final inverse(meshWorld) step back to mesh-local space.
+    """
+    fig = plt.figure(figsize=(12, 5.5), facecolor=STYLE["bg"])
+    ax = fig.add_subplot(111)
+    setup_axes(ax, xlim=(-0.5, 12.5), ylim=(-1.5, 4.5), grid=False, aspect=None)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+    stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
+
+    # --- Space boxes ---
+    box_w, box_h = 2.6, 2.4
+    boxes = [
+        (0.2, 1.0, "Model Space\n(bind pose)", STYLE["accent1"]),
+        (3.7, 1.0, "Joint-Local\nSpace", STYLE["accent3"]),
+        (7.2, 1.0, "Animated\nWorld Space", STYLE["accent2"]),
+        (10.0, 1.0, "Mesh-Local\nSpace", STYLE["accent4"]),
+    ]
+
+    for bx, by, label, color in boxes:
+        rect = FancyBboxPatch(
+            (bx, by),
+            box_w,
+            box_h,
+            boxstyle="round,pad=0.15",
+            facecolor=STYLE["surface"],
+            edgecolor=color,
+            linewidth=1.8,
+            zorder=2,
+        )
+        ax.add_patch(rect)
+        ax.text(
+            bx + box_w / 2,
+            by + box_h / 2,
+            label,
+            color=color,
+            fontsize=11,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke,
+            zorder=5,
+        )
+
+    # --- Vertex dot in model space ---
+    vx, vy = 1.5, 1.4
+    ax.plot(vx, vy, "o", color=STYLE["warn"], ms=10, zorder=6)
+    ax.text(
+        vx + 0.25,
+        vy - 0.3,
+        "v",
+        color=STYLE["warn"],
+        fontsize=13,
+        fontweight="bold",
+        fontstyle="italic",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=7,
+    )
+
+    # --- Transform arrows between boxes ---
+    arrow_y = 2.2
+    arrows = [
+        (2.8, 3.7, "$B_j^{-1}$", STYLE["accent3"], "Inverse bind\nmatrix"),
+        (6.3, 7.2, "$W_j$", STYLE["accent2"], "World\ntransform"),
+        (9.8, 10.0, "$M^{-1}$", STYLE["accent4"], "Inverse mesh\nworld"),
+    ]
+
+    for x_start, x_end, math_label, color, desc_label in arrows:
+        ax.annotate(
+            "",
+            xy=(x_end, arrow_y),
+            xytext=(x_start, arrow_y),
+            arrowprops={
+                "arrowstyle": "->,head_width=0.25,head_length=0.15",
+                "color": color,
+                "lw": 2.5,
+                "connectionstyle": "arc3,rad=0",
+            },
+            zorder=4,
+        )
+        mid_x = (x_start + x_end) / 2
+        # Math label above arrow
+        ax.text(
+            mid_x,
+            arrow_y + 0.45,
+            math_label,
+            color=color,
+            fontsize=12,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke,
+            zorder=5,
+        )
+        # Description below arrow
+        ax.text(
+            mid_x,
+            arrow_y - 0.55,
+            desc_label,
+            color=STYLE["text_dim"],
+            fontsize=7.5,
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+
+    # --- Full formula at bottom ---
+    ax.text(
+        6.25,
+        -0.3,
+        r"$\mathrm{jointMatrix}_j = M_{mesh}^{-1} \times W_j \times B_j^{-1}$",
+        color=STYLE["text"],
+        fontsize=13,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax.text(
+        6.25,
+        -0.9,
+        "Transforms a bind-pose vertex to the mesh node's local space\n"
+        "where the skin matrix is applied in the vertex shader",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="center",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    ax.set_title(
+        "Joint Matrix Pipeline",
+        color=STYLE["text"],
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    fig.tight_layout()
+    save(fig, "gpu/32-skinning-animations", "joint_matrix_pipeline.png")
