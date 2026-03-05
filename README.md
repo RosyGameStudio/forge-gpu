@@ -641,7 +641,7 @@ project to enable Claude to build games and tools with you.
 | [dev-ui-review](.claude/skills/dev-ui-review/SKILL.md) | `/dev-ui-review` | Code quality and documentation review for UI lessons |
 | [dev-create-diagram](.claude/skills/dev-create-diagram/SKILL.md) | `/dev-create-diagram` | Create matplotlib diagrams with the project's dark theme |
 | [dev-add-screenshot](.claude/skills/dev-add-screenshot/SKILL.md) | `/dev-add-screenshot` | Capture a screenshot for a lesson and update its README |
-| [dev-markdown-lint](.claude/skills/dev-markdown-lint/SKILL.md) | `/dev-markdown-lint` | Check and fix markdown formatting issues |
+| [dev-markdown-lint](.claude/skills/dev-markdown-lint/SKILL.md) | `/dev-markdown-lint` | Check and fix Markdown formatting issues |
 | [dev-reset-workspace](.claude/skills/dev-reset-workspace/SKILL.md) | `/dev-reset-workspace` | Clean workspace for fresh work from main branch |
 
 **How to use:**
