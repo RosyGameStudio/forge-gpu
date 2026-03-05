@@ -14475,22 +14475,24 @@ def diagram_arc_length_parameterization():
 
 def diagram_joint_matrix_pipeline():
     """Joint-matrix pipeline across model, joint-local, world, and mesh-local spaces."""
-    fig = plt.figure(figsize=(12, 5.5), facecolor=STYLE["bg"])
+    fig = plt.figure(figsize=(14, 5.5), facecolor=STYLE["bg"])
     ax = fig.add_subplot(111)
-    setup_axes(ax, xlim=(-0.5, 13.0), ylim=(-1.5, 4.5), grid=False, aspect=None)
+    setup_axes(ax, xlim=(-0.5, 15.0), ylim=(-1.5, 4.5), grid=False, aspect=None)
     ax.set_xticks([])
     ax.set_yticks([])
 
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
     stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
 
-    # --- Space boxes ---
+    # --- Space boxes (evenly spaced) ---
     box_w, box_h = 2.6, 2.4
+    gap = 1.0
+    x0 = 0.4
     boxes = [
-        (0.2, 1.0, "Model Space\n(bind pose)", STYLE["accent1"]),
-        (3.7, 1.0, "Joint-Local\nSpace", STYLE["accent3"]),
-        (7.2, 1.0, "Animated\nWorld Space", STYLE["accent2"]),
-        (10.0, 1.0, "Mesh-Local\nSpace", STYLE["accent4"]),
+        (x0 + 0 * (box_w + gap), 1.0, "Model Space\n(bind pose)", STYLE["accent1"]),
+        (x0 + 1 * (box_w + gap), 1.0, "Joint-Local\nSpace", STYLE["accent3"]),
+        (x0 + 2 * (box_w + gap), 1.0, "Animated\nWorld Space", STYLE["accent2"]),
+        (x0 + 3 * (box_w + gap), 1.0, "Mesh-Local\nSpace", STYLE["accent4"]),
     ]
 
     for bx, by, label, color in boxes:
@@ -14519,7 +14521,7 @@ def diagram_joint_matrix_pipeline():
         )
 
     # --- Vertex dot in model space ---
-    vx, vy = 1.5, 1.4
+    vx, vy = 1.7, 1.4
     ax.plot(vx, vy, "o", color=STYLE["warn"], ms=10, zorder=6)
     ax.text(
         vx + 0.25,
@@ -14538,9 +14540,9 @@ def diagram_joint_matrix_pipeline():
     # --- Transform arrows between boxes ---
     arrow_y = 2.2
     arrows = [
-        (2.8, 3.7, "$B_j^{-1}$", STYLE["accent3"], "Inverse bind\nmatrix"),
-        (6.3, 7.2, "$W_j$", STYLE["accent2"], "World\ntransform"),
-        (9.8, 10.0, "$M^{-1}$", STYLE["accent4"], "Inverse mesh\nworld"),
+        (3.0, 4.0, "$B_j^{-1}$", STYLE["accent3"], "Inverse bind\nmatrix"),
+        (6.6, 7.6, "$W_j$", STYLE["accent2"], "World\ntransform"),
+        (10.2, 11.2, "$M^{-1}$", STYLE["accent4"], "Inverse mesh\nworld"),
     ]
 
     for x_start, x_end, math_label, color, desc_label in arrows:
@@ -14585,7 +14587,7 @@ def diagram_joint_matrix_pipeline():
 
     # --- Full formula at bottom ---
     ax.text(
-        6.25,
+        7.25,
         -0.3,
         r"$\mathrm{jointMatrix}_j = M_{mesh}^{-1} \times W_j \times B_j^{-1}$",
         color=STYLE["text"],
@@ -14597,7 +14599,7 @@ def diagram_joint_matrix_pipeline():
         zorder=5,
     )
     ax.text(
-        6.25,
+        7.25,
         -0.9,
         "Transforms a bind-pose vertex to the mesh node's local space\n"
         "where the skin matrix is applied in the vertex shader",
