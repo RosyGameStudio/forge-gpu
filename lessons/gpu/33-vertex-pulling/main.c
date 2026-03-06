@@ -777,8 +777,9 @@ static void draw_pulled_primitive(
             frag_u.base_color[1] = mat->base_color[1];
             frag_u.base_color[2] = mat->base_color[2];
             frag_u.base_color[3] = mat->base_color[3];
-            frag_u.has_texture = mat->has_texture ? 1.0f : 0.0f;
-            if (mat->texture) tex = mat->texture;
+            const bool use_tex = mat->has_texture && prim->has_uvs;
+            frag_u.has_texture = use_tex ? 1.0f : 0.0f;
+            if (use_tex && mat->texture) tex = mat->texture;
         } else {
             frag_u.base_color[0] = 1.0f;
             frag_u.base_color[1] = 1.0f;
@@ -872,7 +873,7 @@ static void build_box_transforms(app_state *state)
 {
     /* Box positions: arranged in a rough circle around the origin.
      * The BoxTextured model spans -1..+1 on each axis (2-unit cube),
-     * so the Y translation must be 1.0 * scale to sit on the ground. */
+     * so the Y translation must be 0.5 * scale to sit on the ground. */
     const struct { float x, z, scale, angle; } box_layout[BOX_COUNT] = {
         {  3.0f,  2.0f, 0.8f,  25.0f },
         { -3.0f,  1.5f, 1.0f, -15.0f },
