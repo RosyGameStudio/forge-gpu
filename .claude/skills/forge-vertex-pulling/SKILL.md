@@ -79,7 +79,7 @@ VSOutput main(uint vertex_id : SV_VertexID)
 No changes needed — fragment shaders work identically regardless of whether
 vertex data came from the input assembler or a storage buffer.
 
-## C side pattern
+## C-side pattern
 
 ### 1. Define the vertex struct (must match HLSL)
 

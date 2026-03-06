@@ -15,10 +15,10 @@
 ![Lesson 33 screenshot](assets/screenshot.png)
 
 A milk truck and eight textured boxes on a procedural grid floor, all lit with
-Blinn-Phong lighting and directional shadows. Every mesh is rendered using
-vertex pulling — the vertex shader reads position, normal, and UV from a
+Blinn-Phong lighting and directional shadows. The truck and boxes are rendered
+with vertex pulling — the vertex shader reads position, normal, and UV from a
 `StructuredBuffer` instead of receiving them through vertex attributes. The
-grid floor uses traditional vertex input for comparison.
+grid floor intentionally uses traditional vertex input for comparison.
 
 ## Key concepts
 
@@ -95,7 +95,23 @@ struct PulledVertex
 
 ![Pipeline state comparison](assets/pipeline_state_comparison.png)
 
-The key CPU-side difference is minimal — one buffer usage flag changes:
+The CPU-side changes are minimal. Three things change:
+
+1. **Buffer usage flag** — Create the buffer with
+   `SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ` instead of
+   `SDL_GPU_BUFFERUSAGE_VERTEX`. This tells SDL GPU the buffer will be
+   read as a storage resource in the shader, not fed through the input
+   assembler.
+
+2. **Bind call** — Replace `SDL_BindGPUVertexBuffers` with
+   `SDL_BindGPUVertexStorageBuffers`. This binds the buffer to a storage
+   slot that the vertex shader can access via `StructuredBuffer`.
+
+3. **Shader resource count** — Set `num_storage_buffers = 1` in
+   `SDL_GPUShaderCreateInfo` so SDL GPU allocates a descriptor for the
+   storage buffer.
+
+The table below summarizes the differences:
 
 | Aspect | Traditional | Vertex Pulling |
 |---|---|---|

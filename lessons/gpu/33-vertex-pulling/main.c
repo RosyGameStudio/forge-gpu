@@ -1657,10 +1657,19 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
             SDL_free(state->boxes[0].primitives);
         }
 
-        /* Release box materials / textures. */
+        /* Release box materials / textures (dedup like truck above). */
         if (state->boxes[0].materials) {
             for (int i = 0; i < state->boxes[0].material_count; i++) {
-                if (state->boxes[0].materials[i].texture)
+                if (!state->boxes[0].materials[i].texture) continue;
+                bool already_released = false;
+                for (int j = 0; j < i; j++) {
+                    if (state->boxes[0].materials[j].texture ==
+                        state->boxes[0].materials[i].texture) {
+                        already_released = true;
+                        break;
+                    }
+                }
+                if (!already_released)
                     SDL_ReleaseGPUTexture(device,
                         state->boxes[0].materials[i].texture);
             }
