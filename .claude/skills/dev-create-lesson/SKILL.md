@@ -308,6 +308,13 @@ $$
 
 Keep worked examples (step-by-step with numbers) in ` ```text ` blocks.
 
+## Large file write limit
+
+Task agents have a 32K output token limit per Write call. If a README exceeds
+~800 lines, split the write into multiple parts and concatenate. This also
+applies to any large code file being written. See `CLAUDE.md` "Large file
+writes" section for the chunked-write pattern.
+
 ## Code style reminders
 
 - Naming: `PascalCase` for typedefs (e.g. `Vertex`, `GpuPrimitive`),

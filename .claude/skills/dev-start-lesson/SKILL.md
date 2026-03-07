@@ -342,6 +342,16 @@ Tell the user:
 - Does **not** update root README.md gallery (that's `/dev-create-lesson`)
 - Does **not** create a branch or PR (that's `/dev-publish-lesson`)
 
+## Large file write limit
+
+Task agents have a 32K output token limit per Write call. A `main.c` over
+~800 lines will fail silently — the file is never created and all work is lost.
+
+When building the scene iteratively, keep this in mind: if the final `main.c`
+will exceed ~800 lines, the PLAN.md must include a "main.c Decomposition"
+section and use the chunked-write pattern (split into 3-4 parts, write to
+`/tmp/`, concatenate). See `CLAUDE.md` "Large file writes" section for details.
+
 ## Code style reminders
 
 - C99 matching SDL's style

@@ -315,6 +315,13 @@ Common fixes needed:
 - Add language tags to code blocks (`` ```text ``, `` ```c ``, `` ```bash ``)
 - Use 4 backticks for nested code blocks (when showing markdown in markdown)
 
+## Large file write limit
+
+Task agents have a 32K output token limit per Write call. If a `main.c` or
+README exceeds ~800 lines, use the chunked-write pattern: split into parts,
+write each to `/tmp/`, then concatenate. See `CLAUDE.md` "Large file writes"
+section for details.
+
 ## Math Library Conventions
 
 ### Coordinate System

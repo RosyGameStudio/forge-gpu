@@ -190,6 +190,22 @@ Never disable lint rules, remove CI workflows, add ignore comments, or relax
 thresholds to make errors pass. Always fix the underlying issue. If a rule
 seems problematic, ask the user — don't bypass it yourself.
 
+## Large file writes (Task agent token limit)
+
+Task agents hit a **32K output token limit** on Write calls. A single Write
+producing ~1200+ lines of C will fail silently — the file is never created and
+all agent work is lost. This is a fatal, unrecoverable error.
+
+**Rules:**
+
+- Any `main.c` expected to exceed ~800 lines **must** use the chunked-write
+  pattern: split the file into 3-4 parts (~400-600 lines each), write each to
+  a temp file, then concatenate.
+- Lesson plans for large files must include a **main.c Decomposition** section
+  specifying what goes in each chunk.
+- See `.claude/projects/-root-forge-gpu/memory/large-file-strategy.md` for the
+  full strategy, agent decomposition template, and recovery steps.
+
 ## Dependencies
 
 - SDL3 (with GPU API)

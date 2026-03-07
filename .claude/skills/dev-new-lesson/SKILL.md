@@ -265,6 +265,16 @@ $$
 
 Keep worked examples (step-by-step with numbers) in ` ```text ` blocks.
 
+## Large file write limit
+
+Task agents have a 32K output token limit per Write call. A `main.c` over
+~800 lines will fail silently — the file is never created and all work is lost.
+
+**If the lesson's main.c will exceed ~800 lines**, add a "main.c Decomposition"
+section to the plan and use the chunked-write pattern: split into 3-4 parts
+(~400-600 lines each), write each to `/tmp/`, then concatenate. See
+`CLAUDE.md` "Large file writes" section for details.
+
 ## Code style reminders
 
 - Naming: `PascalCase` for typedefs (e.g. `Vertex`, `GpuPrimitive`),
