@@ -122,6 +122,14 @@
 #define DECALS_PER_OBJECT  12
 #define CUBE_INDEX_COUNT   36
 
+/* Scene layout */
+#define RING_RADIUS        5.0f     /* radius of Suzanne ring around origin */
+#define FLOOR_DECAL_COUNT  15       /* number of decals scattered on the grid */
+#define FLOOR_DECAL_OFFSET 0.05f    /* Y offset above floor to prevent z-fight */
+#define FLOOR_SIZE_BASE    0.4f     /* minimum floor decal half-extent */
+#define FLOOR_SIZE_RANGE   0.8f     /* random range added to FLOOR_SIZE_BASE */
+#define FLOOR_SCATTER      7.0f     /* half-extent of floor decal scatter area */
+
 /* ── Vertex layout ────────────────────────────────────────────────────── */
 
 /* Position + normal — used for decal box geometry. */
@@ -734,17 +742,17 @@ static void generate_decals(app_state *state)
     }
 
     /* Floor decals — scattered on the grid around and between the Suzannes */
-    const int floor_count = 15;
+    const int floor_count = FLOOR_DECAL_COUNT;
     for (int f = 0; f < floor_count && state->decal_count < MAX_DECALS; f++) {
         Decal *decal = &state->decals[state->decal_count];
 
         /* Random position on the floor within the scene area */
         hash = forge_hash_wang(hash);
-        float fx = forge_hash_to_sfloat(hash) * 7.0f;
+        float fx = forge_hash_to_sfloat(hash) * FLOOR_SCATTER;
         hash = forge_hash_wang(hash);
-        float fz = forge_hash_to_sfloat(hash) * 7.0f;
+        float fz = forge_hash_to_sfloat(hash) * FLOOR_SCATTER;
 
-        decal->position = vec3_create(fx, 0.05f, fz);
+        decal->position = vec3_create(fx, FLOOR_DECAL_OFFSET, fz);
 
         /* Project straight down onto the floor */
         vec3 forward = vec3_create(0.0f, -1.0f, 0.0f);
@@ -767,7 +775,7 @@ static void generate_decals(app_state *state)
 
         /* Larger sizes for floor decals */
         hash = forge_hash_wang(hash);
-        float sz = 0.4f + forge_hash_to_float(hash) * 0.8f;
+        float sz = FLOOR_SIZE_BASE + forge_hash_to_float(hash) * FLOOR_SIZE_RANGE;
         decal->size[0] = sz;
         decal->size[1] = sz * DECAL_DEPTH_RATIO;
         decal->size[2] = sz;
@@ -886,9 +894,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         state->shadow_depth_fmt = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
         SDL_Log("Shadow depth format: D16_UNORM (fallback)");
     } else {
-        /* Use whatever the scene depth format is */
-        state->shadow_depth_fmt = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
-        SDL_Log("Shadow depth format: D32_FLOAT (unprobed, may fail)");
+        SDL_Log("ERROR: No shadow depth format supports DEPTH_STENCIL_TARGET | SAMPLER");
+        return SDL_APP_FAILURE;
     }
 
     /* Scene depth: needs stencil for exercises, plus SAMPLER for decal pass */
@@ -1337,14 +1344,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     /* Arrange Suzannes in a ring around the origin so the camera can see all */
     {
-        const float ring_radius = 5.0f;
         const float base_scales[SUZANNE_COUNT] = { 1.0f, 0.8f, 1.2f, 0.9f, 1.1f, 0.7f };
         for (int i = 0; i < SUZANNE_COUNT; i++) {
-            float angle = (float)i / (float)SUZANNE_COUNT * 2.0f * 3.14159265f;
-            float x = ring_radius * sinf(angle);
-            float z = ring_radius * cosf(angle);
+            float angle = (float)i / (float)SUZANNE_COUNT * 2.0f * FORGE_PI;
+            float x = RING_RADIUS * sinf(angle);
+            float z = RING_RADIUS * cosf(angle);
             /* Face each Suzanne toward the center */
-            float face_angle = angle + 3.14159265f;
+            float face_angle = angle + FORGE_PI;
             state->suzannes[i] = (SceneObject){
                 vec3_create(x, 1.0f, z), base_scales[i], face_angle
             };
@@ -1807,7 +1813,9 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     forge_capture_destroy(&state->capture, state->device);
 #endif
 
-    SDL_WaitForGPUIdle(state->device);
+    if (!SDL_WaitForGPUIdle(state->device)) {
+        SDL_Log("ERROR: SDL_WaitForGPUIdle failed: %s", SDL_GetError());
+    }
 
     /* Release pipelines */
     if (state->shadow_pipeline) SDL_ReleaseGPUGraphicsPipeline(state->device, state->shadow_pipeline);

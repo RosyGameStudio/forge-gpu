@@ -17733,23 +17733,36 @@ def diagram_decal_box_projection():
         zorder=5,
     )
 
-    # --- Projection rays from top of box down to surface ---
+    # --- Projection rays along OBB local Y axis down to surface ---
     n_rays = 7
     ray_xs = np.linspace(-box_hw + 0.15, box_hw - 0.15, n_rays)
+    # OBB local Y direction (projection axis) rotated into world space
+    proj_dx = -sin_t  # world X component of local -Y direction
+    proj_dy = -cos_t  # world Y component of local -Y direction
     for rx in ray_xs:
-        # Rotate ray origin through OBB orientation
-        rx_rot = cos_t * rx - sin_t * box_hh
+        # Ray origin at top of box in OBB local coords, rotated to world
+        rx_top = cos_t * rx - sin_t * box_hh
         ry_top = sin_t * rx + cos_t * box_hh + box_cy
-        ry_hit = -0.12 * rx_rot**2 - 0.8
+        # March along projection direction until hitting the surface
+        # Surface: y = -0.12 * x^2 - 0.8
+        # Solve: ry_top + t * proj_dy = -0.12 * (rx_top + t * proj_dx)^2 - 0.8
+        # Use iterative approach for robustness
+        hit_x, hit_y = rx_top, ry_top
+        for _ in range(50):
+            surface_y = -0.12 * hit_x**2 - 0.8
+            if hit_y <= surface_y:
+                break
+            hit_x += proj_dx * 0.05
+            hit_y += proj_dy * 0.05
         ax.plot(
-            [rx_rot, rx_rot],
-            [ry_top, ry_hit],
+            [rx_top, hit_x],
+            [ry_top, hit_y],
             color=STYLE["accent4"],
             linewidth=1,
             alpha=0.5,
             zorder=3,
         )
-        ax.plot(rx_rot, ry_hit, "o", color=STYLE["accent2"], markersize=4, zorder=5)
+        ax.plot(hit_x, hit_y, "o", color=STYLE["accent2"], markersize=4, zorder=5)
 
     # Arrow label for projection direction (rotated with OBB)
     arrow_offset = box_hw + 0.6
@@ -17783,13 +17796,28 @@ def diagram_decal_box_projection():
         zorder=5,
     )
 
-    # --- Decal region on the surface (highlighted) ---
-    t_decal = np.linspace(-box_hw, box_hw, 100)
-    y_decal = -0.12 * t_decal**2 - 0.8
-    ax.plot(t_decal, y_decal, color=STYLE["accent2"], linewidth=4, zorder=3)
+    # --- Decal region on the surface (highlighted, follows OBB projection) ---
+    # Sample local X positions across the OBB width, project along OBB Y to surface
+    t_local = np.linspace(-box_hw, box_hw, 100)
+    decal_xs = []
+    decal_ys = []
+    for lx in t_local:
+        wx = cos_t * lx - sin_t * box_hh
+        wy = sin_t * lx + cos_t * box_hh + box_cy
+        hx, hy = wx, wy
+        for _ in range(50):
+            sy = -0.12 * hx**2 - 0.8
+            if hy <= sy:
+                break
+            hx += proj_dx * 0.05
+            hy += proj_dy * 0.05
+        decal_xs.append(hx)
+        decal_ys.append(hy)
+    ax.plot(decal_xs, decal_ys, color=STYLE["accent2"], linewidth=4, zorder=3)
+    mid_idx = len(decal_xs) // 2
     ax.text(
-        0.0,
-        -1.7,
+        decal_xs[mid_idx],
+        decal_ys[mid_idx] - 0.35,
         "decal mapped via UV",
         color=STYLE["accent2"],
         fontsize=10,
@@ -17802,8 +17830,8 @@ def diagram_decal_box_projection():
 
     # --- UV coordinate labels at box edges ---
     ax.text(
-        -box_hw,
-        -0.12 * box_hw**2 - 0.8 - 0.25,
+        decal_xs[0],
+        decal_ys[0] - 0.25,
         "U=0",
         color=STYLE["warn"],
         fontsize=9,
@@ -17814,8 +17842,8 @@ def diagram_decal_box_projection():
         zorder=5,
     )
     ax.text(
-        box_hw,
-        -0.12 * box_hw**2 - 0.8 - 0.25,
+        decal_xs[-1],
+        decal_ys[-1] - 0.25,
         "U=1",
         color=STYLE["warn"],
         fontsize=9,
