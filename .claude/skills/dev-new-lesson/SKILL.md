@@ -274,8 +274,10 @@ a fatal error that wastes hours of work.
 
 **Required workflow:**
 
-1. The lesson plan MUST include a **"main.c Decomposition"** section before
-   any coding agent starts writing. Specify what goes in each chunk.
+1. Create a `PLAN.md` in the lesson directory (`lessons/gpu/NN-name/PLAN.md`)
+   with a **"main.c Decomposition"** section before any coding agent starts
+   writing. Specify what goes in each chunk. This is the lesson-local plan,
+   NOT the root `PLAN.md`.
 2. Split into 3-4 parts (~400-600 lines each). Write each to `/tmp/`, then
    concatenate with `cat`.
 3. Agent A (header + helpers + structs) runs first. Agents B and C run in
