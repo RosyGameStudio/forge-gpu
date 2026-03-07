@@ -855,6 +855,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     /* Upload the first primitive's geometry to the GPU */
+    if (!state->gltf_scene.primitives || state->gltf_scene.primitive_count == 0) {
+        SDL_Log("ERROR: Suzanne glTF has no primitives");
+        return SDL_APP_FAILURE;
+    }
     {
         ForgeGltfPrimitive *prim = &state->gltf_scene.primitives[0];
         Uint32 vb_size = prim->vertex_count * (Uint32)sizeof(ForgeGltfVertex);
@@ -1426,6 +1430,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_SUCCESS;
 
     case SDL_EVENT_KEY_DOWN:
+        if (event->key.repeat) break;  /* ignore auto-repeat */
         if (event->key.scancode == SDL_SCANCODE_ESCAPE) {
             bool next = !state->mouse_captured;
             if (!SDL_SetWindowRelativeMouseMode(state->window, next)) {
@@ -1862,7 +1867,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     /* Free glTF scene */
     forge_gltf_free(&state->gltf_scene);
 
-    /* Destroy window and device */
+    /* Release window from GPU device before destroying */
+    SDL_ReleaseWindowFromGPUDevice(state->device, state->window);
     SDL_DestroyWindow(state->window);
     SDL_DestroyGPUDevice(state->device);
 

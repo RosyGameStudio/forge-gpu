@@ -18773,17 +18773,32 @@ def diagram_decal_layering():
         )
 
         # Decal B (right, overlapping)
-        decal_b = Rectangle(
-            (3.0, 2.3),
-            3.5,
-            2.5,
-            facecolor=STYLE["accent2"],
-            edgecolor=STYLE["accent2"],
-            linewidth=2.5,
-            alpha=0.25,
-            zorder=3,
+        decal_b_x, decal_b_y, decal_b_w, decal_b_h = 3.0, 2.3, 3.5, 2.5
+
+        # Overlap region
+        overlap_x = decal_b_x
+        overlap_y = decal_b_y
+        overlap_w = 1.5  # intersection width
+        overlap_h = decal_b_h
+
+        # When stencil is active, only draw B outside the overlap region
+        decal_b_regions = (
+            [(decal_b_x + overlap_w, decal_b_y, decal_b_w - overlap_w, decal_b_h)]
+            if has_stencil
+            else [(decal_b_x, decal_b_y, decal_b_w, decal_b_h)]
         )
-        ax.add_patch(decal_b)
+        for bx, by, bw, bh in decal_b_regions:
+            decal_b = Rectangle(
+                (bx, by),
+                bw,
+                bh,
+                facecolor=STYLE["accent2"],
+                edgecolor=STYLE["accent2"],
+                linewidth=2.5,
+                alpha=0.25,
+                zorder=3,
+            )
+            ax.add_patch(decal_b)
         ax.text(
             5.5,
             4.5,
@@ -18796,12 +18811,6 @@ def diagram_decal_layering():
             path_effects=stroke_thin,
             zorder=5,
         )
-
-        # Overlap region
-        overlap_x = 3.0
-        overlap_y = 2.3
-        overlap_w = 1.5  # intersection width
-        overlap_h = 2.5  # intersection height
 
         if has_stencil:
             # Clean overlap — stencil rejects B, keeps A's appearance
