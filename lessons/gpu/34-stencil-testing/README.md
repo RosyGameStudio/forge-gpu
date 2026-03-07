@@ -99,7 +99,7 @@ execution order.
 The comparison evaluates:
 
 $$
-(\texttt{buffer{\_}value} \mathbin{\&} \texttt{compare{\_}mask}) \enspace \texttt{COMPARE{\_}OP} \enspace (\texttt{reference} \mathbin{\&} \texttt{compare{\_}mask})
+(\mathtt{buffer\_value} \mathbin{\&} \mathtt{compare\_mask}) \enspace \mathtt{COMPARE\_OP} \enspace (\mathtt{reference} \mathbin{\&} \mathtt{compare\_mask})
 $$
 
 where `buffer_value` is the current stencil value at this pixel, `reference`
