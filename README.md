@@ -434,8 +434,36 @@ forge_raster_write_bmp(&buf, "triangle.bmp");
 forge_raster_buffer_destroy(&buf);
 ```
 
-All five libraries are header-only — just include and use. No build
+All five C libraries are header-only — just include and use. No build
 configuration needed.
+
+### Asset Pipeline (`pipeline/`)
+
+A pip-installable Python package for scanning, fingerprinting, and processing
+game assets. Plugin-based architecture — add new asset types by dropping a
+`.py` file into a plugins directory.
+See [`pipeline/README.md`](pipeline/README.md) for the full API reference.
+
+```bash
+pip install -e ".[dev]"        # install from repo root
+forge-pipeline -v              # scan and report
+forge-pipeline --help          # see all options
+```
+
+```python
+from pipeline.config import load_config
+from pipeline.plugin import PluginRegistry
+from pipeline.scanner import scan, FingerprintCache
+
+config = load_config(Path("pipeline.toml"))
+registry = PluginRegistry()
+registry.discover(Path("plugins/"))
+cache = FingerprintCache(config.cache_dir / "fingerprints.json")
+files = scan(config.source_dir, registry.supported_extensions, cache)
+```
+
+Built incrementally across the [asset pipeline lessons](lessons/assets/).
+Each lesson adds real functionality to this shared package.
 
 ## Getting Started
 
@@ -501,16 +529,16 @@ build\lessons\gpu\01-hello-window\Debug\01-hello-window.exe
 ## Testing
 
 The shared libraries have automated tests covering math operations, OBJ parsing,
-glTF parsing, CPU rasterization, and UI systems.
+glTF parsing, CPU rasterization, UI systems, and the asset pipeline.
 
-**Run all tests:**
+**Run all C tests:**
 
 ```bash
 cd build
 ctest -C Debug --output-on-failure
 ```
 
-**Run a specific test suite:**
+**Run a specific C test suite:**
 
 ```bash
 cmake --build build --config Debug --target test_math
@@ -521,8 +549,15 @@ cmake --build build --config Debug --target test_ui
 cmake --build build --config Debug --target test_ui_ctx
 ```
 
-All tests use epsilon comparison for floating-point accuracy and return proper
-exit codes for CI/CD integration.
+**Run pipeline (Python) tests:**
+
+```bash
+pip install -e ".[dev]"        # once, from repo root
+pytest tests/pipeline/ -v
+```
+
+All C tests use epsilon comparison for floating-point accuracy and return
+proper exit codes for CI/CD integration.
 
 See [tests/math/README.md](tests/math/README.md) for adding new tests.
 
@@ -573,7 +608,7 @@ forge-gpu/
 │   │   ├── README.md      Overview and navigation
 │   │   └── NN-topic/      Each topic: program, README, data output
 │   ├── physics/           Physics lessons — simulation rendered with SDL GPU
-│   ├── assets/            Asset pipeline — hybrid Python + C tooling
+│   ├── assets/            Asset pipeline lessons (walkthroughs + exercises)
 │   └── gpu/               GPU lessons — SDL API and rendering
 │       ├── 01-hello-window/
 │       ├── ...
@@ -613,13 +648,21 @@ forge-gpu/
 │   ├── capture/           Screenshot/GIF capture utility
 │   │   └── forge_capture.h
 │   └── forge.h            Shared utilities for lessons
-├── tests/                 Test suite (CTest integration)
+├── pipeline/              Asset pipeline library (Python, pip-installable)
+│   ├── __main__.py        CLI entry point (forge-pipeline)
+│   ├── config.py          TOML configuration loader
+│   ├── plugin.py          Plugin base class, registry, file-based discovery
+│   ├── scanner.py         File scanning, SHA-256 fingerprinting, cache
+│   ├── plugins/           Built-in asset type plugins
+│   └── README.md          API reference and usage guide
+├── tests/                 Test suite (CTest + pytest)
 │   ├── math/              Math library tests
 │   ├── obj/               OBJ parser tests
 │   ├── gltf/              glTF parser tests
 │   ├── raster/            CPU rasterizer tests
 │   ├── ui/                UI library tests (TTF parser, immediate-mode context)
-│   └── physics/           Physics library tests
+│   ├── physics/           Physics library tests
+│   └── pipeline/          Asset pipeline tests (pytest)
 ├── .claude/skills/        Claude Code skills (AI-invokable patterns)
 │   ├── dev-math-lesson/   Add math concept + lesson + update library
 │   ├── dev-ui-lesson/     Add UI lesson (fonts, text, controls)
@@ -639,7 +682,7 @@ forge-gpu/
 - **Engine lessons** teach build systems, C fundamentals, debugging, and project structure
 - **UI lessons** build an immediate-mode UI system (fonts, text, controls) as CPU-side data
 - **Physics lessons** simulate dynamics and render with SDL GPU, building `common/physics/`
-- **Asset pipeline lessons** build tooling (Python + C) that processes raw art into GPU-ready formats and generates procedural geometry
+- **Asset pipeline lessons** teach the design of `pipeline/` — a reusable Python package for processing raw art into GPU-ready formats
 - **GPU lessons** use the shared libraries, render UI data, and link to math lessons for theory
 - **Parsers** (`common/obj/`, `common/gltf/`) load 3D models for GPU lessons
 - **Rasterizer** (`common/raster/`) software-renders triangles for testing and visualization

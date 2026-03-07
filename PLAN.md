@@ -95,8 +95,9 @@ streams as the backend.
 
 ## Asset Pipeline — New Track
 
-A hybrid Python + C track. The pipeline orchestrator is a Python CLI tool with
-a plugin architecture and web frontend. Processing plugins that need
+A hybrid Python + C track. The pipeline is a **reusable Python library** at
+`pipeline/` in the repo root (`pip install -e ".[dev]"`). Each lesson adds
+real functionality to the shared package. Processing plugins that need
 high-performance C libraries (meshoptimizer, MikkTSpace) are compiled C tools
 invoked as subprocesses. Procedural geometry generation lives in a header-only
 C library (`common/shapes/forge_shapes.h`).

@@ -6,15 +6,17 @@ permissions:
 on:
   pull_request:
     paths:
-      - 'lessons/assets/**/*.py'
-      - 'lessons/assets/**/pyproject.toml'
+      - 'pipeline/**/*.py'
+      - 'tests/pipeline/**/*.py'
+      - 'pyproject.toml'
       - '.github/workflows/python-test.yml'
   push:
     branches:
       - main
     paths:
-      - 'lessons/assets/**/*.py'
-      - 'lessons/assets/**/pyproject.toml'
+      - 'pipeline/**/*.py'
+      - 'tests/pipeline/**/*.py'
+      - 'pyproject.toml'
 
 jobs:
   test:
@@ -31,14 +33,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install and test Asset Lesson 01
-        working-directory: lessons/assets/01-pipeline-scaffold
-        run: |
-          pip install -e ".[dev]"
-          pytest -v
+      - name: Install package
+        run: pip install -e ".[dev]"
 
-      - name: Lint Asset Lesson 01
-        working-directory: lessons/assets/01-pipeline-scaffold
+      - name: Run tests
+        run: pytest tests/pipeline/ -v
+
+      - name: Lint
         run: |
-          ruff check .
-          ruff format --check .
+          ruff check pipeline/ tests/pipeline/
+          ruff format --check pipeline/ tests/pipeline/

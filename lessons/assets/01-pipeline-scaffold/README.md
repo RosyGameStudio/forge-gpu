@@ -4,6 +4,10 @@ Build the foundation for an asset processing pipeline: a Python CLI that
 discovers plugins, scans source files, fingerprints them by content hash, and
 reports what needs processing.
 
+The pipeline lives at [`pipeline/`](../../../pipeline/) in the repo root as a
+reusable Python package. This lesson walks through how it was built and why
+each design decision was made.
+
 ## What you'll learn
 
 - Structure a Python CLI project with `pyproject.toml` and `argparse`
@@ -16,7 +20,7 @@ reports what needs processing.
 ## Result
 
 ```text
-$ python -m pipeline -v
+$ forge-pipeline -v
 pipeline: Loaded config from pipeline.toml
 pipeline: Discovered 2 plugin(s) from plugins
 pipeline: Loaded 2 plugin(s)
@@ -39,14 +43,8 @@ Scanned 3 file(s) in assets/raw:
 Running a second time with no file changes:
 
 ```text
-$ python -m pipeline
-pipeline: Loaded config from pipeline.toml
+$ forge-pipeline
 ...
-Scanned 3 file(s) in assets/raw:
-  0 new
-  0 changed
-  3 unchanged
-
 All files up to date — nothing to process.
 ```
 
@@ -56,40 +54,54 @@ All files up to date — nothing to process.
 
 The pipeline has four components that this lesson builds one at a time:
 
-1. **Configuration** (`config.py`) — Reads `pipeline.toml` and produces a
-   typed `PipelineConfig` dataclass.
-2. **Plugin registry** (`plugin.py`) — Discovers plugin `.py` files, imports
-   them, and registers `AssetPlugin` subclasses by name and extension.
-3. **Scanner** (`scanner.py`) — Walks the source directory, fingerprints each
-   file with SHA-256, and compares against a persistent JSON cache.
-4. **CLI** (`__main__.py`) — Ties everything together with `argparse`.
+1. **Configuration** ([`pipeline/config.py`](../../../pipeline/config.py)) —
+   Reads `pipeline.toml` and produces a typed `PipelineConfig` dataclass.
+2. **Plugin registry** ([`pipeline/plugin.py`](../../../pipeline/plugin.py)) —
+   Discovers plugin `.py` files, imports them, and registers `AssetPlugin`
+   subclasses by name and extension.
+3. **Scanner** ([`pipeline/scanner.py`](../../../pipeline/scanner.py)) — Walks
+   the source directory, fingerprints each file with SHA-256, and compares
+   against a persistent JSON cache.
+4. **CLI** ([`pipeline/__main__.py`](../../../pipeline/__main__.py)) — Ties
+   everything together with `argparse`.
 
 ## Project structure
 
+The pipeline is a reusable package at the repo root:
+
 ```text
-01-pipeline-scaffold/
-  pipeline.toml              # Project configuration
-  pyproject.toml             # Python package definition
+forge-gpu/
+  pyproject.toml             # Package definition (forge-pipeline)
   pipeline/
-    __init__.py              # Package marker
+    README.md                # API reference and usage guide
+    __init__.py
     __main__.py              # CLI entry point
     config.py                # TOML config loader
     plugin.py                # Plugin base class, registry, discovery
     scanner.py               # File scanning and fingerprinting
-  plugins/
-    texture.py               # Example texture plugin (no-op)
-    mesh.py                  # Example mesh plugin (no-op)
-  assets/
-    raw/                     # Sample source assets for testing
-      textures/
-        hero.png
-        detail.tga
-      models/
-        cube.obj
+    plugins/
+      texture.py             # Built-in texture plugin (scaffold)
+      mesh.py                # Built-in mesh plugin (scaffold)
   tests/
-    test_config.py           # Config loading and validation tests
-    test_plugin.py           # Plugin registration and discovery tests
-    test_scanner.py          # Fingerprinting and scanning tests
+    pipeline/
+      test_config.py         # Config loading and validation tests
+      test_plugin.py         # Plugin registration and discovery tests
+      test_scanner.py        # Fingerprinting and scanning tests
+```
+
+Each asset lesson adds real functionality to this shared package. The lesson
+directory contains only the README, diagram, and sample assets for hands-on
+testing:
+
+```text
+lessons/assets/01-pipeline-scaffold/
+  README.md                  # This walkthrough
+  pipeline.toml              # Example configuration
+  assets/
+    pipeline-architecture.png
+    raw/                     # Sample source files
+      textures/hero.png, detail.tga
+      models/cube.obj
 ```
 
 ## Configuration — `pipeline.toml`
@@ -149,8 +161,8 @@ class AssetPlugin:
 ```
 
 The `process` method transforms a source file into a processed output. In this
-lesson the example plugins are no-ops — real processing is added in Lessons 02
-(textures) and 03 (meshes).
+lesson the built-in plugins are scaffolds — real processing is added in
+Lessons 02 (textures) and 03 (meshes).
 
 ### Registry
 
@@ -191,14 +203,14 @@ Discovery works by:
 4. Instantiating and registering each one
 
 This means adding support for a new asset type is as simple as dropping a new
-`.py` file into the `plugins/` directory. No core code changes required.
+`.py` file into the plugins directory. No core code changes required.
 
 ### Writing a plugin
 
-Create a file in `plugins/` with a class inheriting from `AssetPlugin`:
+Create a file with a class inheriting from `AssetPlugin`:
 
 ```python
-# plugins/audio.py
+# my_plugins/audio.py
 from pipeline.plugin import AssetPlugin, AssetResult
 
 class AudioPlugin(AssetPlugin):
@@ -263,7 +275,7 @@ cache file lives in the `cache_dir` specified in `pipeline.toml` (default:
 The CLI ties the three subsystems together:
 
 ```text
-$ python -m pipeline --help
+$ forge-pipeline --help
 usage: forge-pipeline [-h] [-c CONFIG] [--plugins-dir PLUGINS_DIR]
                       [--source-dir SOURCE_DIR] [--dry-run] [-v]
 
@@ -292,22 +304,23 @@ The execution flow:
 ### Setup
 
 ```bash
-cd lessons/assets/01-pipeline-scaffold
+# From the forge-gpu repository root
 pip install -e ".[dev]"
 ```
 
-### Run the pipeline
+### Try it out
 
 ```bash
-python -m pipeline              # scan with default settings
-python -m pipeline -v           # verbose output with debug logging
-python -m pipeline -c my.toml   # use a different config file
+cd lessons/assets/01-pipeline-scaffold
+forge-pipeline -v              # scan sample assets
+forge-pipeline                 # second run — all unchanged
 ```
 
 ### Run the tests
 
 ```bash
-pytest -v
+# From the repository root
+pytest tests/pipeline/ -v
 ```
 
 29 tests covering all three modules: config loading, plugin registration and
@@ -362,7 +375,7 @@ in your own project.
 
 ## Exercises
 
-1. **Add an audio plugin** — Create `plugins/audio.py` that handles `.wav`,
+1. **Add an audio plugin** — Create a plugin file that handles `.wav`,
    `.ogg`, and `.mp3` files. Drop a test file into `assets/raw/audio/` and
    verify the scanner finds it.
 
@@ -383,6 +396,8 @@ in your own project.
 
 ## Further reading
 
+- [Pipeline API reference](../../../pipeline/README.md) — Full API docs and
+  usage guide
 - [TOML specification](https://toml.io/) — The configuration format used by
   the pipeline
 - [hashlib documentation](https://docs.python.org/3/library/hashlib.html) —
