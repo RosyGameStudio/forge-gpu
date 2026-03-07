@@ -15951,7 +15951,7 @@ def diagram_binding_comparison():
 
 
 def diagram_stencil_buffer_concept():
-    """Three framebuffer attachments: Color, Depth, Stencil with D24S8 packing."""
+    """Three framebuffer attachments: color, depth, and stencil in a shared depth-stencil texture."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 5), facecolor=STYLE["bg"])
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
@@ -16147,8 +16147,8 @@ def diagram_stencil_buffer_concept():
     fig.text(
         0.65,
         0.02,
-        "Depth + Stencil share one texture: D24_UNORM_S8_UINT  "
-        "(24-bit depth + 8-bit stencil)",
+        "Depth + Stencil share one texture: D24_UNORM_S8_UINT or "
+        "D32_FLOAT_S8_UINT (platform-dependent depth + 8-bit stencil)",
         color=STYLE["warn"],
         fontsize=10,
         fontweight="bold",
@@ -16330,10 +16330,10 @@ def diagram_portal_technique():
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
     panel_info = [
-        ("1. Write Stencil Mask", "Portal rect = stencil 1"),
-        ("2. Draw Portal World (stencil==1)", "Objects inside portal only"),
-        ("3. Draw Main World (stencil!=1)", "Objects outside portal only"),
-        ("4. Final Composite", "Portal frame overlay"),
+        ("1. Draw Main World", "Depth-writing occluders first"),
+        ("2. Write Stencil Mask", "Portal rect = stencil 1 (depth blocks mask)"),
+        ("3. Draw Portal World (stencil==1)", "Objects inside portal only"),
+        ("4. Final Composite", "Portal frame + outlines"),
     ]
 
     for idx, ax in enumerate(axes.flat):

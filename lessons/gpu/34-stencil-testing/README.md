@@ -9,7 +9,7 @@
 
 - What the stencil buffer is: an 8-bit per-pixel integer alongside the depth buffer
 - How to configure the `D24_UNORM_S8_UINT` depth-stencil format (and why the `_S8_UINT` suffix matters)
-- Where stencil testing sits in the fragment pipeline: after fragment shading, before depth testing
+- The logical stencil/depth flow used to reason about stencil behavior
 - All 8 stencil operations and 8 comparison functions available in SDL GPU
 - The portal masking technique: render a different world through a stencil-masked opening
 - The object outline technique: stencil silhouette expansion for colored borders
@@ -86,11 +86,15 @@ this lesson does with the V key toggle.
 
 ![Stencil test pipeline](assets/stencil_test_pipeline.png)
 
-The stencil test occurs between fragment shading and depth testing. After a
-fragment shader produces its output, the GPU evaluates the stencil condition
-before checking depth:
+For reasoning about stencil behavior, we use this logical order:
 
 **Fragment Shader** -> **Stencil Test** -> **Depth Test** -> **Color Write**
+
+Modern GPUs may optimize by running stencil and depth tests before the fragment
+shader when legal (for example, when the shader does not write custom depth
+values). Treat this sequence as the conceptual model for understanding how
+`fail_op`, `depth_fail_op`, and `pass_op` apply — not the guaranteed hardware
+execution order.
 
 The comparison evaluates:
 

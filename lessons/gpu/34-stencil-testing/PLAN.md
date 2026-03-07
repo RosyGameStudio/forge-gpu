@@ -50,9 +50,9 @@ Pass 1: Shadow map (depth-only, D32_FLOAT, 2048x2048)
   - Draw main world cubes only
 
 Pass 2: Main scene (swapchain color + D24_UNORM_S8_UINT depth-stencil)
-  Phase A: Portal mask write    (stencil=1, no color, no depth write)
-  Phase B: Portal world         (stencil==1, alternate objects + tint)
-  Phase C: Main world + grid    (stencil!=1, cubes + outlined cubes + grid)
+  Phase A: Main world + grid    (depth-writing occluders first)
+  Phase B: Portal mask write    (stencil=1, no color, no depth write)
+  Phase C: Portal world         (stencil==1, alternate objects + tint)
   Phase D: Portal frame         (stencil ALWAYS, visible frame mesh)
   Phase E: Outline pass         (stencil REPLACE then NOT_EQUAL for outlines)
 
@@ -116,7 +116,7 @@ typedef struct SceneFragUniforms {
     float specular_str;
     float tint[3];          /* additive tint for portal world */
     float _pad0;
-} SceneFragUniforms;                                /* 80 bytes */
+} SceneFragUniforms;                                /* 88 bytes */
 
 typedef struct GridVertUniforms {
     mat4 vp;        /* view-projection */
