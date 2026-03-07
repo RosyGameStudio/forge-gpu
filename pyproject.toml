@@ -28,7 +28,7 @@ testpaths = ["tests/pipeline"]
 target-version = "py310"
 
 # Lint pipeline code and scripts
-include = ["scripts/*.py", "pipeline/**/*.py", "tests/pipeline/**/*.py"]
+include = ["scripts/**/*.py", "pipeline/**/*.py", "tests/pipeline/**/*.py"]
 
 [tool.ruff.lint]
 # Enable a sensible set of rules

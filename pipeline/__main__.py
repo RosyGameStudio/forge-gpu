@@ -118,6 +118,10 @@ def main(argv: list[str] | None = None) -> int:
     if plugins_dir.is_dir():
         count = registry.discover(plugins_dir)
         log.info("Loaded %d plugin(s)", count)
+    elif args.plugins_dir is not None:
+        # User explicitly provided a path that doesn't exist — fail fast.
+        log.error("Plugins directory not found: %s", plugins_dir)
+        return 1
     else:
         log.info("No plugins directory at %s — running with no plugins", plugins_dir)
 
@@ -136,6 +140,10 @@ def main(argv: list[str] | None = None) -> int:
     # -- Scanning -----------------------------------------------------------
     cache_path = config.cache_dir / "fingerprints.json"
     cache = FingerprintCache(cache_path)
+
+    if not config.source_dir.is_dir():
+        log.error("Source directory not found: %s", config.source_dir)
+        return 1
 
     files = scan(config.source_dir, supported, cache)
     if not files:

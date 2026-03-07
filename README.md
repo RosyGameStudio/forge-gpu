@@ -434,7 +434,7 @@ forge_raster_write_bmp(&buf, "triangle.bmp");
 forge_raster_buffer_destroy(&buf);
 ```
 
-All five C libraries are header-only — just include and use. No build
+All six C libraries are header-only — just include and use. No build
 configuration needed.
 
 ### Asset Pipeline (`pipeline/`)

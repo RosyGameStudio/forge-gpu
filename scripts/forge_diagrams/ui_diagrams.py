@@ -195,7 +195,7 @@ def diagram_glyph_anatomy():
     )
 
     # Draw points
-    for x, y, on in zip(outer_x[:-1], outer_y[:-1], on_curve_outer, strict=True):
+    for x, y, on in zip(outer_x[:-1], outer_y[:-1], on_curve_outer[:-1], strict=True):
         marker = "o" if on else "s"
         color = STYLE["accent1"]
         ax.plot(
@@ -209,7 +209,7 @@ def diagram_glyph_anatomy():
             zorder=5,
         )
 
-    for x, y, on in zip(inner_x[:-1], inner_y[:-1], on_curve_inner, strict=True):
+    for x, y, on in zip(inner_x[:-1], inner_y[:-1], on_curve_inner[:-1], strict=True):
         marker = "o" if on else "s"
         color = STYLE["accent2"]
         ax.plot(
