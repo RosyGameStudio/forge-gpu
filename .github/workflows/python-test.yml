@@ -1,0 +1,44 @@
+name: Python Tests
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - 'lessons/assets/**/*.py'
+      - 'lessons/assets/**/pyproject.toml'
+      - '.github/workflows/python-test.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'lessons/assets/**/*.py'
+      - 'lessons/assets/**/pyproject.toml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.12']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install and test Asset Lesson 01
+        working-directory: lessons/assets/01-pipeline-scaffold
+        run: |
+          pip install -e ".[dev]"
+          pytest -v
+
+      - name: Lint Asset Lesson 01
+        working-directory: lessons/assets/01-pipeline-scaffold
+        run: |
+          ruff check .
+          ruff format --check .

@@ -293,7 +293,7 @@ MikkTSpace) and procedural geometry lives in a header-only C library
 
 | # | Topic | What you'll learn |
 |---|-------|-------------------|
-| | *Coming soon* | See [PLAN.md](PLAN.md) for the roadmap |
+| 01 | [Pipeline Scaffold](lessons/assets/01-pipeline-scaffold/) | CLI entry point, plugin discovery, asset scanning, content-hash fingerprinting, TOML config |
 
 See [lessons/assets/README.md](lessons/assets/README.md) for details and
 [PLAN.md](PLAN.md) for the roadmap.
@@ -691,6 +691,7 @@ project to enable Claude to build games and tools with you.
 | [forge-auto-widget-layout](.claude/skills/forge-auto-widget-layout/SKILL.md) | `/forge-auto-widget-layout` | Automatic widget layout with vertical/horizontal stacking, padding, spacing, and nested layouts |
 | [forge-draggable-windows](.claude/skills/forge-draggable-windows/SKILL.md) | `/forge-draggable-windows` | Draggable, z-ordered, collapsible windows for immediate-mode UI |
 | [forge-stencil-testing](.claude/skills/forge-stencil-testing/SKILL.md) | `/forge-stencil-testing` | Stencil buffer testing, portals, outlines, per-pixel masking |
+| [forge-asset-pipeline](.claude/skills/forge-asset-pipeline/SKILL.md) | `/forge-asset-pipeline` | Plugin-based asset pipeline with CLI, content-hash fingerprinting, TOML config |
 
 ### Development skills (used within this repo)
 

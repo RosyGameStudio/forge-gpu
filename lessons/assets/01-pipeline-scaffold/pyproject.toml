@@ -1,0 +1,45 @@
+[project]
+name = "forge-asset-pipeline"
+version = "0.1.0"
+description = "Asset processing pipeline for forge-gpu"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+forge-pipeline = "pipeline.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["pipeline*", "plugins*"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+    "UP",  # pyupgrade (modern Python idioms)
+    "B",   # flake8-bugbear (common bugs)
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501", # line too long — let formatter handle it
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pipeline"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

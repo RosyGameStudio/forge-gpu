@@ -72,3 +72,7 @@ build2/
 # Local editor config
 .clang-format
 __pycache__
+*.egg-info/
+
+# Asset pipeline cache (generated at runtime)
+.forge-cache/

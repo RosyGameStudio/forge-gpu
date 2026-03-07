@@ -44,7 +44,7 @@ procedural geometry. Later lessons add a browser-based UI for asset browsing,
 
 | # | Topic | Language | What you'll learn |
 |---|-------|----------|-------------------|
-| | *Coming soon* | | See [PLAN.md](../../PLAN.md) for the roadmap |
+| 01 | [Pipeline Scaffold](01-pipeline-scaffold/) | Python | CLI entry point, plugin discovery, asset scanning, content-hash fingerprinting, TOML configuration |
 
 ## Building
 
