@@ -17098,11 +17098,11 @@ def diagram_draw_order_stencil():
 
     passes = [
         ("Shadow\nPass", STYLE["text_dim"], "depth only", 1.2),
-        ("Portal\nMask", STYLE["accent2"], "stencil=1\nno color", 3.3),
-        ("Portal\nWorld", STYLE["accent2"], "stencil==1", 5.4),
-        ("Main\nWorld", STYLE["accent1"], "stencil!=1", 7.5),
-        ("Grid\nFloor", STYLE["accent3"], "always", 9.6),
-        ("Portal\nFrame", STYLE["accent4"], "always", 11.7),
+        ("Main\nCubes", STYLE["accent1"], "depth only\nno stencil", 3.3),
+        ("Portal\nMask", STYLE["accent2"], "stencil=1\nno color", 5.4),
+        ("Portal\nWorld", STYLE["accent2"], "stencil==1", 7.5),
+        ("Grid\nFloor", STYLE["accent3"], "stencil !=\nand ==", 9.6),
+        ("Portal\nFrame", STYLE["accent4"], "depth only", 11.7),
         ("Outline\nPass", STYLE["warn"], "replace\nthen !=", 13.8),
         ("Debug\nOverlay", STYLE["text_dim"], "if toggled", 15.9),
     ]
@@ -17185,3 +17185,469 @@ def diagram_draw_order_stencil():
     )
     fig.tight_layout(rect=[0, 0, 1, 0.92])
     save(fig, "gpu/34-stencil-testing", "draw_order_stencil.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/34-stencil-testing — phase_ordering.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_phase_ordering():
+    """Side-by-side comparison of wrong vs correct stencil/depth phase order.
+
+    Shows how drawing the portal mask before opaque cubes allows the portal
+    to bleed through closer geometry (the bug), and how reversing the order
+    fixes it by letting the depth buffer prevent stencil writes behind
+    closer objects.
+    """
+    from matplotlib.patches import FancyBboxPatch, Rectangle
+
+    fig, (ax_bad, ax_good) = plt.subplots(2, 1, figsize=(14, 9), facecolor=STYLE["bg"])
+
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+    stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
+
+    def draw_scenario(ax, title, title_color, steps, depth_bar, stencil_bar):
+        """Draw one scenario (wrong or correct) as a 3-step side view."""
+        setup_axes(ax, xlim=(-0.5, 15.5), ylim=(-1.8, 4.5), grid=False, aspect=None)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        # Scenario title
+        ax.text(
+            7.5,
+            4.2,
+            title,
+            color=title_color,
+            fontsize=14,
+            fontweight="bold",
+            ha="center",
+            va="top",
+            path_effects=stroke,
+            zorder=10,
+        )
+
+        step_width = 4.5
+        step_gap = 0.5
+
+        for i, step in enumerate(steps):
+            x_base = i * (step_width + step_gap) + 0.3
+            x_mid = x_base + step_width / 2
+
+            # Step label
+            ax.text(
+                x_mid,
+                3.5,
+                step["label"],
+                color=step["label_color"],
+                fontsize=9,
+                fontweight="bold",
+                ha="center",
+                va="top",
+                path_effects=stroke_thin,
+                zorder=10,
+            )
+
+            # --- Scene side view (camera on right, portal on left) ---
+            scene_y = 1.2
+            scene_h = 1.8
+
+            # Z axis arrow (depth direction)
+            ax.annotate(
+                "",
+                xy=(x_base + 0.2, scene_y - 0.6),
+                xytext=(x_base + step_width - 0.2, scene_y - 0.6),
+                arrowprops={
+                    "arrowstyle": "->,head_width=0.15,head_length=0.08",
+                    "color": STYLE["text_dim"],
+                    "lw": 1.2,
+                },
+                zorder=2,
+            )
+            ax.text(
+                x_base + 0.1,
+                scene_y - 0.9,
+                "far (z=-5)",
+                color=STYLE["text_dim"],
+                fontsize=6,
+                ha="left",
+                va="top",
+                path_effects=stroke_thin,
+                zorder=5,
+            )
+            ax.text(
+                x_base + step_width - 0.1,
+                scene_y - 0.9,
+                "near (camera)",
+                color=STYLE["text_dim"],
+                fontsize=6,
+                ha="right",
+                va="top",
+                path_effects=stroke_thin,
+                zorder=5,
+            )
+
+            # Portal frame (always at left side — far Z)
+            portal_x = x_base + 0.5
+            portal_w = 0.35
+            portal_rect = Rectangle(
+                (portal_x, scene_y - 0.1),
+                portal_w,
+                scene_h + 0.2,
+                facecolor=STYLE["text_dim"],
+                edgecolor=STYLE["axis"],
+                linewidth=1.5,
+                alpha=step.get("portal_alpha", 0.7),
+                zorder=step.get("portal_z", 3),
+            )
+            ax.add_patch(portal_rect)
+            if i == 0:
+                ax.text(
+                    portal_x + portal_w / 2,
+                    scene_y + scene_h + 0.35,
+                    "Frame\n(z=-5)",
+                    color=STYLE["text_dim"],
+                    fontsize=6.5,
+                    ha="center",
+                    va="bottom",
+                    path_effects=stroke_thin,
+                    zorder=5,
+                )
+
+            # Portal mask quad (thin line at portal)
+            if step.get("show_mask", False):
+                mask_color = step.get("mask_color", STYLE["accent2"])
+                ax.plot(
+                    [portal_x + portal_w + 0.05, portal_x + portal_w + 0.05],
+                    [scene_y, scene_y + scene_h],
+                    color=mask_color,
+                    linewidth=3,
+                    alpha=0.8,
+                    zorder=4,
+                )
+                ax.text(
+                    portal_x + portal_w + 0.15,
+                    scene_y + scene_h + 0.35,
+                    "Mask",
+                    color=mask_color,
+                    fontsize=6.5,
+                    ha="center",
+                    va="bottom",
+                    path_effects=stroke_thin,
+                    zorder=5,
+                )
+
+            # Stencil region projection (cone from mask to screen)
+            if step.get("show_stencil_cone", False):
+                cone_color = step.get("cone_color", STYLE["accent2"])
+                cone_alpha = step.get("cone_alpha", 0.12)
+                cone_verts = [
+                    (portal_x + portal_w + 0.05, scene_y),
+                    (portal_x + portal_w + 0.05, scene_y + scene_h),
+                    (x_base + step_width - 0.3, scene_y + scene_h + 0.3),
+                    (x_base + step_width - 0.3, scene_y - 0.3),
+                ]
+                cone = Polygon(
+                    cone_verts,
+                    facecolor=cone_color,
+                    alpha=cone_alpha,
+                    edgecolor="none",
+                    zorder=1,
+                )
+                ax.add_patch(cone)
+
+            # Cube (in the middle — closer to camera)
+            cube_x = x_base + 2.0
+            cube_w = 1.2
+            cube_color = step.get("cube_color", STYLE["accent1"])
+            cube_alpha = step.get("cube_alpha", 0.85)
+            cube_style = step.get("cube_style", "solid")
+
+            cube_rect = FancyBboxPatch(
+                (cube_x, scene_y + 0.2),
+                cube_w,
+                scene_h - 0.4,
+                boxstyle="round,pad=0.05",
+                facecolor=cube_color if cube_style == "solid" else "none",
+                edgecolor=cube_color,
+                linewidth=2,
+                alpha=cube_alpha,
+                linestyle="-" if cube_style == "solid" else "--",
+                zorder=step.get("cube_z", 4),
+            )
+            ax.add_patch(cube_rect)
+            if i == 0:
+                ax.text(
+                    cube_x + cube_w / 2,
+                    scene_y + scene_h + 0.35,
+                    "Cube\n(z=-3)",
+                    color=STYLE["accent1"],
+                    fontsize=6.5,
+                    ha="center",
+                    va="bottom",
+                    path_effects=stroke_thin,
+                    zorder=5,
+                )
+
+            # Rejected region overlay
+            if step.get("show_rejected", False):
+                rej_x = cube_x
+                rej_w = cube_w
+                rej_rect = Rectangle(
+                    (rej_x, scene_y + 0.2),
+                    rej_w,
+                    scene_h - 0.4,
+                    facecolor=STYLE["accent2"],
+                    alpha=0.25,
+                    edgecolor=STYLE["accent2"],
+                    linewidth=1,
+                    linestyle="--",
+                    zorder=5,
+                )
+                ax.add_patch(rej_rect)
+                ax.text(
+                    cube_x + cube_w / 2,
+                    scene_y + scene_h / 2,
+                    "REJECTED\nby stencil",
+                    color=STYLE["accent2"],
+                    fontsize=7,
+                    fontweight="bold",
+                    ha="center",
+                    va="center",
+                    path_effects=stroke,
+                    zorder=6,
+                )
+
+            # Depth write indicator
+            if step.get("show_depth_write", False):
+                dw_color = step.get("depth_write_color", STYLE["accent3"])
+                ax.text(
+                    cube_x + cube_w / 2,
+                    scene_y - 0.2,
+                    step.get("depth_write_label", "depth written"),
+                    color=dw_color,
+                    fontsize=6.5,
+                    ha="center",
+                    va="top",
+                    path_effects=stroke_thin,
+                    zorder=5,
+                )
+
+            # Mask blocked indicator
+            if step.get("show_mask_blocked", False):
+                ax.text(
+                    portal_x + portal_w + 0.4,
+                    scene_y + scene_h / 2,
+                    step.get("mask_blocked_label", "mask FAILS\ndepth test"),
+                    color=STYLE["accent3"],
+                    fontsize=7,
+                    fontweight="bold",
+                    ha="left",
+                    va="center",
+                    path_effects=stroke,
+                    zorder=6,
+                )
+
+            # Frame result indicator
+            if step.get("show_frame_result", False):
+                fr_color = step.get("frame_result_color", STYLE["accent2"])
+                fr_text = step.get("frame_result_text", "")
+                ax.text(
+                    portal_x + portal_w / 2,
+                    scene_y + scene_h / 2,
+                    fr_text,
+                    color=fr_color,
+                    fontsize=7,
+                    fontweight="bold",
+                    ha="center",
+                    va="center",
+                    rotation=90,
+                    path_effects=stroke,
+                    zorder=6,
+                )
+
+            # Camera icon
+            cam_x = x_base + step_width - 0.4
+            cam_y = scene_y + scene_h / 2
+            cam_verts = [
+                (cam_x, cam_y + 0.3),
+                (cam_x + 0.3, cam_y),
+                (cam_x, cam_y - 0.3),
+            ]
+            cam = Polygon(
+                cam_verts,
+                facecolor=STYLE["text_dim"],
+                edgecolor=STYLE["axis"],
+                linewidth=1,
+                zorder=5,
+            )
+            ax.add_patch(cam)
+
+        # Depth buffer bar visualization
+        bar_y = -1.4
+        ax.text(
+            0.3,
+            bar_y + 0.3,
+            "Depth buffer:",
+            color=STYLE["text_dim"],
+            fontsize=7,
+            ha="left",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+        for i, (label, color) in enumerate(depth_bar):
+            bx = 3.5 + i * 3.8
+            ax.text(
+                bx,
+                bar_y + 0.3,
+                label,
+                color=color,
+                fontsize=7,
+                ha="center",
+                va="center",
+                path_effects=stroke_thin,
+                zorder=5,
+            )
+
+        ax.text(
+            0.3,
+            bar_y - 0.15,
+            "Stencil buffer:",
+            color=STYLE["text_dim"],
+            fontsize=7,
+            ha="left",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+        for i, (label, color) in enumerate(stencil_bar):
+            bx = 3.5 + i * 3.8
+            ax.text(
+                bx,
+                bar_y - 0.15,
+                label,
+                color=color,
+                fontsize=7,
+                ha="center",
+                va="center",
+                path_effects=stroke_thin,
+                zorder=5,
+            )
+
+    # ── Wrong order scenario ──
+    draw_scenario(
+        ax_bad,
+        "WRONG: Mask before cubes — portal bleeds through closer geometry",
+        STYLE["accent2"],
+        steps=[
+            {
+                "label": "Phase A: Mask writes stencil",
+                "label_color": STYLE["accent2"],
+                "show_mask": True,
+                "show_stencil_cone": True,
+                "cube_color": STYLE["accent1"],
+                "cube_alpha": 0.3,
+                "cube_style": "dashed",
+                "cube_z": 2,
+            },
+            {
+                "label": "Phase B: Cube rejected by stencil!=1",
+                "label_color": STYLE["accent2"],
+                "show_mask": True,
+                "show_stencil_cone": True,
+                "show_rejected": True,
+                "cube_style": "dashed",
+                "cube_alpha": 0.3,
+                "cube_z": 2,
+            },
+            {
+                "label": "Phase C: Frame passes depth (no cube depth!)",
+                "label_color": STYLE["accent2"],
+                "show_mask": True,
+                "show_stencil_cone": True,
+                "cube_style": "dashed",
+                "cube_alpha": 0.2,
+                "cube_z": 2,
+                "portal_alpha": 1.0,
+                "portal_z": 6,
+                "show_frame_result": True,
+                "frame_result_color": STYLE["accent2"],
+                "frame_result_text": "RENDERS\nON TOP",
+            },
+        ],
+        depth_bar=[
+            ("cleared (1.0)", STYLE["text_dim"]),
+            ("still 1.0 (no cube wrote!)", STYLE["accent2"]),
+            ("frame passes LESS vs 1.0", STYLE["accent2"]),
+        ],
+        stencil_bar=[
+            ("portal region = 1", STYLE["accent2"]),
+            ("cube blocked where stencil=1", STYLE["accent2"]),
+            ("frame ignores stencil", STYLE["text_dim"]),
+        ],
+    )
+
+    # ── Correct order scenario ──
+    draw_scenario(
+        ax_good,
+        "CORRECT: Cubes before mask — depth buffer prevents stencil behind closer objects",
+        STYLE["accent3"],
+        steps=[
+            {
+                "label": "Phase A: Cube draws first, writes depth",
+                "label_color": STYLE["accent3"],
+                "cube_color": STYLE["accent1"],
+                "cube_alpha": 0.85,
+                "cube_style": "solid",
+                "show_depth_write": True,
+                "depth_write_color": STYLE["accent3"],
+                "depth_write_label": "depth written \u2713",
+            },
+            {
+                "label": "Phase B: Mask fails depth where cube is closer",
+                "label_color": STYLE["accent3"],
+                "show_mask": True,
+                "mask_color": STYLE["accent2"],
+                "cube_color": STYLE["accent1"],
+                "cube_alpha": 0.85,
+                "cube_style": "solid",
+                "show_mask_blocked": True,
+                "mask_blocked_label": "mask FAILS\ndepth test\n\u2717",
+            },
+            {
+                "label": "Phase C: Frame fails depth against cube",
+                "label_color": STYLE["accent3"],
+                "show_mask": True,
+                "mask_color": STYLE["text_dim"],
+                "cube_color": STYLE["accent1"],
+                "cube_alpha": 0.85,
+                "cube_style": "solid",
+                "portal_alpha": 0.3,
+                "portal_z": 2,
+                "show_frame_result": True,
+                "frame_result_color": STYLE["accent3"],
+                "frame_result_text": "OCCLUDED\n\u2713",
+            },
+        ],
+        depth_bar=[
+            ("cube writes depth", STYLE["accent3"]),
+            ("mask depth > cube depth \u2192 FAIL", STYLE["accent3"]),
+            ("frame depth > cube depth \u2192 FAIL", STYLE["accent3"]),
+        ],
+        stencil_bar=[
+            ("all zeros", STYLE["text_dim"]),
+            ("stencil NOT written behind cube", STYLE["accent3"]),
+            ("frame has no stencil test", STYLE["text_dim"]),
+        ],
+    )
+
+    fig.suptitle(
+        "Stencil Phase Ordering: Why Draw Order Matters for Depth Correctness",
+        color=STYLE["text"],
+        fontsize=15,
+        fontweight="bold",
+        y=0.99,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    save(fig, "gpu/34-stencil-testing", "phase_ordering.png")

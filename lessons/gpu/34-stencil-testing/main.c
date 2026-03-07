@@ -940,10 +940,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     /* ── Pipeline 4: main_pipeline ───────────────────────────────────
-     * Draws the main world objects.  Stencil testing is DISABLED so that
-     * cubes closer to the camera than the portal correctly occlude it
-     * via the depth test.  The portal world already wrote its depth in
-     * Phase B, so depth alone determines which fragments win. */
+     * Draws the main world objects.  Main cubes render BEFORE the portal
+     * mask so they write depth first.  The mask's depth test then
+     * prevents stencil from being written where a closer cube exists,
+     * ensuring cubes in front of the portal correctly occlude it.
+     *
+     * No stencil test is needed — draw order handles the masking. */
     {
         SDL_GPUGraphicsPipelineCreateInfo pi;
         SDL_zero(pi);
@@ -959,8 +961,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.depth_stencil_state.enable_depth_test = true;
         pi.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
         pi.depth_stencil_state.enable_depth_write = true;
-
-        /* No stencil test — depth handles occlusion with portal world */
         pi.depth_stencil_state.enable_stencil_test = false;
 
         pi.target_info.color_target_descriptions = &color_target;
@@ -1004,7 +1004,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
      * First pass of object outlining: draw the object normally while
      * writing STENCIL_OUTLINE into the stencil buffer for every pixel
      * the object covers.  This creates a stencil silhouette of the
-     * object that the outline pass will use as a mask. */
+     * object that the outline pass will use as a mask.
+     *
+     * Uses LESS_OR_EQUAL because the cube was already drawn in the
+     * main cube phase at the same depth.  LESS would fail on equal
+     * depth, preventing the stencil write entirely. */
     {
         SDL_GPUGraphicsPipelineCreateInfo pi;
         SDL_zero(pi);
@@ -1018,7 +1022,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
 
         pi.depth_stencil_state.enable_depth_test = true;
-        pi.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+        pi.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
         pi.depth_stencil_state.enable_depth_write = true;
 
         /* Stencil: stamp STENCIL_OUTLINE onto every visible pixel */
@@ -1616,20 +1620,84 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(
         cmd, &color_target, 1, &ds_target);
 
-    /* ── Phase A: Portal mask write ────────────────────────────────
+    /* ── Phase A: Main world cubes ────────────────────────────────
+     * Draw main-world cubes FIRST so they write depth before the
+     * portal mask.  This ensures cubes in front of the portal
+     * correctly occlude it — the mask's depth test will fail where
+     * a closer cube already wrote, preventing stencil from being
+     * written there.  No stencil test is needed at this stage. */
+
+    SDL_GPUTextureSamplerBinding shadow_bind;
+    shadow_bind.texture = state->shadow_depth;
+    shadow_bind.sampler = state->nearest_clamp;
+
+    SDL_BindGPUGraphicsPipeline(pass, state->main_pipeline);
+
+    /* Bind shadow map for main-world fragment sampling */
+    SDL_BindGPUFragmentSamplers(pass, 0, &shadow_bind, 1);
+
+    for (int i = 0; i < CUBE_COUNT; i++) {
+        mat4 model = mat4_multiply(
+            mat4_translate(state->cubes[i].position),
+            mat4_scale_uniform(state->cubes[i].scale));
+        mat4 mvp  = mat4_multiply(cam_vp, model);
+        mat4 lmvp = mat4_multiply(state->light_vp, model);
+
+        SceneVertUniforms vert_u;
+        vert_u.mvp      = mvp;
+        vert_u.model    = model;
+        vert_u.light_vp = lmvp;
+        SDL_PushGPUVertexUniformData(cmd, 0, &vert_u, sizeof(vert_u));
+
+        SceneFragUniforms frag_u;
+        SDL_zero(frag_u);
+        frag_u.base_color[0] = state->cubes[i].color[0];
+        frag_u.base_color[1] = state->cubes[i].color[1];
+        frag_u.base_color[2] = state->cubes[i].color[2];
+        frag_u.base_color[3] = state->cubes[i].color[3];
+        frag_u.eye_pos[0] = state->cam_position.x;
+        frag_u.eye_pos[1] = state->cam_position.y;
+        frag_u.eye_pos[2] = state->cam_position.z;
+        frag_u.ambient       = 0.12f;
+        frag_u.light_dir[0]  = light_dir.x;
+        frag_u.light_dir[1]  = light_dir.y;
+        frag_u.light_dir[2]  = light_dir.z;
+        frag_u.light_dir[3]  = 0.0f;
+        frag_u.light_color[0] = 1.0f;
+        frag_u.light_color[1] = 1.0f;
+        frag_u.light_color[2] = 1.0f;
+        frag_u.light_intensity = 1.0f;
+        frag_u.shininess     = 64.0f;
+        frag_u.specular_str  = 0.4f;
+        /* No tint for the main world */
+        frag_u.tint[0] = 0.0f;
+        frag_u.tint[1] = 0.0f;
+        frag_u.tint[2] = 0.0f;
+        SDL_PushGPUFragmentUniformData(cmd, 0, &frag_u, sizeof(frag_u));
+
+        SDL_GPUBufferBinding vb_bind = { state->cube_vb, 0 };
+        SDL_BindGPUVertexBuffers(pass, 0, &vb_bind, 1);
+        SDL_GPUBufferBinding ib_bind = { state->cube_ib, 0 };
+        SDL_BindGPUIndexBuffer(pass, &ib_bind,
+                               SDL_GPU_INDEXELEMENTSIZE_16BIT);
+        SDL_DrawGPUIndexedPrimitives(pass, state->cube_index_count,
+                                     1, 0, 0, 0);
+    }
+
+    /* ── Phase B: Portal mask write ────────────────────────────────
      * Draw an invisible quad at the portal opening.  The mask pipeline
      * writes STENCIL_PORTAL to the stencil buffer but disables color
-     * writes and depth writes.  After this phase, the portal region
-     * in the stencil buffer contains the value STENCIL_PORTAL (1). */
+     * writes and depth writes.  The mask uses depth LESS_OR_EQUAL so
+     * it only writes stencil where no closer main-world geometry
+     * already wrote depth.  After this phase, the portal region
+     * in the stencil buffer contains STENCIL_PORTAL (1) only where
+     * the portal opening is unoccluded. */
 
     SDL_BindGPUGraphicsPipeline(pass, state->mask_pipeline);
     SDL_SetGPUStencilReference(pass, STENCIL_PORTAL);
 
     /* Bind shadow map sampler — the mask pipeline uses scene_frag which
      * declares a sampler slot, even though color output is masked. */
-    SDL_GPUTextureSamplerBinding shadow_bind;
-    shadow_bind.texture = state->shadow_depth;
-    shadow_bind.sampler = state->nearest_clamp;
     SDL_BindGPUFragmentSamplers(pass, 0, &shadow_bind, 1);
 
     {
@@ -1658,13 +1726,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                                      1, 0, 0, 0);
     }
 
-    /* ── Phase B: Portal world (stencil == PORTAL) ─────────────────
+    /* ── Phase C: Portal world (stencil == PORTAL) ─────────────────
      * Draw objects that should appear "inside" the portal.  The portal
      * pipeline passes only where stencil == STENCIL_PORTAL, so these
-     * objects are visible only through the portal opening.  We also
-     * clear the depth in the portal region by drawing with depth ALWAYS
-     * (handled by the pipeline), so portal objects depth-test correctly
-     * against each other but not against main-world geometry. */
+     * objects are visible only through the portal opening.  Portal
+     * objects depth-test correctly against each other. */
 
     SDL_BindGPUGraphicsPipeline(pass, state->portal_pipeline);
     SDL_SetGPUStencilReference(pass, STENCIL_PORTAL);
@@ -1718,64 +1784,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_BindGPUIndexBuffer(pass, &ib_bind,
                                SDL_GPU_INDEXELEMENTSIZE_16BIT);
         SDL_DrawGPUIndexedPrimitives(pass, state->sphere_index_count,
-                                     1, 0, 0, 0);
-    }
-
-    /* ── Phase C: Main world (stencil != PORTAL) ───────────────────
-     * Draw main-world cubes.  The main pipeline has NO stencil test —
-     * depth alone determines occlusion.  Cubes closer to the camera
-     * than the portal will correctly draw over portal content. */
-
-    SDL_BindGPUGraphicsPipeline(pass, state->main_pipeline);
-
-    /* Re-bind shadow map for main-world fragment sampling */
-    SDL_BindGPUFragmentSamplers(pass, 0, &shadow_bind, 1);
-
-    for (int i = 0; i < CUBE_COUNT; i++) {
-        mat4 model = mat4_multiply(
-            mat4_translate(state->cubes[i].position),
-            mat4_scale_uniform(state->cubes[i].scale));
-        mat4 mvp  = mat4_multiply(cam_vp, model);
-        mat4 lmvp = mat4_multiply(state->light_vp, model);
-
-        SceneVertUniforms vert_u;
-        vert_u.mvp      = mvp;
-        vert_u.model    = model;
-        vert_u.light_vp = lmvp;
-        SDL_PushGPUVertexUniformData(cmd, 0, &vert_u, sizeof(vert_u));
-
-        SceneFragUniforms frag_u;
-        SDL_zero(frag_u);
-        frag_u.base_color[0] = state->cubes[i].color[0];
-        frag_u.base_color[1] = state->cubes[i].color[1];
-        frag_u.base_color[2] = state->cubes[i].color[2];
-        frag_u.base_color[3] = state->cubes[i].color[3];
-        frag_u.eye_pos[0] = state->cam_position.x;
-        frag_u.eye_pos[1] = state->cam_position.y;
-        frag_u.eye_pos[2] = state->cam_position.z;
-        frag_u.ambient       = 0.12f;
-        frag_u.light_dir[0]  = light_dir.x;
-        frag_u.light_dir[1]  = light_dir.y;
-        frag_u.light_dir[2]  = light_dir.z;
-        frag_u.light_dir[3]  = 0.0f;
-        frag_u.light_color[0] = 1.0f;
-        frag_u.light_color[1] = 1.0f;
-        frag_u.light_color[2] = 1.0f;
-        frag_u.light_intensity = 1.0f;
-        frag_u.shininess     = 64.0f;
-        frag_u.specular_str  = 0.4f;
-        /* No tint for the main world */
-        frag_u.tint[0] = 0.0f;
-        frag_u.tint[1] = 0.0f;
-        frag_u.tint[2] = 0.0f;
-        SDL_PushGPUFragmentUniformData(cmd, 0, &frag_u, sizeof(frag_u));
-
-        SDL_GPUBufferBinding vb_bind = { state->cube_vb, 0 };
-        SDL_BindGPUVertexBuffers(pass, 0, &vb_bind, 1);
-        SDL_GPUBufferBinding ib_bind = { state->cube_ib, 0 };
-        SDL_BindGPUIndexBuffer(pass, &ib_bind,
-                               SDL_GPU_INDEXELEMENTSIZE_16BIT);
-        SDL_DrawGPUIndexedPrimitives(pass, state->cube_index_count,
                                      1, 0, 0, 0);
     }
 

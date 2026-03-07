@@ -142,55 +142,60 @@ The portal effect renders a different world visible only through a rectangular
 opening. It works in four phases within a single render pass, each using a
 different pipeline with different stencil settings.
 
-### Phase 1: Write the stencil mask
+**The phase ordering is critical.** Main-world cubes must draw *before* the
+portal mask so the depth buffer prevents stencil from being written behind
+closer objects. See [Phase ordering pitfall](#phase-ordering-pitfall) below.
+
+### Phase 1: Draw main-world cubes
+
+Draw the main-world cubes first with a standard depth-test pipeline (depth
+LESS, depth write enabled, **no stencil**). These cubes write their depth
+values into the depth buffer. This ensures that any cube in front of the
+portal correctly blocks the stencil mask in the next phase.
+
+### Phase 2: Write the stencil mask
 
 Draw the portal opening quad with stencil comparison set to ALWAYS and pass
 operation set to REPLACE. The reference value is `STENCIL_PORTAL` (1). This
 stamps a 1 into every pixel covered by the portal opening.
 
-Color writes and depth writes are both **disabled** for this phase. The mask
-quad must not write depth, because that would occlude the portal world objects
-drawn behind it in Phase 2.
+Color writes and depth writes are both **disabled** for this phase, but
+**depth testing is enabled** with `LESS_OR_EQUAL`. Because the cubes already
+wrote depth in Phase 1, the mask's depth test fails wherever a closer cube
+exists — preventing stencil from being written there. The mask only writes
+stencil in the unoccluded portal region.
 
 ```c
-/* Mask pipeline stencil configuration */
+/* Mask pipeline: stencil write with depth test but no depth/color write */
 SDL_GPUStencilOpState mask_stencil = {
     .fail_op       = SDL_GPU_STENCILOP_KEEP,
     .pass_op       = SDL_GPU_STENCILOP_REPLACE,  /* stamp ref value */
     .depth_fail_op = SDL_GPU_STENCILOP_KEEP,
-    .compare_op    = SDL_GPU_COMPAREOP_ALWAYS     /* always write */
+    .compare_op    = SDL_GPU_COMPAREOP_ALWAYS     /* always write stencil */
 };
 
-/* Disable color and depth writes — stencil only */
-pipeline_info.target_info.has_depth_stencil_target = true;
-pipeline_info.depth_stencil_state.enable_stencil_test = true;
-pipeline_info.depth_stencil_state.front_stencil_state = mask_stencil;
-pipeline_info.depth_stencil_state.back_stencil_state  = mask_stencil;
-pipeline_info.depth_stencil_state.enable_depth_write   = false;
-pipeline_info.target_info.num_color_targets = 0;    /* no color output */
+pipeline_info.depth_stencil_state.enable_depth_test    = true;
+pipeline_info.depth_stencil_state.compare_op           = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+pipeline_info.depth_stencil_state.enable_depth_write   = false;  /* don't pollute depth */
+pipeline_info.depth_stencil_state.enable_stencil_test  = true;
+pipeline_info.depth_stencil_state.front_stencil_state  = mask_stencil;
+pipeline_info.depth_stencil_state.back_stencil_state   = mask_stencil;
 ```
 
-### Phase 2: Draw the portal world
+### Phase 3: Draw the portal world
 
 Bind the portal pipeline, which tests `EQUAL` against reference 1. Only
 fragments where the stencil buffer contains 1 (the portal opening) will pass.
 Draw the portal world objects: golden and colored spheres with warm-tinted
 lighting. These objects appear only inside the portal.
 
-### Phase 3: Draw the main world
-
-Bind the main pipeline, which tests `NOT_EQUAL` against reference 1. Fragments
-inside the portal opening are rejected. Draw the main world cubes and the grid
-floor. The grid uses a separate pipeline with its own `NOT_EQUAL` stencil test
-and a different tint inside the portal region (using a matching `EQUAL`
-pipeline for the portal-side grid).
-
 ### Phase 4: Draw the portal frame
 
-Bind the frame pipeline with stencil set to ALWAYS. Draw the portal frame
+Bind the frame pipeline with no stencil test. Draw the portal frame
 geometry (four box sections: top, left, right, and threshold) as a normal
-opaque object. The frame renders on top of everything and gives the portal
-its visible border.
+opaque object with depth LESS. The frame correctly fails depth wherever a
+closer cube already wrote, so it never renders on top of objects in front
+of the portal.
 
 ## Object outlines
 
@@ -205,6 +210,10 @@ Draw the object normally using the outline-write pipeline. This pipeline has
 stencil set to ALWAYS with pass operation REPLACE and reference value
 `STENCIL_OUTLINE` (2). Every pixel the object covers gets a stencil value
 of 2.
+
+The depth compare must be `LESS_OR_EQUAL` (not `LESS`) because the cube was
+already drawn in the main cube phase. At equal depth, `LESS` would fail and
+the stencil write would be silently skipped — breaking the outline effect.
 
 ### Pass 2: Draw the expanded silhouette
 
@@ -235,23 +244,52 @@ share a single render pass but bind different pipelines:
 | Phase | Pipeline | Stencil ref | Purpose |
 |-------|----------|-------------|---------|
 | 1 | Shadow | disabled | Depth-only shadow map (2048x2048, D32_FLOAT) |
-| 2 | Mask | ref = 1, ALWAYS/REPLACE | Stamp portal opening into stencil |
-| 3 | Portal | ref = 1, EQUAL | Draw portal world spheres |
-| 4 | Main + Grid | ref = 1, NOT_EQUAL | Draw main world cubes and grid |
-| 5 | Grid (portal) | ref = 1, EQUAL | Draw grid with portal tint |
-| 6 | Frame | ALWAYS | Draw portal frame geometry |
-| 7 | Outline write | ref = 2, ALWAYS/REPLACE | Draw outlined cubes, mark stencil |
-| 8 | Outline draw | ref = 2, NOT_EQUAL | Draw expanded silhouettes |
+| 2 | Main | disabled | Draw main world cubes (writes depth first) |
+| 3 | Mask | ref = 1, ALWAYS/REPLACE | Stamp portal opening into stencil |
+| 4 | Portal | ref = 1, EQUAL | Draw portal world spheres |
+| 5 | Grid | ref = 1, NOT_EQUAL | Draw main world grid |
+| 6 | Grid (portal) | ref = 1, EQUAL | Draw grid with portal tint |
+| 7 | Frame | disabled | Draw portal frame geometry |
+| 8 | Outline write | ref = 2, ALWAYS/REPLACE | Draw outlined cubes, mark stencil |
+| 9 | Outline draw | ref = 2, NOT_EQUAL | Draw expanded silhouettes |
 
-Order matters. The mask must be written before anything that tests against it.
-Outline writes must happen after main world rendering so that the stencil
-value 2 does not interfere with the portal test (which uses value 1).
+Order matters. Main cubes must draw **before** the portal mask so the depth
+buffer prevents stencil writes behind closer geometry. The mask must be written
+before anything that tests against it. Outline writes must happen after main
+world rendering so that the stencil value 2 does not interfere with the portal
+test (which uses value 1).
 
 This lesson creates **9 graphics pipelines** for the main scene pass alone
 (plus 1 for shadows and 1 for the debug overlay). This pipeline state
 explosion is inherent to stencil-based effects: each combination of stencil
 test, stencil operation, color write enable, and depth write enable requires
 a separate pipeline object.
+
+## Phase ordering pitfall
+
+![Phase ordering](assets/phase_ordering.png)
+
+A common mistake with portal rendering is writing the stencil mask **before**
+drawing opaque geometry. This creates a subtle depth-stencil interaction bug:
+
+1. The mask writes `STENCIL_PORTAL` across the portal quad's screen projection
+2. Main cubes use `NOT_EQUAL` to avoid drawing in the portal region — but this
+   also prevents them from writing **depth** there
+3. The portal frame (drawn later with no stencil test) passes `depth < 1.0`
+   against the cleared depth buffer and renders **on top** of cubes that should
+   occlude it
+
+The fix is to draw opaque main-world geometry **first**, before writing the
+stencil mask. The cubes write their depth values. Then the mask's depth test
+(`LESS_OR_EQUAL`) naturally fails wherever a closer cube already exists,
+preventing stencil from being written behind closer objects. The portal frame's
+depth test then correctly fails against the cube's depth.
+
+This is the key insight: **the depth buffer and stencil buffer interact through
+draw order**. Stencil masking can prevent depth writes, which can cause later
+geometry to pass depth tests it should fail. By letting the depth buffer
+establish the scene's occlusion first, the stencil mask is confined to only
+the visible (unoccluded) portal region.
 
 ## Controls
 
@@ -310,8 +348,14 @@ when stencil buffer techniques are needed in your project.
 ## What's next
 
 [Lesson 35 — Decals](../35-decals/) projects flat detail (bullet holes, dirt,
-signs) onto existing geometry using stencil masking and deferred decal boxes.
-It builds directly on the stencil techniques from this lesson.
+signs) onto existing geometry using deferred decal boxes and stencil
+increment for layering. It builds directly on the stencil masking and phase
+ordering techniques from this lesson.
+
+[Lesson 36 — Edge Detection & X-Ray](../36-edge-detection/) explores
+alternative outline methods: post-process edge detection on depth and normal
+buffers, and X-ray vision using `depth_fail_op` to reveal occluded objects.
+It compares these approaches with the stencil outline technique taught here.
 
 ## Exercises
 

@@ -60,6 +60,7 @@ from .gpu_diagrams import (
     diagram_depth_reconstruction,
     diagram_downsample_13tap,
     diagram_draw_order_stencil,
+    diagram_phase_ordering,
     diagram_exposure_effect,
     diagram_filtering_comparison,
     diagram_fog_blending,
@@ -478,6 +479,7 @@ DIAGRAMS = {
         ("outline_technique.png", diagram_outline_technique),
         ("stencil_operations.png", diagram_stencil_operations),
         ("draw_order_stencil.png", diagram_draw_order_stencil),
+        ("phase_ordering.png", diagram_phase_ordering),
     ],
     "ui/01": [
         ("ttf_file_structure.png", diagram_ttf_file_structure),
