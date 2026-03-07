@@ -53,10 +53,20 @@ for depth and 8 bits for stencil, packed into a 32-bit value per pixel. This
 is the most widely supported combined format across Vulkan, Metal, and D3D12.
 
 ```c
-/* Create the depth-stencil texture — the _S8_UINT suffix is essential */
+/* Probe for D24_UNORM_S8_UINT first; fall back to D32_FLOAT_S8_UINT */
+SDL_GPUTextureFormat ds_fmt;
+if (SDL_GPUTextureSupportsFormat(device,
+        SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT,
+        SDL_GPU_TEXTURETYPE_2D,
+        SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET)) {
+    ds_fmt = SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT;
+} else {
+    ds_fmt = SDL_GPU_TEXTUREFORMAT_D32_FLOAT_S8_UINT;
+}
+
 SDL_GPUTextureCreateInfo ds_info = {0};
 ds_info.type   = SDL_GPU_TEXTURETYPE_2D;
-ds_info.format = SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT;
+ds_info.format = ds_fmt;
 ds_info.width  = WINDOW_WIDTH;
 ds_info.height = WINDOW_HEIGHT;
 ds_info.usage  = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
@@ -64,9 +74,7 @@ ds_info.usage  = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
 
 A critical detail: if you use `D24_UNORM` or `D32_FLOAT` without the `_S8_UINT`
 suffix, the texture has **no stencil bits**. All stencil operations will
-silently do nothing. The lesson uses `D24_UNORM_S8_UINT` as the primary format,
-with `D32_FLOAT_S8_UINT` as a fallback for hardware that does not support the
-24-bit variant.
+silently do nothing.
 
 The stencil buffer is not automatically visible on screen. To see its contents,
 you must read it back from the GPU and render it as a colored overlay, which

@@ -16628,8 +16628,8 @@ def diagram_outline_technique():
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
 
     panel_info = [
-        "1. Draw Object, Stencil=1",
-        "2. Draw Scaled, Stencil!=1",
+        "1. Draw Object, Stencil=2",
+        "2. Draw Scaled, Stencil!=2",
         "3. Final Result",
     ]
 
@@ -16682,7 +16682,7 @@ def diagram_outline_technique():
     ax1.text(
         5.0,
         1.2,
-        "stencil = 1 where drawn",
+        "stencil = 2 where drawn",
         color=STYLE["accent2"],
         fontsize=9,
         fontweight="bold",
@@ -16734,7 +16734,7 @@ def diagram_outline_technique():
     ax2.text(
         5.0,
         4.25,
-        "blocked\n(stencil==1)",
+        "blocked\n(stencil==2)",
         color=STYLE["text_dim"],
         fontsize=8,
         fontstyle="italic",
@@ -17547,7 +17547,7 @@ def diagram_phase_ordering():
                 "cube_z": 2,
             },
             {
-                "label": "Phase B: Cube depth arrives too late",
+                "label": "Phase B: Cube never wrote depth",
                 "label_color": STYLE["accent2"],
                 "show_mask": True,
                 "cube_style": "dashed",
