@@ -606,9 +606,8 @@ forge-gpu/
 │   ├── physics/           Physics library (particles, rigid bodies, collisions)
 │   │   ├── forge_physics.h Physics simulation (header-only)
 │   │   └── README.md      API reference and design
-│   ├── shapes/            Procedural geometry (sphere, torus, capsule, etc.)
-│   │   ├── forge_shapes.h Parametric mesh generation (header-only)
-│   │   └── README.md      API reference and shape gallery
+│   ├── shapes/            Procedural geometry (planned — Asset Lesson 04)
+│   │   └── forge_shapes.h Parametric mesh generation (header-only)
 │   ├── raster/            CPU triangle rasterizer (edge function method)
 │   │   └── forge_raster.h Rasterizer implementation (header-only)
 │   ├── capture/           Screenshot/GIF capture utility

@@ -110,9 +110,9 @@ tests/
 
 **Added to CMakeLists.txt** — register the test target and any GPU demo.
 
-For the procedural geometry lesson specifically, also reference the
-`FORGE_SHAPES.md` and `FORGE_SHAPES_LESSON.md` documents in `~/projects/`
-which contain a complete specification for `forge_shapes.h`.
+For the procedural geometry lesson specifically, reference
+`docs/FORGE_SHAPES.md` and `docs/FORGE_SHAPES_LESSON.md` which contain
+the complete specification for `forge_shapes.h`.
 
 ## Steps
 
@@ -391,8 +391,8 @@ rigor as the rendering code it serves.
 5. **Tests**: 28 tests covering vertex counts, normals, UVs, winding, memory
 6. **README**: Parametric surfaces, slices/stacks, seam duplication, smooth vs
    flat normals, struct-of-arrays vs interleaved
-7. **Reference docs**: `~/projects/FORGE_SHAPES.md` and
-   `~/projects/FORGE_SHAPES_LESSON.md` contain the complete specification
+7. **Reference docs**: `docs/FORGE_SHAPES.md` and
+   `docs/FORGE_SHAPES_LESSON.md` contain the complete specification
 
 ## When NOT to Create an Asset Lesson
 

@@ -181,6 +181,7 @@ after any HLSL change — the C build does not auto-detect shader changes.
 - **Hybrid Python + C track** — Python orchestrates, C handles performance-
   critical processing (meshoptimizer, MikkTSpace) and procedural geometry
 - Python lessons are not added to CMakeLists.txt; C tool/library lessons are
+  added and must be listed in CMakeLists.txt for building
 - Plugin architecture — each asset type (texture, mesh, scene) is a plugin;
   C tools are invoked as subprocesses by the Python pipeline
 - Procedural geometry lives in `common/shapes/forge_shapes.h` (header-only)
