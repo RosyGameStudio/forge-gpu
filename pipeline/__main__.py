@@ -50,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--plugins-dir",
         type=Path,
         default=None,
-        help="Directory containing plugin .py files (default: <lesson>/plugins/)",
+        help="Directory containing plugin .py files (default: built-in pipeline/plugins/)",
     )
     parser.add_argument(
         "--source-dir",

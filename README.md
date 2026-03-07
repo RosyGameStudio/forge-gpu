@@ -531,7 +531,8 @@ build\lessons\gpu\01-hello-window\Debug\01-hello-window.exe
 ## Testing
 
 The shared libraries have automated tests covering math operations, OBJ parsing,
-glTF parsing, CPU rasterization, UI systems, and the asset pipeline.
+glTF parsing, CPU rasterization, UI systems, the asset pipeline, and physics
+(coming soon).
 
 **Run all C tests:**
 
