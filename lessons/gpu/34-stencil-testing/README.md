@@ -85,7 +85,7 @@ before checking depth:
 The comparison evaluates:
 
 $$
-(\text{buffer}\_\text{value} \mathbin{\&} \text{compare}\_\text{mask}) \enspace \text{COMPARE}\_\text{OP} \enspace (\text{reference} \mathbin{\&} \text{compare}\_\text{mask})
+(\text{buffer}\_\text{value} \mathbin{\&} \text{compare}\_\text{mask}) \text{ COMPARE}\_\text{OP } (\text{reference} \mathbin{\&} \text{compare}\_\text{mask})
 $$
 
 where `buffer_value` is the current stencil value at this pixel, `reference`
@@ -264,8 +264,8 @@ before anything that tests against it. Outline writes must happen after main
 world rendering so that the stencil value 2 does not interfere with the portal
 test (which uses value 1).
 
-This lesson creates **9 graphics pipelines** for the main scene pass alone
-(plus 1 for shadows and 1 for the debug overlay). This pipeline state
+This lesson creates **9 graphics pipelines** for scene rendering (including
+shadows) plus **1 for the debug overlay** (10 total). This pipeline state
 explosion is inherent to stencil-based effects: each combination of stencil
 test, stencil operation, color write enable, and depth write enable requires
 a separate pipeline object.

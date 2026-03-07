@@ -83,7 +83,7 @@ Pass 3: Debug overlay           (if toggled, fullscreen stencil visualization)
 | shadow.frag.hlsl          | Fragment | Empty (depth-only, required by SDL GPU)       |
 | grid.vert.hlsl            | Vertex   | Grid floor vertex transform                   |
 | grid.frag.hlsl            | Fragment | Procedural grid + shadow + tint_color uniform |
-| outline.frag.hlsl         | Fragment | Solid outline color output                    |
+| outline.frag.hlsl         | Fragment | Solid outline color output (reuses scene.vert) |
 | debug_overlay.vert.hlsl   | Vertex   | Fullscreen quad from SV_VertexID              |
 | debug_overlay.frag.hlsl   | Fragment | Sample debug texture with transparency        |
 
@@ -149,7 +149,7 @@ typedef struct app_state {
     SDL_Window    *window;
     SDL_GPUDevice *device;
 
-    /* Pipelines (9) */
+    /* Pipelines (9 scene + 1 debug = 10) */
     SDL_GPUGraphicsPipeline *shadow_pipeline;
     SDL_GPUGraphicsPipeline *mask_pipeline;
     SDL_GPUGraphicsPipeline *portal_pipeline;

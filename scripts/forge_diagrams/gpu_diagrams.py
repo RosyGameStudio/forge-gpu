@@ -17101,7 +17101,7 @@ def diagram_draw_order_stencil():
         ("Main\nCubes", STYLE["accent1"], "depth only\nno stencil", 3.3),
         ("Portal\nMask", STYLE["accent2"], "stencil=1\nno color", 5.4),
         ("Portal\nWorld", STYLE["accent2"], "stencil==1", 7.5),
-        ("Grid\nFloor", STYLE["accent3"], "stencil !=\nand ==", 9.6),
+        ("Grid\nFloor", STYLE["accent3"], "stencil!=1\nthen stencil==1", 9.6),
         ("Portal\nFrame", STYLE["accent4"], "depth only", 11.7),
         ("Outline\nPass", STYLE["warn"], "replace\nthen !=", 13.8),
         ("Debug\nOverlay", STYLE["text_dim"], "if toggled", 15.9),
@@ -17546,10 +17546,9 @@ def diagram_phase_ordering():
                 "cube_z": 2,
             },
             {
-                "label": "Phase B: Cube skipped — depth not yet written",
+                "label": "Phase B: Cube depth arrives too late",
                 "label_color": STYLE["accent2"],
                 "show_mask": True,
-                "show_rejected": True,
                 "cube_style": "dashed",
                 "cube_alpha": 0.3,
                 "cube_z": 2,
@@ -17576,7 +17575,7 @@ def diagram_phase_ordering():
         ],
         stencil_bar=[
             ("portal region = 1", STYLE["accent2"]),
-            ("cube blocked where stencil=1", STYLE["accent2"]),
+            ("cube depth still missing", STYLE["accent2"]),
             ("frame ignores stencil", STYLE["text_dim"]),
         ],
     )
