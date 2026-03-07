@@ -1057,6 +1057,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     if (!scene_vert || !scene_frag || !shadow_vert || !shadow_frag ||
         !grid_vert || !grid_frag || !decal_vert || !decal_frag) {
         SDL_Log("ERROR: One or more shaders failed to compile");
+        /* Release any shaders that were successfully created */
+        if (scene_vert)  SDL_ReleaseGPUShader(device, scene_vert);
+        if (scene_frag)  SDL_ReleaseGPUShader(device, scene_frag);
+        if (shadow_vert) SDL_ReleaseGPUShader(device, shadow_vert);
+        if (shadow_frag) SDL_ReleaseGPUShader(device, shadow_frag);
+        if (grid_vert)   SDL_ReleaseGPUShader(device, grid_vert);
+        if (grid_frag)   SDL_ReleaseGPUShader(device, grid_frag);
+        if (decal_vert)  SDL_ReleaseGPUShader(device, decal_vert);
+        if (decal_frag)  SDL_ReleaseGPUShader(device, decal_frag);
         return SDL_APP_FAILURE;
     }
 

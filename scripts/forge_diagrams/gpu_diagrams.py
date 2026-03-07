@@ -17748,12 +17748,12 @@ def diagram_decal_box_projection():
         # Solve: ry_top + t * proj_dy = -0.12 * (rx_top + t * proj_dx)^2 - 0.8
         # Use iterative approach for robustness
         hit_x, hit_y = rx_top, ry_top
-        for _ in range(50):
+        for _ in range(200):
             surface_y = -0.12 * hit_x**2 - 0.8
             if hit_y <= surface_y:
                 break
-            hit_x += proj_dx * 0.05
-            hit_y += proj_dy * 0.05
+            hit_x += proj_dx * 0.02
+            hit_y += proj_dy * 0.02
         ax.plot(
             [rx_top, hit_x],
             [ry_top, hit_y],
@@ -17766,10 +17766,10 @@ def diagram_decal_box_projection():
 
     # Arrow label for projection direction (rotated with OBB)
     arrow_offset = box_hw + 0.6
-    arrow_top_x = cos_t * arrow_offset + sin_t * (box_hh - 0.2) + 0
-    arrow_top_y = -sin_t * arrow_offset + cos_t * (box_hh - 0.2) + box_cy
-    arrow_bot_x = cos_t * arrow_offset - sin_t * (box_hh - 0.2) + 0
-    arrow_bot_y = -sin_t * arrow_offset - cos_t * (box_hh - 0.2) + box_cy
+    arrow_top_x = cos_t * arrow_offset - sin_t * (box_hh - 0.2)
+    arrow_top_y = sin_t * arrow_offset + cos_t * (box_hh - 0.2) + box_cy
+    arrow_bot_x = cos_t * arrow_offset - sin_t * (-box_hh + 0.2)
+    arrow_bot_y = sin_t * arrow_offset + cos_t * (-box_hh + 0.2) + box_cy
     ax.annotate(
         "",
         xy=(arrow_bot_x, arrow_bot_y),
@@ -17805,12 +17805,12 @@ def diagram_decal_box_projection():
         wx = cos_t * lx - sin_t * box_hh
         wy = sin_t * lx + cos_t * box_hh + box_cy
         hx, hy = wx, wy
-        for _ in range(50):
+        for _ in range(200):
             sy = -0.12 * hx**2 - 0.8
             if hy <= sy:
                 break
-            hx += proj_dx * 0.05
-            hy += proj_dy * 0.05
+            hx += proj_dx * 0.02
+            hy += proj_dy * 0.02
         decal_xs.append(hx)
         decal_ys.append(hy)
     ax.plot(decal_xs, decal_ys, color=STYLE["accent2"], linewidth=4, zorder=3)
@@ -18652,9 +18652,9 @@ def diagram_back_face_culling_decals():
         STYLE["accent2"],
         "SDL_GPU_CULLMODE_BACK",
         camera_inside=True,
-        result_text="Front faces face AWAY from camera inside \u2192 decal DISAPPEARS",
+        result_text="Back faces are culled when camera is inside \u2192 decal DISAPPEARS",
         result_color=STYLE["accent2"],
-        face_label="front face\n(culled when\ninside box)",
+        face_label="back face\n(culled by\nCULL_BACK)",
         face_color=STYLE["accent2"],
     )
 
