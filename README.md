@@ -189,8 +189,8 @@ HDR, post-processing, UI rendering, and animations.
 </tr>
 <tr>
 <td align="center">
-<a href="lessons/gpu/34-stencil-testing/"><img src="lessons/gpu/34-stencil-testing/assets/screenshot.png" width="200" alt="Stencil Testing" /></a><br />
-<b>34</b> — Stencil Testing
+<a href="lessons/gpu/34-stencil-testing/"><img src="lessons/gpu/34-stencil-testing/assets/screenshot.png" width="200" alt="Portals & Outlines" /></a><br />
+<b>34</b> — Portals & Outlines
 </td>
 </tr>
 </table>

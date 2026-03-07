@@ -1,4 +1,9 @@
-# Lesson 34 — Stencil Testing
+# Lesson 34 — Portals & Outlines
+
+> **Core concept: stencil testing.** This lesson teaches the stencil buffer
+> through two real-world applications — portal rendering and object outlines.
+> Both techniques are built entirely on stencil state configuration; the
+> shaders have no stencil-related code at all.
 
 ## What you will learn
 

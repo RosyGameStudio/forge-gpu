@@ -1,4 +1,4 @@
-# Lesson 34 — Stencil Testing: Implementation Plan
+# Lesson 34 — Portals & Outlines: Implementation Plan
 
 ## Overview
 

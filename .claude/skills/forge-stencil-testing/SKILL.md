@@ -218,7 +218,7 @@ SDL_SetGPUStencilReference(render_pass, 1);
 
 ## Cross-references
 
-- [GPU Lesson 34 — Stencil Testing](../../../lessons/gpu/34-stencil-testing/)
+- [GPU Lesson 34 — Portals & Outlines](../../../lessons/gpu/34-stencil-testing/)
   for the full walkthrough
 - [GPU Lesson 06 — Depth & 3D](../../../lessons/gpu/06-depth-and-3d/)
   for depth buffer fundamentals

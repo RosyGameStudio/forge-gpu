@@ -1,5 +1,5 @@
 /*
- * Lesson 34 — Stencil Testing
+ * Lesson 34 — Portals & Outlines
  *
  * Demonstrates stencil buffer fundamentals through three techniques:
  * 1. Portal effect — render a different world through a masked opening
@@ -594,7 +594,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     SDL_Window *window = SDL_CreateWindow(
-        "Lesson 34 — Stencil Testing",
+        "Lesson 34 — Portals & Outlines",
         WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     if (!window) {
         SDL_Log("ERROR: SDL_CreateWindow failed: %s", SDL_GetError());
