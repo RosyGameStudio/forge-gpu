@@ -17097,17 +17097,18 @@ def diagram_draw_order_stencil():
     )
 
     passes = [
-        ("Shadow\nPass", STYLE["text_dim"], "depth only", 1.2),
-        ("Main\nCubes", STYLE["accent1"], "depth only\nno stencil", 3.3),
-        ("Portal\nMask", STYLE["accent2"], "stencil=1\nno color", 5.4),
-        ("Portal\nWorld", STYLE["accent2"], "stencil==1", 7.5),
-        ("Grid\nFloor", STYLE["accent3"], "stencil!=1\nthen stencil==1", 9.6),
-        ("Portal\nFrame", STYLE["accent4"], "depth only", 11.7),
-        ("Outline\nPass", STYLE["warn"], "replace\nthen !=", 13.8),
-        ("Debug\nOverlay", STYLE["text_dim"], "if toggled", 15.9),
+        ("Shadow\nPass", STYLE["text_dim"], "depth only", 1.1),
+        ("Main\nCubes", STYLE["accent1"], "color+depth\nno stencil", 3.0),
+        ("Portal\nMask", STYLE["accent2"], "stencil=1\nno color", 4.9),
+        ("Portal\nWorld", STYLE["accent2"], "stencil==1\ncolor+depth", 6.8),
+        ("Grid\nFloor", STYLE["accent3"], "stencil!=1\nthen ==1", 8.7),
+        ("Portal\nFrame", STYLE["accent4"], "color+depth", 10.6),
+        ("Outline\nWrite", STYLE["warn"], "stencil=2\ncolor+depth", 12.5),
+        ("Outline\nDraw", STYLE["warn"], "stencil!=2\ncolor only", 14.4),
+        ("Debug\nOverlay", STYLE["text_dim"], "if toggled", 16.3),
     ]
 
-    box_w = 1.8
+    box_w = 1.7
     box_h = 1.6
     for label, color, annotation, x in passes:
         rect = FancyBboxPatch(

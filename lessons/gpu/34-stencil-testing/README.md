@@ -90,8 +90,8 @@ $$
 
 where `buffer_value` is the current stencil value at this pixel, `reference`
 is set per draw call, and `COMPARE_OP` is one of the eight comparison
-functions (NEVER, LESS, EQUAL, LESS\_OR\_EQUAL, GREATER, NOT\_EQUAL,
-GREATER\_OR\_EQUAL, ALWAYS).
+functions (NEVER, LESS, EQUAL, LESS_OR_EQUAL, GREATER, NOT_EQUAL,
+GREATER_OR_EQUAL, ALWAYS).
 
 Three outcomes determine what happens to the stencil buffer:
 
@@ -182,6 +182,7 @@ SDL_GPUStencilOpState mask_stencil = {
 pipeline_info.depth_stencil_state.enable_depth_test    = true;
 pipeline_info.depth_stencil_state.compare_op           = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
 pipeline_info.depth_stencil_state.enable_depth_write   = false;  /* don't pollute depth */
+color_target.blend_state.color_write_mask              = 0;      /* no color output */
 pipeline_info.depth_stencil_state.enable_stencil_test  = true;
 pipeline_info.depth_stencil_state.front_stencil_state  = mask_stencil;
 pipeline_info.depth_stencil_state.back_stencil_state   = mask_stencil;
@@ -225,8 +226,10 @@ the stencil write would be silently skipped — breaking the outline effect.
 Draw the same object again, scaled uniformly by 4% using `mat4_scale_uniform`:
 
 ```c
+#define OUTLINE_SCALE 1.04f
+
 /* Scale the model matrix to expand the silhouette */
-mat4 scale = mat4_scale_uniform(OUTLINE_SCALE); /* 1.04 */
+mat4 scale = mat4_scale_uniform(OUTLINE_SCALE);
 mat4 outline_model = mat4_multiply(object_model, scale);
 ```
 
