@@ -226,10 +226,10 @@ typedef struct app_state {
     SDL_GPUGraphicsPipeline *decal_pipeline;  /* projected decal pass (back-face, alpha blend) */
 
     /* Render targets */
-    SDL_GPUTexture *shadow_depth;           /* D32_FLOAT shadow map (SHADOW_MAP_SIZE²) */
-    SDL_GPUTexture *scene_depth;            /* window-sized depth (DS target + sampler) */
-    SDL_GPUTextureFormat depth_stencil_fmt; /* negotiated DS format (D24S8 or D32FS8) */
-    SDL_GPUTextureFormat shadow_depth_fmt;  /* negotiated shadow depth format */
+    SDL_GPUTexture *shadow_depth;           /* shadow map texture; format negotiated at runtime (may be D32_FLOAT or other depth formats) */
+    SDL_GPUTexture *scene_depth;            /* window-sized depth texture used as depth-stencil target and sampled for decal reconstruction */
+    SDL_GPUTextureFormat depth_stencil_fmt; /* negotiated depth-stencil format for scene rendering (D24S8 or D32_FLOAT — stencil may be absent) */
+    SDL_GPUTextureFormat shadow_depth_fmt;  /* negotiated shadow map depth format (selected from preferred list at init) */
 
     /* Samplers */
     SDL_GPUSampler *nearest_clamp; /* point sampling for depth textures */
@@ -1544,6 +1544,15 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
         return SDL_APP_CONTINUE;
     }
+    if (sw != WINDOW_WIDTH || sh != WINDOW_HEIGHT) {
+        SDL_Log("ERROR: Swapchain size (%ux%u) does not match scene dimensions (%dx%d)",
+                sw, sh, WINDOW_WIDTH, WINDOW_HEIGHT);
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("ERROR: SDL_SubmitGPUCommandBuffer failed: %s",
+                    SDL_GetError());
+        }
+        return SDL_APP_CONTINUE;
+    }
 
     /* ── 5. Pass 1: Shadow ─────────────────────────────────────────── */
 
@@ -1763,8 +1772,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         DecalFragUniforms dfu;
         dfu.inv_vp = inv_vp;
         dfu.inv_decal_model = inv_decal_model;
-        dfu.screen_size[0] = (float)sw;
-        dfu.screen_size[1] = (float)sh;
+        dfu.screen_size[0] = (float)WINDOW_WIDTH;
+        dfu.screen_size[1] = (float)WINDOW_HEIGHT;
         dfu.near_plane = NEAR_PLANE;
         dfu.far_plane = FAR_PLANE;
         dfu.decal_tint[0] = d->tint[0];
