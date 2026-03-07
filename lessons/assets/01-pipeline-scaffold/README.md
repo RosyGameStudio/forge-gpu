@@ -297,16 +297,19 @@ The execution flow:
 3. Discover and register plugins from the plugins directory
 4. Scan the source directory and fingerprint files
 5. Compare against the cache and report status
-6. Update the cache (so unchanged files are skipped on the next run)
+6. Update the cache so unchanged files are skipped on the next run
 
-## Running
-
-### Setup
+## Building
 
 ```bash
 # From the forge-gpu repository root
 pip install -e ".[dev]"
 ```
+
+This installs the `forge-pipeline` CLI and all development dependencies
+(pytest, ruff). No C compilation needed — this lesson is pure Python.
+
+## Running
 
 ### Try it out
 

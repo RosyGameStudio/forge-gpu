@@ -87,8 +87,13 @@ class FingerprintCache:
         self._data: dict[str, str] = {}
         if cache_path.exists():
             try:
-                self._data = json.loads(cache_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+                raw = json.loads(cache_path.read_text(encoding="utf-8"))
+                if not isinstance(raw, dict) or not all(
+                    isinstance(k, str) and isinstance(v, str) for k, v in raw.items()
+                ):
+                    raise ValueError("cache must be dict[str, str]")
+                self._data = raw
+            except (json.JSONDecodeError, OSError, ValueError):
                 log.warning(
                     "Corrupt fingerprint cache at %s — starting fresh", cache_path
                 )

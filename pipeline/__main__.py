@@ -111,8 +111,8 @@ def main(argv: list[str] | None = None) -> int:
     # -- Plugin discovery ---------------------------------------------------
     plugins_dir = args.plugins_dir
     if plugins_dir is None:
-        # Default: look for a plugins/ directory next to the config file
-        plugins_dir = config_path.parent / "plugins"
+        # Default to the built-in plugins shipped with the pipeline package.
+        plugins_dir = Path(__file__).resolve().parent / "plugins"
 
     registry = PluginRegistry()
     if plugins_dir.is_dir():
@@ -166,10 +166,14 @@ def main(argv: list[str] | None = None) -> int:
             plugin_name = plugin.name if plugin else "?"
             print(f"  {label}  {f.relative}  ({plugin_name})")
 
-    # Lesson 01 only scans/reports — don't advance the fingerprint cache.
-    # Persisting fingerprints here would mark files as UNCHANGED on the next
-    # run even though no processing actually happened.  Cache writes belong
-    # in a real processing step (added in later lessons).
+    # Update the fingerprint cache so the next run sees unchanged files as
+    # UNCHANGED.  This demonstrates incremental detection — the core value of
+    # content-hash fingerprinting.  Later lessons will tie cache updates to
+    # successful processing; for now the scan itself is the "processing step".
+    for f in files:
+        if f.status is not FileStatus.UNCHANGED:
+            cache.set(f.relative, f.fingerprint)
+    cache.save()
 
     if new_count + changed_count > 0:
         print(f"\n{new_count + changed_count} file(s) would be processed.")

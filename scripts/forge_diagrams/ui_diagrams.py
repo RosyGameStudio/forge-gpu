@@ -195,7 +195,7 @@ def diagram_glyph_anatomy():
     )
 
     # Draw points
-    for x, y, on in zip(outer_x[:-1], outer_y[:-1], on_curve_outer, strict=False):
+    for x, y, on in zip(outer_x[:-1], outer_y[:-1], on_curve_outer, strict=True):
         marker = "o" if on else "s"
         color = STYLE["accent1"]
         ax.plot(
@@ -209,7 +209,7 @@ def diagram_glyph_anatomy():
             zorder=5,
         )
 
-    for x, y, on in zip(inner_x[:-1], inner_y[:-1], on_curve_inner, strict=False):
+    for x, y, on in zip(inner_x[:-1], inner_y[:-1], on_curve_inner, strict=True):
         marker = "o" if on else "s"
         color = STYLE["accent2"]
         ax.plot(
@@ -2589,7 +2589,7 @@ def diagram_line_breaking():
     )
 
     # ── Draw each line of text ──
-    for i, (line_text, lw) in enumerate(zip(lines, line_widths, strict=False)):
+    for i, (line_text, lw) in enumerate(zip(lines, line_widths, strict=True)):
         baseline_y = top_y - i * line_height
 
         # Text block rect
@@ -3429,7 +3429,7 @@ def diagram_checkbox_anatomy():
         ("Checked", True, STYLE["text_dim"], STYLE["surface"]),
     ]
 
-    for ax, (title, checked, border_color, box_fill) in zip(axes, states, strict=False):
+    for ax, (title, checked, border_color, box_fill) in zip(axes, states, strict=True):
         setup_axes(ax, xlim=(-0.5, 8), ylim=(-1, 3), grid=False, aspect=None)
         ax.axis("off")
         ax.set_title(title, color=border_color, fontsize=10, fontweight="bold", pad=8)
@@ -3615,7 +3615,7 @@ def diagram_checkbox_vs_button():
             axes,
             [STYLE["accent2"], STYLE["accent1"]],
             ["Returns bool", "Modifies *value"],
-            strict=False,
+            strict=True,
         )
     ):
         ax_ref.text(
@@ -3834,7 +3834,7 @@ def diagram_slider_value_mapping():
     ]
 
     for ax, (title, left_lbl, right_lbl, mark_lbl, color) in zip(
-        axes, labels, strict=False
+        axes, labels, strict=True
     ):
         setup_axes(ax, xlim=(0, 10.5), ylim=(-0.8, 1.5), grid=False, aspect=None)
         ax.axis("off")
@@ -3948,7 +3948,7 @@ def diagram_drag_outside_bounds():
     ]
 
     for ax, (title, cursor_t, mouse_down, _cursor_inside, title_color) in zip(
-        axes, panels, strict=False
+        axes, panels, strict=True
     ):
         setup_axes(ax, xlim=(-1, 8), ylim=(-1.5, 4), grid=False, aspect=None)
         ax.axis("off")
@@ -4064,7 +4064,7 @@ def diagram_slider_state_colors():
         ("Disabled", 0.3, STYLE["text_dim"], STYLE["grid"]),
     ]
 
-    for ax, (label, t_pos, label_color, thumb_color) in zip(axes, states, strict=False):
+    for ax, (label, t_pos, label_color, thumb_color) in zip(axes, states, strict=True):
         setup_axes(ax, xlim=(-0.5, 12), ylim=(-0.3, 1.3), grid=False, aspect=None)
         ax.axis("off")
 
@@ -4244,7 +4244,7 @@ def diagram_widget_interaction_comparison():
     }
 
     for ry, entries in data.items():
-        for _i, (entry, (_, cx, color)) in enumerate(zip(entries, cols, strict=False)):
+        for _i, (entry, (_, cx, color)) in enumerate(zip(entries, cols, strict=True)):
             bg = mpatches.FancyBboxPatch(
                 (cx - 1.5, ry - 0.55),
                 3.0,
@@ -4700,7 +4700,7 @@ def diagram_cursor_positioning():
     widths = [1.6, 1.3, 0.8, 0.8, 1.5]
     pen_x = padding_x
 
-    for i, (letter, w) in enumerate(zip(letters, widths, strict=False)):
+    for i, (letter, w) in enumerate(zip(letters, widths, strict=True)):
         color = STYLE["accent1"] if i < 3 else STYLE["text_dim"]
         ax.text(
             pen_x + 0.1,
@@ -5333,7 +5333,7 @@ def diagram_layout_cursor_model():
     cursor_positions = [cursor_y]
 
     for _i, (h, label, color) in enumerate(
-        zip(widget_heights, labels, colors, strict=False)
+        zip(widget_heights, labels, colors, strict=True)
     ):
         wy = cursor_y - h
         wrect = mpatches.FancyBboxPatch(
@@ -5472,7 +5472,7 @@ def diagram_horizontal_vs_vertical():
             heights = [1.2, 1.0, 1.0, 1.4]
             cy = ly + lh - pad
             for _i, (h, label, color) in enumerate(
-                zip(heights, labels, colors, strict=False)
+                zip(heights, labels, colors, strict=True)
             ):
                 wy = cy - h
                 r = mpatches.FancyBboxPatch(
@@ -5520,7 +5520,7 @@ def diagram_horizontal_vs_vertical():
             widths = [1.2, 1.0, 1.0, 1.4]
             cx = inner_x
             for _i, (w, label, color) in enumerate(
-                zip(widths, labels, colors, strict=False)
+                zip(widths, labels, colors, strict=True)
             ):
                 r = mpatches.FancyBboxPatch(
                     (cx, inner_y),
@@ -5774,7 +5774,7 @@ def diagram_layout_stack_visualization():
 
     max_slots = 4  # Show 4 slots of the stack
 
-    for ax, (title, entries, depth) in zip(axes, states, strict=False):
+    for ax, (title, entries, depth) in zip(axes, states, strict=True):
         setup_axes(ax, xlim=(-0.5, 4), ylim=(-0.5, 5.5), grid=False, aspect=None)
         ax.axis("off")
         ax.set_title(title, color=STYLE["text"], fontsize=10, fontweight="bold", pad=12)
@@ -6336,7 +6336,7 @@ def diagram_clip_rect_operation():
         "Fully Outside (discard)",
     ]
 
-    for ax, title in zip(axes, titles, strict=False):
+    for ax, title in zip(axes, titles, strict=True):
         setup_axes(ax, xlim=(-0.5, 8), ylim=(-0.5, 6.5), grid=False, aspect=None)
         ax.axis("off")
         ax.set_title(title, color=STYLE["text"], fontsize=10, fontweight="bold", pad=8)
@@ -6490,7 +6490,7 @@ def diagram_scroll_offset_model():
         "Checkbox E",
     ]
 
-    for ax, label, scroll_y in zip(axes, labels, scroll_offsets, strict=False):
+    for ax, label, scroll_y in zip(axes, labels, scroll_offsets, strict=True):
         setup_axes(ax, xlim=(-0.5, 8), ylim=(-0.5, 8), grid=False, aspect=None)
         ax.axis("off")
         ax.set_title(label, color=STYLE["text"], fontsize=10, fontweight="bold", pad=8)
@@ -6909,7 +6909,7 @@ def diagram_panel_with_scroll_sequence():
     step_labels = ["scroll_y = 0", "scroll_y = 30%", "scroll_y = 70%", "scroll_y = max"]
     num_widgets = 8
 
-    for ax, scroll_frac, label in zip(axes, scroll_values, step_labels, strict=False):
+    for ax, scroll_frac, label in zip(axes, scroll_values, step_labels, strict=True):
         setup_axes(ax, xlim=(-0.2, 5), ylim=(-0.2, 7), grid=False, aspect=None)
         ax.axis("off")
         ax.set_title(label, color=STYLE["text"], fontsize=9, fontweight="bold", pad=6)
@@ -8801,7 +8801,7 @@ def diagram_scale_factor_effect():
     vis_scale = (x_end - x_start - gap_total) / total_pixel_w
     x_cursor = x_start
 
-    for _i, (s, col) in enumerate(zip(scales, colors, strict=False)):
+    for _i, (s, col) in enumerate(zip(scales, colors, strict=True)):
         w = base_w * s * vis_scale
         h = base_h * s * vis_scale
         font_px = base_font * s
@@ -8965,7 +8965,7 @@ def diagram_spacing_anatomy():
 
     widgets = []
     wy = inner_y + inner_h - widget_h  # start from top
-    for _i, (label, col) in enumerate(zip(widget_labels, widget_colors, strict=False)):
+    for _i, (label, col) in enumerate(zip(widget_labels, widget_colors, strict=True)):
         # Widget background (full rect)
         wrect = mpatches.FancyBboxPatch(
             (inner_x, wy),

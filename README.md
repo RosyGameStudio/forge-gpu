@@ -451,6 +451,8 @@ forge-pipeline --help          # see all options
 ```
 
 ```python
+from pathlib import Path
+
 from pipeline.config import load_config
 from pipeline.plugin import PluginRegistry
 from pipeline.scanner import scan, FingerprintCache
@@ -472,7 +474,7 @@ Each lesson adds real functionality to this shared package.
 - **CMake 3.24+**
 - **A C compiler** (MSVC, GCC, or Clang)
 - **A GPU** with Vulkan, Direct3D 12, or Metal support
-- **Python 3** (for helper scripts)
+- **Python 3.10+** (for helper scripts and the asset pipeline)
 
 SDL3 is fetched automatically — no manual installation required.
 

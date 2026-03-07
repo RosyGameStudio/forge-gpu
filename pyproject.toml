@@ -5,7 +5,9 @@ description = "Asset processing pipeline for forge-gpu — plugin-based CLI for 
 requires-python = ">=3.10"
 license = "Zlib"
 readme = "pipeline/README.md"
-dependencies = []
+dependencies = [
+    "tomli>=1.0.0; python_version < '3.11'",
+]
 
 [project.optional-dependencies]
 dev = [
