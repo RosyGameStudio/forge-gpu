@@ -48,9 +48,11 @@ Every pixel in the framebuffer can have three values: color (RGBA), depth
 (float), and stencil (8-bit unsigned integer). The stencil and depth values
 share a single texture using a combined format.
 
-The format that matters is `SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT`: 24 bits
-for depth and 8 bits for stencil, packed into a 32-bit value per pixel. This
-is the most widely supported combined format across Vulkan, Metal, and D3D12.
+The preferred format is `SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT`: 24 bits
+for depth and 8 bits for stencil, packed into a 32-bit value per pixel. Not
+all devices support it (some Metal GPUs lack `Depth24Unorm_Stencil8`), so
+apps must probe at runtime and fall back to `D32_FLOAT_S8_UINT` when needed.
+The code below shows the correct probe-first, fallback-second pattern.
 
 ```c
 /* Probe for D24_UNORM_S8_UINT first; fall back to D32_FLOAT_S8_UINT */
