@@ -17739,21 +17739,23 @@ def diagram_decal_box_projection():
     # OBB local Y direction (projection axis) rotated into world space
     proj_dx = sin_t  # world X component of local -Y direction
     proj_dy = -cos_t  # world Y component of local -Y direction
+
+    def project_to_surface(start_x, start_y):
+        """March along projection direction until hitting the curved surface."""
+        hx, hy = start_x, start_y
+        for _ in range(200):
+            sy = -0.12 * hx**2 - 0.8
+            if hy <= sy:
+                break
+            hx += proj_dx * 0.02
+            hy += proj_dy * 0.02
+        return hx, hy
+
     for rx in ray_xs:
         # Ray origin at top of box in OBB local coords, rotated to world
         rx_top = cos_t * rx - sin_t * box_hh
         ry_top = sin_t * rx + cos_t * box_hh + box_cy
-        # March along projection direction until hitting the surface
-        # Surface: y = -0.12 * x^2 - 0.8
-        # Solve: ry_top + t * proj_dy = -0.12 * (rx_top + t * proj_dx)^2 - 0.8
-        # Use iterative approach for robustness
-        hit_x, hit_y = rx_top, ry_top
-        for _ in range(200):
-            surface_y = -0.12 * hit_x**2 - 0.8
-            if hit_y <= surface_y:
-                break
-            hit_x += proj_dx * 0.02
-            hit_y += proj_dy * 0.02
+        hit_x, hit_y = project_to_surface(rx_top, ry_top)
         ax.plot(
             [rx_top, hit_x],
             [ry_top, hit_y],
@@ -17804,13 +17806,7 @@ def diagram_decal_box_projection():
     for lx in t_local:
         wx = cos_t * lx - sin_t * box_hh
         wy = sin_t * lx + cos_t * box_hh + box_cy
-        hx, hy = wx, wy
-        for _ in range(200):
-            sy = -0.12 * hx**2 - 0.8
-            if hy <= sy:
-                break
-            hx += proj_dx * 0.02
-            hy += proj_dy * 0.02
+        hx, hy = project_to_surface(wx, wy)
         decal_xs.append(hx)
         decal_ys.append(hy)
     ax.plot(decal_xs, decal_ys, color=STYLE["accent2"], linewidth=4, zorder=3)
@@ -17873,8 +17869,8 @@ def diagram_decal_box_projection():
 def diagram_decal_depth_reconstruction():
     """Pipeline diagram showing how world position is reconstructed from depth.
 
-    Flow: Screen UV -> Depth Sample -> NDC (with Y-flip) -> inv_vp multiply
-    -> World Position.
+    Flow: Screen UV -> Depth Sample -> NDC Position (with Y-flip)
+    -> Clip Position (float4 lift) -> inv(VP) Multiply -> World Position.
     """
     fig, ax = plt.subplots(1, 1, figsize=(14, 4), facecolor=STYLE["bg"])
     setup_axes(ax, xlim=(0, 18), ylim=(0.5, 4.8), grid=False, aspect=None)
@@ -17952,12 +17948,19 @@ def diagram_decal_depth_reconstruction():
     for cx, label, color, sublabel in stages:
         draw_box(cx, y_center, box_w, box_h, label, color, sublabel)
 
-    # Arrows between stages
+    # Arrows between stages — computed from stage positions
     arrow_y = y_center
-    draw_arrow(3.5, 4.1, arrow_y, STYLE["text_dim"])
-    draw_arrow(7.0, 7.6, arrow_y, STYLE["accent4"])
-    draw_arrow(10.5, 11.3, arrow_y, STYLE["accent1"])
-    draw_arrow(14.3, 14.8, arrow_y, STYLE["accent2"])
+    arrow_colors = [
+        STYLE["text_dim"],
+        STYLE["accent4"],
+        STYLE["accent1"],
+        STYLE["accent2"],
+        STYLE["accent3"],
+    ]
+    for i, color in enumerate(arrow_colors):
+        src_x = stages[i][0] + box_w / 2
+        dst_x = stages[i + 1][0] - box_w / 2
+        draw_arrow(src_x, dst_x, arrow_y, color)
 
     # Y-flip annotation
     ax.text(
