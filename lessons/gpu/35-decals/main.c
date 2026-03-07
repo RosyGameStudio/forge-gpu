@@ -857,6 +857,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* Upload the first primitive's geometry to the GPU */
     if (!state->gltf_scene.primitives || state->gltf_scene.primitive_count == 0) {
         SDL_Log("ERROR: Suzanne glTF has no primitives");
+        forge_gltf_free(&state->gltf_scene);
         return SDL_APP_FAILURE;
     }
     {
