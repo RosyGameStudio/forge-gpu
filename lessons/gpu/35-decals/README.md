@@ -402,9 +402,9 @@ pattern used here for decal projection.
 
 ## Cross-references
 
-- [GPU Lesson 06 — Depth & 3D](../06-depth/): Depth buffer fundamentals and
-  the depth-stencil texture format
-- [GPU Lesson 15 — Shadow Maps](../15-shadow-mapping/): Depth-only render
+- [GPU Lesson 06 — Depth & 3D](../06-depth-and-3d/): Depth buffer fundamentals
+  and the depth-stencil texture format
+- [GPU Lesson 15 — Shadow Maps](../15-cascaded-shadow-maps/): Depth-only render
   passes and shadow sampling technique
 - [GPU Lesson 34 — Stencil Testing](../34-stencil-testing/): Stencil buffer
   operations used for decal layering (Exercise 1)

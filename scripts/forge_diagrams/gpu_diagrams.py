@@ -17751,11 +17751,16 @@ def diagram_decal_box_projection():
         )
         ax.plot(rx_rot, ry_hit, "o", color=STYLE["accent2"], markersize=4, zorder=5)
 
-    # Arrow label for projection direction
+    # Arrow label for projection direction (rotated with OBB)
+    arrow_offset = box_hw + 0.6
+    arrow_top_x = cos_t * arrow_offset + sin_t * (box_hh - 0.2) + 0
+    arrow_top_y = -sin_t * arrow_offset + cos_t * (box_hh - 0.2) + box_cy
+    arrow_bot_x = cos_t * arrow_offset - sin_t * (box_hh - 0.2) + 0
+    arrow_bot_y = -sin_t * arrow_offset - cos_t * (box_hh - 0.2) + box_cy
     ax.annotate(
         "",
-        xy=(box_hw + 0.6, box_cy - box_hh + 0.2),
-        xytext=(box_hw + 0.6, box_cy + box_hh - 0.2),
+        xy=(arrow_bot_x, arrow_bot_y),
+        xytext=(arrow_top_x, arrow_top_y),
         arrowprops={
             "arrowstyle": "->,head_width=0.25,head_length=0.12",
             "color": STYLE["accent4"],
@@ -17763,9 +17768,11 @@ def diagram_decal_box_projection():
         },
         zorder=5,
     )
+    label_x = (arrow_top_x + arrow_bot_x) / 2 + 0.15
+    label_y = (arrow_top_y + arrow_bot_y) / 2
     ax.text(
-        box_hw + 0.75,
-        box_cy,
+        label_x,
+        label_y,
         "projection\ndirection",
         color=STYLE["accent4"],
         fontsize=9,
@@ -18820,8 +18827,8 @@ def diagram_decal_layering():
         if has_stencil:
             technique_lines = [
                 "1. Draw decal A, increment stencil",
-                "2. Draw decal B, test stencil \u2260 0",
-                "3. Overlap pixels already marked \u2192 skip",
+                "2. Draw decal B, test stencil == 0",
+                "3. Overlap pixels already marked \u2192 reject",
             ]
             for i, line in enumerate(technique_lines):
                 ax.text(

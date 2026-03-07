@@ -60,7 +60,7 @@
 #define WINDOW_WIDTH       1280
 #define WINDOW_HEIGHT      720
 #define SHADOW_MAP_SIZE    2048
-#define SHADOW_DEPTH_FMT   SDL_GPU_TEXTUREFORMAT_D32_FLOAT
+/* Shadow depth format is probed at init (stored in app_state.shadow_depth_fmt) */
 #define FOV_DEG            60.0f
 #define NEAR_PLANE         0.1f
 #define FAR_PLANE          200.0f
@@ -108,10 +108,10 @@
 
 /* Initial camera */
 #define CAM_START_X        0.0f
-#define CAM_START_Y        4.0f
-#define CAM_START_Z       10.0f
+#define CAM_START_Y        7.0f
+#define CAM_START_Z       14.0f
 #define CAM_START_YAW      0.0f     /* initial horizontal rotation (radians) */
-#define CAM_START_PITCH   -0.3f     /* initial vertical rotation (radians) */
+#define CAM_START_PITCH   -0.4f     /* initial vertical rotation (radians) */
 
 /* Decal system */
 #define MAX_DECALS         120
@@ -221,6 +221,7 @@ typedef struct app_state {
     SDL_GPUTexture *shadow_depth;           /* D32_FLOAT shadow map (SHADOW_MAP_SIZE²) */
     SDL_GPUTexture *scene_depth;            /* window-sized depth (DS target + sampler) */
     SDL_GPUTextureFormat depth_stencil_fmt; /* negotiated DS format (D24S8 or D32FS8) */
+    SDL_GPUTextureFormat shadow_depth_fmt;  /* negotiated shadow depth format */
 
     /* Samplers */
     SDL_GPUSampler *nearest_clamp; /* point sampling for depth textures */
@@ -732,7 +733,60 @@ static void generate_decals(app_state *state)
         }
     }
 
-    SDL_Log("Generated %d decals for %d objects", state->decal_count, SUZANNE_COUNT);
+    /* Floor decals — scattered on the grid around and between the Suzannes */
+    const int floor_count = 15;
+    for (int f = 0; f < floor_count && state->decal_count < MAX_DECALS; f++) {
+        Decal *decal = &state->decals[state->decal_count];
+
+        /* Random position on the floor within the scene area */
+        hash = forge_hash_wang(hash);
+        float fx = forge_hash_to_sfloat(hash) * 7.0f;
+        hash = forge_hash_wang(hash);
+        float fz = forge_hash_to_sfloat(hash) * 7.0f;
+
+        decal->position = vec3_create(fx, 0.05f, fz);
+
+        /* Project straight down onto the floor */
+        vec3 forward = vec3_create(0.0f, -1.0f, 0.0f);
+        vec3 right   = vec3_create(1.0f, 0.0f, 0.0f);
+        vec3 up_dir  = vec3_create(0.0f, 0.0f, -1.0f);
+
+        mat4 rot = mat4_identity();
+        rot.m[0] = right.x;   rot.m[1] = right.y;   rot.m[2] = right.z;
+        rot.m[4] = up_dir.x;  rot.m[5] = up_dir.y;  rot.m[6] = up_dir.z;
+        rot.m[8] = forward.x; rot.m[9] = forward.y;  rot.m[10] = forward.z;
+
+        /* Random yaw rotation for variety */
+        hash = forge_hash_wang(hash);
+        float yaw = forge_hash_to_float(hash) * 2.0f * FORGE_PI;
+        quat yaw_q = quat_from_axis_angle(vec3_create(0.0f, 1.0f, 0.0f), yaw);
+
+        decal->orientation = quat_from_mat4(rot);
+        decal->orientation = quat_multiply(yaw_q, decal->orientation);
+        decal->orientation = quat_normalize(decal->orientation);
+
+        /* Larger sizes for floor decals */
+        hash = forge_hash_wang(hash);
+        float sz = 0.4f + forge_hash_to_float(hash) * 0.8f;
+        decal->size[0] = sz;
+        decal->size[1] = sz * DECAL_DEPTH_RATIO;
+        decal->size[2] = sz;
+
+        /* Random texture and color */
+        hash = forge_hash_wang(hash);
+        decal->tex_index = (int)(forge_hash_to_float(hash) * (float)NUM_DECAL_SHAPES) % NUM_DECAL_SHAPES;
+        hash = forge_hash_wang(hash);
+        int color_idx = (int)(forge_hash_to_float(hash) * (float)NUM_DECAL_COLORS) % NUM_DECAL_COLORS;
+        decal->tint[0] = DECAL_COLORS[color_idx][0];
+        decal->tint[1] = DECAL_COLORS[color_idx][1];
+        decal->tint[2] = DECAL_COLORS[color_idx][2];
+        decal->tint[3] = DECAL_COLORS[color_idx][3];
+
+        state->decal_count++;
+    }
+
+    SDL_Log("Generated %d decals (%d on objects, %d on floor)",
+            state->decal_count, state->decal_count - floor_count, floor_count);
 }
 
 /* ── SDL_AppInit ──────────────────────────────────────────────────────── */
@@ -816,6 +870,28 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     /* ── 3. Depth format probe ───────────────────────────────────────── */
 
+    /* Shadow map: depth-only, needs DEPTH_STENCIL_TARGET | SAMPLER for PCF */
+    if (SDL_GPUTextureSupportsFormat(device,
+            SDL_GPU_TEXTUREFORMAT_D32_FLOAT,
+            SDL_GPU_TEXTURETYPE_2D,
+            SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET |
+            SDL_GPU_TEXTUREUSAGE_SAMPLER)) {
+        state->shadow_depth_fmt = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+        SDL_Log("Shadow depth format: D32_FLOAT");
+    } else if (SDL_GPUTextureSupportsFormat(device,
+            SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+            SDL_GPU_TEXTURETYPE_2D,
+            SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET |
+            SDL_GPU_TEXTUREUSAGE_SAMPLER)) {
+        state->shadow_depth_fmt = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+        SDL_Log("Shadow depth format: D16_UNORM (fallback)");
+    } else {
+        /* Use whatever the scene depth format is */
+        state->shadow_depth_fmt = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+        SDL_Log("Shadow depth format: D32_FLOAT (unprobed, may fail)");
+    }
+
+    /* Scene depth: needs stencil for exercises, plus SAMPLER for decal pass */
     if (SDL_GPUTextureSupportsFormat(device,
             SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT,
             SDL_GPU_TEXTURETYPE_2D,
@@ -840,13 +916,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_Log("Depth format: D32_FLOAT (no stencil, fallback)");
     } else {
         SDL_Log("ERROR: No depth format supports DEPTH_STENCIL_TARGET | SAMPLER");
-        SDL_ReleaseGPUBuffer(device, state->suzanne_ib);
-        SDL_ReleaseGPUBuffer(device, state->suzanne_vb);
-        forge_gltf_free(&state->gltf_scene);
-        SDL_ReleaseWindowFromGPUDevice(device, window);
-        SDL_DestroyWindow(window);
-        SDL_DestroyGPUDevice(device);
-        SDL_free(state);
         return SDL_APP_FAILURE;
     }
 
@@ -877,7 +946,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_GPUTextureCreateInfo ti;
         SDL_zero(ti);
         ti.type = SDL_GPU_TEXTURETYPE_2D;
-        ti.format = SHADOW_DEPTH_FMT;
+        ti.format = state->shadow_depth_fmt;
         ti.width = SHADOW_MAP_SIZE;
         ti.height = SHADOW_MAP_SIZE;
         ti.layer_count_or_depth = 1;
@@ -1106,7 +1175,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.depth_stencil_state.enable_depth_test = true;
         pi.depth_stencil_state.enable_depth_write = true;
         pi.target_info.num_color_targets = 0;
-        pi.target_info.depth_stencil_format = SHADOW_DEPTH_FMT;
+        pi.target_info.depth_stencil_format = state->shadow_depth_fmt;
         pi.target_info.has_depth_stencil_target = true;
         state->shadow_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
     }
@@ -1187,14 +1256,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         state->decal_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
     }
 
-    if (!state->shadow_pipeline || !state->scene_pipeline ||
-        !state->grid_pipeline || !state->decal_pipeline) {
-        SDL_Log("ERROR: One or more pipelines failed to create: %s",
-                SDL_GetError());
-        return SDL_APP_FAILURE;
-    }
-
-    /* ── 9. Release shaders ──────────────────────────────────────────── */
+    /* ── 9. Release shaders (safe with NULL — release before pipeline
+     *        check so shaders are freed even if a pipeline failed) ──── */
 
     SDL_ReleaseGPUShader(device, scene_vert);
     SDL_ReleaseGPUShader(device, scene_frag);
@@ -1204,6 +1267,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_ReleaseGPUShader(device, grid_frag);
     SDL_ReleaseGPUShader(device, decal_vert);
     SDL_ReleaseGPUShader(device, decal_frag);
+
+    if (!state->shadow_pipeline || !state->scene_pipeline ||
+        !state->grid_pipeline || !state->decal_pipeline) {
+        SDL_Log("ERROR: One or more pipelines failed to create: %s",
+                SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
 
     /* ── 10. Cube geometry (decal boxes) ─────────────────────────────── */
 
@@ -1267,7 +1337,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     /* Arrange Suzannes in a ring around the origin so the camera can see all */
     {
-        const float ring_radius = 3.5f;
+        const float ring_radius = 5.0f;
         const float base_scales[SUZANNE_COUNT] = { 1.0f, 0.8f, 1.2f, 0.9f, 1.1f, 0.7f };
         for (int i = 0; i < SUZANNE_COUNT; i++) {
             float angle = (float)i / (float)SUZANNE_COUNT * 2.0f * 3.14159265f;
@@ -1308,8 +1378,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* ── 17. Mouse capture ───────────────────────────────────────────── */
 
     if (!SDL_SetWindowRelativeMouseMode(state->window, true)) {
-        SDL_Log("WARN: SDL_SetWindowRelativeMouseMode failed: %s",
+        SDL_Log("ERROR: SDL_SetWindowRelativeMouseMode failed: %s",
                 SDL_GetError());
+        return SDL_APP_FAILURE;
     }
     state->mouse_captured = true;
 
@@ -1341,10 +1412,12 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     case SDL_EVENT_KEY_DOWN:
         if (event->key.scancode == SDL_SCANCODE_ESCAPE) {
-            state->mouse_captured = !state->mouse_captured;
-            if (!SDL_SetWindowRelativeMouseMode(state->window, state->mouse_captured)) {
+            bool next = !state->mouse_captured;
+            if (!SDL_SetWindowRelativeMouseMode(state->window, next)) {
                 SDL_Log("ERROR: SDL_SetWindowRelativeMouseMode failed: %s",
                         SDL_GetError());
+            } else {
+                state->mouse_captured = next;
             }
         }
         break;
@@ -1360,10 +1433,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         if (!state->mouse_captured) {
-            state->mouse_captured = true;
             if (!SDL_SetWindowRelativeMouseMode(state->window, true)) {
                 SDL_Log("ERROR: SDL_SetWindowRelativeMouseMode failed: %s",
                         SDL_GetError());
+            } else {
+                state->mouse_captured = true;
             }
         }
         break;
@@ -1495,15 +1569,21 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     color_target.store_op   = SDL_GPU_STOREOP_STORE;
     color_target.clear_color = (SDL_FColor){ CLEAR_R, CLEAR_G, CLEAR_B, 1.0f };
 
+    bool has_stencil =
+        state->depth_stencil_fmt == SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT ||
+        state->depth_stencil_fmt == SDL_GPU_TEXTUREFORMAT_D32_FLOAT_S8_UINT;
+
     SDL_GPUDepthStencilTargetInfo scene_ds;
     SDL_zero(scene_ds);
     scene_ds.texture         = state->scene_depth;
     scene_ds.load_op         = SDL_GPU_LOADOP_CLEAR;
     scene_ds.store_op        = SDL_GPU_STOREOP_STORE;
     scene_ds.clear_depth     = 1.0f;
-    scene_ds.stencil_load_op  = SDL_GPU_LOADOP_CLEAR;
-    scene_ds.stencil_store_op = SDL_GPU_STOREOP_STORE;
-    scene_ds.clear_stencil   = 0;
+    if (has_stencil) {
+        scene_ds.stencil_load_op  = SDL_GPU_LOADOP_CLEAR;
+        scene_ds.stencil_store_op = SDL_GPU_STOREOP_STORE;
+        scene_ds.clear_stencil    = 0;
+    }
 
     SDL_GPURenderPass *scene_pass = SDL_BeginGPURenderPass(
         cmd, &color_target, 1, &scene_ds);
