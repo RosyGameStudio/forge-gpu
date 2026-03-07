@@ -224,8 +224,8 @@ typedef struct app_state {
     bool show_stencil_debug;         /* toggled with V key                */
 
     /* Scene objects */
-    SceneObject cubes[CUBE_COUNT];
-    SceneObject portal_spheres[PORTAL_SPHERE_COUNT];
+    SceneObject cubes[CUBE_COUNT];                  /* main-world cubes (position, scale, color, outline) */
+    SceneObject portal_spheres[PORTAL_SPHERE_COUNT]; /* alternate-world spheres visible through portal */
 
     /* Light */
     vec3 light_dir;                  /* normalized directional light direction */
@@ -243,7 +243,7 @@ typedef struct app_state {
     bool   mouse_captured; /* true when mouse is captured for FPS look    */
 
 #ifdef FORGE_CAPTURE
-    ForgeCapture capture;
+    ForgeCapture capture;                             /* screenshot/GIF capture state */
 #endif
 } app_state;
 
@@ -612,6 +612,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     app_state *state = SDL_calloc(1, sizeof(app_state));
     if (!state) {
         SDL_Log("ERROR: Failed to allocate app_state");
+        SDL_DestroyWindow(window);
+        SDL_DestroyGPUDevice(device);
         return SDL_APP_FAILURE;
     }
     state->device = device;
@@ -1534,12 +1536,18 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                                          &swapchain_tex, &sw, &sh)) {
         SDL_Log("ERROR: SDL_AcquireGPUSwapchainTexture failed: %s",
                 SDL_GetError());
-        SDL_SubmitGPUCommandBuffer(cmd);
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("ERROR: SDL_SubmitGPUCommandBuffer failed: %s",
+                    SDL_GetError());
+        }
         return SDL_APP_CONTINUE;
     }
     if (!swapchain_tex) {
         /* Window minimized or not ready — skip this frame */
-        SDL_SubmitGPUCommandBuffer(cmd);
+        if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+            SDL_Log("ERROR: SDL_SubmitGPUCommandBuffer failed: %s",
+                    SDL_GetError());
+        }
         return SDL_APP_CONTINUE;
     }
 
@@ -2117,7 +2125,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 #ifdef FORGE_CAPTURE
     if (state->capture.mode != FORGE_CAPTURE_NONE) {
         if (!forge_capture_finish_frame(&state->capture, cmd, swapchain_tex)) {
-            SDL_SubmitGPUCommandBuffer(cmd);
+            if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+                SDL_Log("ERROR: SDL_SubmitGPUCommandBuffer failed: %s",
+                        SDL_GetError());
+            }
         }
         if (forge_capture_should_quit(&state->capture)) {
             return SDL_APP_SUCCESS;
