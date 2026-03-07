@@ -187,6 +187,12 @@ HDR, post-processing, UI rendering, and animations.
 <b>33</b> — Vertex Pulling
 </td>
 </tr>
+<tr>
+<td align="center">
+<a href="lessons/gpu/34-stencil-testing/"><img src="lessons/gpu/34-stencil-testing/assets/screenshot.png" width="200" alt="Stencil Testing" /></a><br />
+<b>34</b> — Stencil Testing
+</td>
+</tr>
 </table>
 
 ### Math Lessons (lessons/math/)
@@ -662,6 +668,7 @@ project to enable Claude to build games and tools with you.
 | [forge-skinning-animations](.claude/skills/forge-skinning-animations/SKILL.md) | `/forge-skinning-animations` | Skeletal skinning, joint hierarchies, inverse bind matrices, blend weights |
 | [forge-auto-widget-layout](.claude/skills/forge-auto-widget-layout/SKILL.md) | `/forge-auto-widget-layout` | Automatic widget layout with vertical/horizontal stacking, padding, spacing, and nested layouts |
 | [forge-draggable-windows](.claude/skills/forge-draggable-windows/SKILL.md) | `/forge-draggable-windows` | Draggable, z-ordered, collapsible windows for immediate-mode UI |
+| [forge-stencil-testing](.claude/skills/forge-stencil-testing/SKILL.md) | `/forge-stencil-testing` | Stencil buffer testing, portals, outlines, per-pixel masking |
 
 ### Development skills (used within this repo)
 

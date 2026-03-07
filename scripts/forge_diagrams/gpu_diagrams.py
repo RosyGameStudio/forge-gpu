@@ -14679,14 +14679,25 @@ def diagram_skinned_normal_transform():
         # Origin
         ax.plot(0, 0, "+", color=STYLE["text_dim"], ms=10, mew=1.5, zorder=2)
         ax.text(
-            0.0, -0.4, "origin", color=STYLE["text_dim"], fontsize=7,
-            ha="center", va="center", path_effects=stroke_thin, zorder=3,
+            0.0,
+            -0.4,
+            "origin",
+            color=STYLE["text_dim"],
+            fontsize=7,
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=3,
         )
 
         # Character body
         body = Circle(
-            (char_x, char_z), 0.4, facecolor=STYLE["surface"],
-            edgecolor=STYLE["accent1"], lw=2.0, zorder=5,
+            (char_x, char_z),
+            0.4,
+            facecolor=STYLE["surface"],
+            edgecolor=STYLE["accent1"],
+            lw=2.0,
+            zorder=5,
         )
         ax.add_patch(body)
 
@@ -14702,15 +14713,22 @@ def diagram_skinned_normal_transform():
             xytext=(lsx, lsz),
             arrowprops={
                 "arrowstyle": "->,head_width=0.2,head_length=0.12",
-                "color": STYLE["warn"], "lw": 2.5,
+                "color": STYLE["warn"],
+                "lw": 2.5,
             },
             zorder=6,
         )
         ax.text(
-            lsx - 0.1, lsz + 0.45,
-            "light dir (world)", color=STYLE["warn"], fontsize=7.5,
-            fontweight="bold", ha="center", va="center",
-            path_effects=stroke_thin, zorder=7,
+            lsx - 0.1,
+            lsz + 0.45,
+            "light dir (world)",
+            color=STYLE["warn"],
+            fontsize=7.5,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=7,
         )
 
         # Normal arrow
@@ -14729,11 +14747,13 @@ def diagram_skinned_normal_transform():
         nrm_end_x = char_x + nrm_dx * nrm_len
         nrm_end_z = char_z + nrm_dz * nrm_len
         ax.annotate(
-            "", xy=(nrm_end_x, nrm_end_z),
+            "",
+            xy=(nrm_end_x, nrm_end_z),
             xytext=(char_x, char_z),
             arrowprops={
                 "arrowstyle": "->,head_width=0.2,head_length=0.12",
-                "color": nrm_color, "lw": 2.5,
+                "color": nrm_color,
+                "lw": 2.5,
             },
             zorder=8,
         )
@@ -14741,26 +14761,42 @@ def diagram_skinned_normal_transform():
         # the facing arrow or the NdotL badge below.
         perp_x, perp_z = -nrm_dz, nrm_dx  # 90° CCW from normal direction
         ax.text(
-            nrm_end_x + perp_x * 0.7, nrm_end_z + perp_z * 0.7, nrm_label,
-            color=nrm_color, fontsize=8, fontweight="bold",
-            ha="center", va="center", path_effects=stroke_thin, zorder=9,
+            nrm_end_x + perp_x * 0.7,
+            nrm_end_z + perp_z * 0.7,
+            nrm_label,
+            color=nrm_color,
+            fontsize=8,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=9,
         )
 
         # Facing arrow — drawn after normal so it's visible on top
         ax.annotate(
-            "", xy=(char_x + face_x * f_len, char_z + face_z * f_len),
+            "",
+            xy=(char_x + face_x * f_len, char_z + face_z * f_len),
             xytext=(char_x, char_z),
             arrowprops={
                 "arrowstyle": "->,head_width=0.15,head_length=0.1",
-                "color": STYLE["accent1"], "lw": 2.0,
+                "color": STYLE["accent1"],
+                "lw": 2.0,
             },
             zorder=10,
         )
         # Place facing label above the arrow tip to avoid badge collision
         ax.text(
-            char_x + face_x * 1.1, char_z + face_z * 1.1 + 0.3, "facing",
-            color=STYLE["accent1"], fontsize=7.5, fontweight="bold",
-            ha="center", va="center", path_effects=stroke_thin, zorder=11,
+            char_x + face_x * 1.1,
+            char_z + face_z * 1.1 + 0.3,
+            "facing",
+            color=STYLE["accent1"],
+            fontsize=7.5,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=11,
         )
 
         # Compute NdotL
@@ -14776,8 +14812,12 @@ def diagram_skinned_normal_transform():
             shade_alpha = 0.12
 
         shade = Circle(
-            (char_x, char_z), 0.4, facecolor=shade_color,
-            alpha=shade_alpha, edgecolor="none", zorder=4,
+            (char_x, char_z),
+            0.4,
+            facecolor=shade_color,
+            alpha=shade_alpha,
+            edgecolor="none",
+            zorder=4,
         )
         ax.add_patch(shade)
 
@@ -14796,10 +14836,16 @@ def diagram_skinned_normal_transform():
             verdict_color = badge_color
 
         ax.text(
-            char_x, char_z - 1.1,
+            char_x,
+            char_z - 1.1,
             ndotl_text + verdict,
-            color=verdict_color, fontsize=9, fontweight="bold",
-            ha="center", va="center", path_effects=stroke, zorder=10,
+            color=verdict_color,
+            fontsize=9,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke,
+            zorder=10,
             bbox={
                 "boxstyle": "round,pad=0.3",
                 "facecolor": STYLE["surface"],
@@ -14817,14 +14863,25 @@ def diagram_skinned_normal_transform():
             formula_color = STYLE["accent2"]
 
         ax.text(
-            0.0, -3.2, formula, color=formula_color, fontsize=10,
-            fontweight="bold", ha="center", va="center",
-            family="monospace", path_effects=stroke, zorder=10,
+            0.0,
+            -3.2,
+            formula,
+            color=formula_color,
+            fontsize=10,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            family="monospace",
+            path_effects=stroke,
+            zorder=10,
         )
 
         ax.set_title(
-            title, color=STYLE["text"], fontsize=13,
-            fontweight="bold", pad=12,
+            title,
+            color=STYLE["text"],
+            fontsize=13,
+            fontweight="bold",
+            pad=12,
         )
 
     draw_panel(ax1, "Broken: normal ignores path rotation", is_correct=False)
@@ -14832,14 +14889,28 @@ def diagram_skinned_normal_transform():
 
     # Verdict marks
     ax1.text(
-        3.0, -3.2, "✗", color=STYLE["accent2"], fontsize=20,
-        fontweight="bold", ha="center", va="center",
-        path_effects=stroke, zorder=10,
+        3.0,
+        -3.2,
+        "✗",
+        color=STYLE["accent2"],
+        fontsize=20,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=10,
     )
     ax2.text(
-        3.0, -3.2, "✓", color=STYLE["accent3"], fontsize=20,
-        fontweight="bold", ha="center", va="center",
-        path_effects=stroke, zorder=10,
+        3.0,
+        -3.2,
+        "✓",
+        color=STYLE["accent3"],
+        fontsize=20,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=10,
     )
 
     fig.tight_layout()
@@ -15872,3 +15943,1245 @@ def diagram_binding_comparison():
 
     fig.tight_layout()
     save(fig, "gpu/33-vertex-pulling", "binding_comparison.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/34-stencil-testing — stencil_buffer_concept.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_stencil_buffer_concept():
+    """Three framebuffer attachments: Color, Depth, Stencil with D24S8 packing."""
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5), facecolor=STYLE["bg"])
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+
+    titles = ["Color Buffer", "Depth Buffer", "Stencil Buffer"]
+    colors = [STYLE["accent1"], STYLE["text_dim"], STYLE["accent2"]]
+
+    for ax in axes:
+        setup_axes(ax, xlim=(0, 8), ylim=(0, 8), grid=False, aspect="equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    # --- Color buffer: colored rectangles representing rendered objects ---
+    ax_c = axes[0]
+    ax_c.set_title(titles[0], color=colors[0], fontsize=13, fontweight="bold", pad=12)
+    from matplotlib.patches import Rectangle
+
+    bg_rect = Rectangle(
+        (0.5, 0.5),
+        7,
+        7,
+        facecolor=STYLE["surface"],
+        edgecolor=STYLE["accent1"],
+        linewidth=2,
+        zorder=1,
+    )
+    ax_c.add_patch(bg_rect)
+    # Simplified scene objects
+    obj1 = Rectangle(
+        (1.5, 4.0),
+        2.5,
+        2.0,
+        facecolor=STYLE["accent1"],
+        edgecolor=STYLE["text"],
+        linewidth=1.5,
+        alpha=0.85,
+        zorder=2,
+    )
+    obj2 = Rectangle(
+        (4.0, 2.0),
+        2.0,
+        3.0,
+        facecolor=STYLE["accent2"],
+        edgecolor=STYLE["text"],
+        linewidth=1.5,
+        alpha=0.85,
+        zorder=2,
+    )
+    obj3 = Rectangle(
+        (2.0, 1.0),
+        4.0,
+        1.5,
+        facecolor=STYLE["accent3"],
+        edgecolor=STYLE["text"],
+        linewidth=1.5,
+        alpha=0.85,
+        zorder=2,
+    )
+    for p in (obj1, obj2, obj3):
+        ax_c.add_patch(p)
+    ax_c.text(
+        4.0,
+        0.15,
+        "RGBA8",
+        color=STYLE["text_dim"],
+        fontsize=9,
+        ha="center",
+        va="bottom",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # --- Depth buffer: grayscale gradient ---
+    ax_d = axes[1]
+    ax_d.set_title(titles[1], color=colors[1], fontsize=13, fontweight="bold", pad=12)
+    import numpy as np
+
+    grad = np.linspace(0.2, 0.9, 64).reshape(1, -1)
+    grad = np.tile(grad, (64, 1))
+    # Add some depth variation
+    y_grad = np.linspace(0.3, 0.8, 64).reshape(-1, 1)
+    depth_img = grad * 0.6 + y_grad * 0.4
+    ax_d.imshow(
+        depth_img,
+        extent=(0.5, 7.5, 0.5, 7.5),
+        cmap="gray",
+        vmin=0,
+        vmax=1,
+        aspect="auto",
+        zorder=1,
+    )
+    border = Rectangle(
+        (0.5, 0.5),
+        7,
+        7,
+        facecolor="none",
+        edgecolor=STYLE["text_dim"],
+        linewidth=2,
+        zorder=3,
+    )
+    ax_d.add_patch(border)
+    ax_d.text(
+        4.0,
+        7.8,
+        "Near = 0.0",
+        color=STYLE["text"],
+        fontsize=8,
+        ha="center",
+        va="bottom",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax_d.text(
+        4.0,
+        0.15,
+        "Far = 1.0",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="center",
+        va="bottom",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # --- Stencil buffer: integer values shown as colored cells ---
+    ax_s = axes[2]
+    ax_s.set_title(titles[2], color=colors[2], fontsize=13, fontweight="bold", pad=12)
+    stencil_bg = Rectangle(
+        (0.5, 0.5),
+        7,
+        7,
+        facecolor=STYLE["bg"],
+        edgecolor=STYLE["accent2"],
+        linewidth=2,
+        zorder=1,
+    )
+    ax_s.add_patch(stencil_bg)
+
+    stencil_colors = {"0": STYLE["bg"], "1": STYLE["accent2"], "2": STYLE["accent3"]}
+    stencil_labels = {"0": STYLE["text_dim"], "1": STYLE["warn"], "2": STYLE["text"]}
+
+    # Grid of stencil values
+    grid_data = [
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 1, 1, 0, 0],
+        [0, 0, 1, 1, 1, 0, 0],
+        [0, 0, 1, 2, 2, 2, 0],
+        [0, 0, 0, 2, 2, 2, 0],
+        [0, 0, 0, 2, 2, 2, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+    ]
+    cell_size = 1.0
+    for row_i, row in enumerate(grid_data):
+        for col_i, val in enumerate(row):
+            x = 0.5 + col_i * cell_size
+            y = 6.5 - row_i * cell_size
+            c = stencil_colors[str(val)]
+            cell = Rectangle(
+                (x, y),
+                cell_size,
+                cell_size,
+                facecolor=c,
+                edgecolor=STYLE["grid"],
+                linewidth=0.5,
+                zorder=2,
+            )
+            ax_s.add_patch(cell)
+            ax_s.text(
+                x + cell_size / 2,
+                y + cell_size / 2,
+                str(val),
+                color=stencil_labels[str(val)],
+                fontsize=7,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                zorder=5,
+            )
+
+    # Legend for stencil values
+    ax_s.text(
+        4.0,
+        0.15,
+        "8-bit integer (0-255)",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="center",
+        va="bottom",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Annotation linking depth and stencil
+    fig.text(
+        0.65,
+        0.02,
+        "Depth + Stencil share one texture: D24_UNORM_S8_UINT  "
+        "(24-bit depth + 8-bit stencil)",
+        color=STYLE["warn"],
+        fontsize=10,
+        fontweight="bold",
+        ha="center",
+        va="bottom",
+        path_effects=stroke,
+    )
+
+    fig.suptitle(
+        "Framebuffer Attachments",
+        color=STYLE["text"],
+        fontsize=16,
+        fontweight="bold",
+        y=0.98,
+    )
+    fig.tight_layout(rect=[0, 0.06, 1, 0.94])
+    save(fig, "gpu/34-stencil-testing", "stencil_buffer_concept.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/34-stencil-testing — stencil_test_pipeline.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_stencil_test_pipeline():
+    """Fragment pipeline flow with stencil test branching and comparison formula."""
+    from matplotlib.patches import FancyBboxPatch
+
+    fig, ax = plt.subplots(1, 1, figsize=(14, 7), facecolor=STYLE["bg"])
+    setup_axes(ax, xlim=(0, 14), ylim=(0, 8), grid=False, aspect=None)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+    stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
+
+    def draw_box(cx, cy, w, h, label, color, fontsize=10, fc=None):
+        facecolor = fc if fc else STYLE["surface"]
+        rect = FancyBboxPatch(
+            (cx - w / 2, cy - h / 2),
+            w,
+            h,
+            boxstyle="round,pad=0.1",
+            facecolor=facecolor,
+            edgecolor=color,
+            linewidth=2.5,
+            zorder=2,
+        )
+        ax.add_patch(rect)
+        ax.text(
+            cx,
+            cy,
+            label,
+            color=color,
+            fontsize=fontsize,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke,
+            zorder=5,
+        )
+
+    def draw_arrow(x1, y1, x2, y2, color, label=None, label_pos=None):
+        ax.annotate(
+            "",
+            xy=(x2, y2),
+            xytext=(x1, y1),
+            arrowprops={
+                "arrowstyle": "->,head_width=0.35,head_length=0.18",
+                "color": color,
+                "lw": 2.2,
+            },
+            zorder=3,
+        )
+        if label and label_pos:
+            ax.text(
+                label_pos[0],
+                label_pos[1],
+                label,
+                color=color,
+                fontsize=8,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                path_effects=stroke_thin,
+                zorder=5,
+            )
+
+    # Main pipeline boxes
+    draw_box(1.5, 6.0, 2.2, 1.0, "Fragment", STYLE["accent1"])
+    draw_box(4.8, 6.0, 2.4, 1.0, "Stencil Test", STYLE["accent2"])
+    draw_box(8.5, 6.0, 2.2, 1.0, "Depth Test", STYLE["accent3"])
+    draw_box(12.0, 6.0, 2.2, 1.0, "Color Write", STYLE["warn"])
+
+    # Main flow arrows
+    draw_arrow(2.6, 6.0, 3.6, 6.0, STYLE["text_dim"])
+    draw_arrow(6.0, 6.0, 7.4, 6.0, STYLE["text_dim"], "PASS", (6.7, 6.3))
+    draw_arrow(9.6, 6.0, 10.9, 6.0, STYLE["text_dim"], "PASS", (10.25, 6.3))
+
+    # Stencil test branches
+    # Fail branch (down-left)
+    draw_arrow(4.0, 5.5, 2.5, 4.0, STYLE["accent2"], "FAIL", (3.0, 4.9))
+    draw_box(2.5, 3.3, 2.0, 0.9, "fail_op", STYLE["accent2"], fontsize=9)
+
+    # Depth fail branch (down-center)
+    draw_arrow(8.5, 5.5, 7.0, 4.0, STYLE["accent3"], "DEPTH\nFAIL", (7.5, 4.8))
+    draw_box(7.0, 3.3, 2.2, 0.9, "depth_fail_op", STYLE["accent3"], fontsize=9)
+
+    # Both pass branch (down-right)
+    draw_arrow(9.6, 5.5, 11.0, 4.0, STYLE["warn"], "BOTH\nPASS", (10.5, 4.8))
+    draw_box(11.0, 3.3, 2.0, 0.9, "pass_op", STYLE["warn"], fontsize=9)
+
+    # Comparison formula
+    formula_y = 1.6
+    ax.text(
+        7.0,
+        formula_y + 0.6,
+        "Comparison Formula:",
+        color=STYLE["text"],
+        fontsize=11,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax.text(
+        7.0,
+        formula_y,
+        "(stencil_buffer & compare_mask)  OP  (ref & compare_mask)",
+        color=STYLE["accent1"],
+        fontsize=11,
+        fontweight="bold",
+        fontfamily="monospace",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Operations list
+    ops_text = (
+        "Operations:  KEEP | ZERO | REPLACE | INCREMENT_AND_CLAMP | "
+        "DECREMENT_AND_CLAMP | INVERT | INCREMENT_AND_WRAP | DECREMENT_AND_WRAP"
+    )
+    ax.text(
+        7.0,
+        0.5,
+        ops_text,
+        color=STYLE["text_dim"],
+        fontsize=7.5,
+        ha="center",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    fig.suptitle(
+        "Stencil Test Pipeline",
+        color=STYLE["text"],
+        fontsize=16,
+        fontweight="bold",
+        y=0.97,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    save(fig, "gpu/34-stencil-testing", "stencil_test_pipeline.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/34-stencil-testing — portal_technique.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_portal_technique():
+    """4-panel portal rendering steps using stencil masking."""
+    from matplotlib.patches import Rectangle
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10), facecolor=STYLE["bg"])
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+
+    panel_info = [
+        ("1. Write Stencil Mask", "Portal rect = stencil 1"),
+        ("2. Draw Portal World (stencil==1)", "Objects inside portal only"),
+        ("3. Draw Main World (stencil!=1)", "Objects outside portal only"),
+        ("4. Final Composite", "Portal frame overlay"),
+    ]
+
+    for idx, ax in enumerate(axes.flat):
+        setup_axes(ax, xlim=(0, 10), ylim=(0, 8), grid=False, aspect="equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        title, subtitle = panel_info[idx]
+        ax.set_title(title, color=STYLE["text"], fontsize=11, fontweight="bold", pad=12)
+        ax.text(
+            5.0,
+            0.3,
+            subtitle,
+            color=STYLE["text_dim"],
+            fontsize=8,
+            ha="center",
+            va="center",
+            path_effects=stroke,
+            zorder=5,
+        )
+
+    # Panel 1: Stencil mask — dark bg with red portal region
+    ax1 = axes[0, 0]
+    bg = Rectangle(
+        (0.2, 0.6),
+        9.6,
+        7.0,
+        facecolor=STYLE["bg"],
+        edgecolor=STYLE["grid"],
+        linewidth=1.5,
+        zorder=1,
+    )
+    ax1.add_patch(bg)
+    portal_mask = Rectangle(
+        (3.0, 2.5),
+        4.0,
+        3.5,
+        facecolor=STYLE["accent2"],
+        edgecolor=STYLE["accent2"],
+        linewidth=2,
+        alpha=0.8,
+        zorder=2,
+    )
+    ax1.add_patch(portal_mask)
+    ax1.text(
+        5.0,
+        4.25,
+        "stencil = 1",
+        color=STYLE["warn"],
+        fontsize=11,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax1.text(
+        1.5,
+        6.5,
+        "0",
+        color=STYLE["text_dim"],
+        fontsize=14,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Panel 2: Portal world — objects only inside portal rect
+    ax2 = axes[0, 1]
+    bg2 = Rectangle(
+        (0.2, 0.6),
+        9.6,
+        7.0,
+        facecolor=STYLE["bg"],
+        edgecolor=STYLE["grid"],
+        linewidth=1.5,
+        zorder=1,
+    )
+    ax2.add_patch(bg2)
+    portal_view = Rectangle(
+        (3.0, 2.5),
+        4.0,
+        3.5,
+        facecolor=STYLE["surface"],
+        edgecolor=STYLE["accent2"],
+        linewidth=1.5,
+        alpha=0.6,
+        zorder=2,
+    )
+    ax2.add_patch(portal_view)
+    # Objects in portal world
+    p_obj1 = Rectangle(
+        (3.5, 3.0),
+        1.5,
+        1.2,
+        facecolor=STYLE["accent2"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        alpha=0.9,
+        zorder=3,
+    )
+    p_obj2 = Rectangle(
+        (5.2, 4.0),
+        1.2,
+        1.5,
+        facecolor=STYLE["accent4"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        alpha=0.9,
+        zorder=3,
+    )
+    ax2.add_patch(p_obj1)
+    ax2.add_patch(p_obj2)
+
+    # Panel 3: Main world — objects only outside portal
+    ax3 = axes[1, 0]
+    bg3 = Rectangle(
+        (0.2, 0.6),
+        9.6,
+        7.0,
+        facecolor=STYLE["surface"],
+        edgecolor=STYLE["grid"],
+        linewidth=1.5,
+        zorder=1,
+    )
+    ax3.add_patch(bg3)
+    # Blocked portal region
+    portal_block = Rectangle(
+        (3.0, 2.5),
+        4.0,
+        3.5,
+        facecolor=STYLE["bg"],
+        edgecolor=STYLE["accent2"],
+        linewidth=1.5,
+        linestyle="--",
+        alpha=0.6,
+        zorder=2,
+    )
+    ax3.add_patch(portal_block)
+    ax3.text(
+        5.0,
+        4.25,
+        "blocked",
+        color=STYLE["text_dim"],
+        fontsize=9,
+        fontstyle="italic",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    # Main world objects outside portal
+    m_obj1 = Rectangle(
+        (0.8, 5.0),
+        1.8,
+        1.5,
+        facecolor=STYLE["accent1"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        alpha=0.9,
+        zorder=3,
+    )
+    m_obj2 = Rectangle(
+        (7.5, 1.5),
+        1.8,
+        2.0,
+        facecolor=STYLE["accent3"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        alpha=0.9,
+        zorder=3,
+    )
+    ax3.add_patch(m_obj1)
+    ax3.add_patch(m_obj2)
+
+    # Panel 4: Final composite
+    ax4 = axes[1, 1]
+    bg4 = Rectangle(
+        (0.2, 0.6),
+        9.6,
+        7.0,
+        facecolor=STYLE["surface"],
+        edgecolor=STYLE["grid"],
+        linewidth=1.5,
+        zorder=1,
+    )
+    ax4.add_patch(bg4)
+    # Portal with inner world
+    portal_inner = Rectangle(
+        (3.0, 2.5),
+        4.0,
+        3.5,
+        facecolor=STYLE["surface"],
+        edgecolor=STYLE["accent4"],
+        linewidth=3,
+        alpha=0.6,
+        zorder=2,
+    )
+    ax4.add_patch(portal_inner)
+    # Portal world objects
+    f_p1 = Rectangle(
+        (3.5, 3.0),
+        1.5,
+        1.2,
+        facecolor=STYLE["accent2"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        alpha=0.9,
+        zorder=3,
+    )
+    f_p2 = Rectangle(
+        (5.2, 4.0),
+        1.2,
+        1.5,
+        facecolor=STYLE["accent4"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        alpha=0.9,
+        zorder=3,
+    )
+    ax4.add_patch(f_p1)
+    ax4.add_patch(f_p2)
+    # Main world objects
+    f_m1 = Rectangle(
+        (0.8, 5.0),
+        1.8,
+        1.5,
+        facecolor=STYLE["accent1"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        alpha=0.9,
+        zorder=3,
+    )
+    f_m2 = Rectangle(
+        (7.5, 1.5),
+        1.8,
+        2.0,
+        facecolor=STYLE["accent3"],
+        edgecolor=STYLE["text"],
+        linewidth=1,
+        alpha=0.9,
+        zorder=3,
+    )
+    ax4.add_patch(f_m1)
+    ax4.add_patch(f_m2)
+    # Portal frame
+    portal_frame = Rectangle(
+        (2.9, 2.4),
+        4.2,
+        3.7,
+        facecolor="none",
+        edgecolor=STYLE["warn"],
+        linewidth=3.5,
+        zorder=4,
+    )
+    ax4.add_patch(portal_frame)
+    ax4.text(
+        5.0,
+        6.5,
+        "portal frame",
+        color=STYLE["warn"],
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    fig.suptitle(
+        "Portal Rendering with Stencil Masking",
+        color=STYLE["text"],
+        fontsize=16,
+        fontweight="bold",
+        y=0.98,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    save(fig, "gpu/34-stencil-testing", "portal_technique.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/34-stencil-testing — outline_technique.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_outline_technique():
+    """3-panel outline rendering: draw with stencil, scaled draw, final result."""
+    from matplotlib.patches import FancyBboxPatch, Rectangle
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5.5), facecolor=STYLE["bg"])
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+
+    panel_info = [
+        "1. Draw Object, Stencil=1",
+        "2. Draw Scaled, Stencil!=1",
+        "3. Final Result",
+    ]
+
+    for idx, ax in enumerate(axes):
+        setup_axes(ax, xlim=(0, 10), ylim=(0, 8), grid=False, aspect="equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(
+            panel_info[idx], color=STYLE["text"], fontsize=11, fontweight="bold", pad=12
+        )
+
+    # Panel 1: Object drawn, stencil written
+    ax1 = axes[0]
+    bg1 = Rectangle(
+        (0.2, 0.2),
+        9.6,
+        7.6,
+        facecolor=STYLE["bg"],
+        edgecolor=STYLE["grid"],
+        linewidth=1.5,
+        zorder=1,
+    )
+    ax1.add_patch(bg1)
+    # Cube-like shape
+    cube1 = FancyBboxPatch(
+        (3.0, 2.5),
+        4.0,
+        3.5,
+        boxstyle="round,pad=0.15",
+        facecolor=STYLE["accent1"],
+        edgecolor=STYLE["text"],
+        linewidth=1.5,
+        alpha=0.9,
+        zorder=2,
+    )
+    ax1.add_patch(cube1)
+    ax1.text(
+        5.0,
+        4.25,
+        "Object",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    # Stencil annotation
+    ax1.text(
+        5.0,
+        1.2,
+        "stencil = 1 where drawn",
+        color=STYLE["accent2"],
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Panel 2: Scaled object, only border passes
+    ax2 = axes[1]
+    bg2 = Rectangle(
+        (0.2, 0.2),
+        9.6,
+        7.6,
+        facecolor=STYLE["bg"],
+        edgecolor=STYLE["grid"],
+        linewidth=1.5,
+        zorder=1,
+    )
+    ax2.add_patch(bg2)
+    # Larger outline shape (scaled)
+    outer = FancyBboxPatch(
+        (2.2, 1.7),
+        5.6,
+        5.1,
+        boxstyle="round,pad=0.15",
+        facecolor=STYLE["accent2"],
+        edgecolor=STYLE["accent2"],
+        linewidth=2,
+        alpha=0.4,
+        zorder=2,
+    )
+    ax2.add_patch(outer)
+    # Inner blocked area (stencil==1)
+    inner = FancyBboxPatch(
+        (3.0, 2.5),
+        4.0,
+        3.5,
+        boxstyle="round,pad=0.15",
+        facecolor=STYLE["bg"],
+        edgecolor=STYLE["text_dim"],
+        linewidth=1.5,
+        linestyle="--",
+        alpha=0.8,
+        zorder=3,
+    )
+    ax2.add_patch(inner)
+    ax2.text(
+        5.0,
+        4.25,
+        "blocked\n(stencil==1)",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        fontstyle="italic",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax2.text(
+        5.0,
+        1.0,
+        "only border ring passes",
+        color=STYLE["accent2"],
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Panel 3: Final result — object with outline
+    ax3 = axes[2]
+    bg3 = Rectangle(
+        (0.2, 0.2),
+        9.6,
+        7.6,
+        facecolor=STYLE["bg"],
+        edgecolor=STYLE["grid"],
+        linewidth=1.5,
+        zorder=1,
+    )
+    ax3.add_patch(bg3)
+    # Outline ring
+    outline = FancyBboxPatch(
+        (2.2, 1.7),
+        5.6,
+        5.1,
+        boxstyle="round,pad=0.15",
+        facecolor=STYLE["accent2"],
+        edgecolor=STYLE["accent2"],
+        linewidth=2,
+        alpha=0.5,
+        zorder=2,
+    )
+    ax3.add_patch(outline)
+    # Object on top
+    cube3 = FancyBboxPatch(
+        (3.0, 2.5),
+        4.0,
+        3.5,
+        boxstyle="round,pad=0.15",
+        facecolor=STYLE["accent1"],
+        edgecolor=STYLE["text"],
+        linewidth=1.5,
+        alpha=0.95,
+        zorder=3,
+    )
+    ax3.add_patch(cube3)
+    ax3.text(
+        5.0,
+        4.25,
+        "Object",
+        color=STYLE["text"],
+        fontsize=12,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax3.text(
+        5.0,
+        1.0,
+        "object + colored outline",
+        color=STYLE["warn"],
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    fig.suptitle(
+        "Object Outline via Stencil Testing",
+        color=STYLE["text"],
+        fontsize=16,
+        fontweight="bold",
+        y=0.99,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    save(fig, "gpu/34-stencil-testing", "outline_technique.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/34-stencil-testing — stencil_operations.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_stencil_operations():
+    """Visual reference of all 8 stencil operations with before/after values."""
+    from matplotlib.patches import FancyBboxPatch
+
+    fig, ax = plt.subplots(1, 1, figsize=(14, 8), facecolor=STYLE["bg"])
+    setup_axes(ax, xlim=(0, 14), ylim=(0, 9.5), grid=False, aspect=None)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
+    stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
+
+    operations = [
+        ("KEEP", "42", "42", "Value unchanged"),
+        ("ZERO", "42", "0", "Always zero"),
+        ("REPLACE", "42", "ref", "Set to reference (ref=42)"),
+        ("INCREMENT_AND_CLAMP", "254", "255", "254+1=255; 255+1=255 (clamped)"),
+        ("DECREMENT_AND_CLAMP", "1", "0", "1-1=0; 0-1=0 (clamped)"),
+        ("INVERT", "0x0F", "0xF0", "Bitwise NOT"),
+        ("INCREMENT_AND_WRAP", "255", "0", "255+1=0 (wraps)"),
+        ("DECREMENT_AND_WRAP", "0", "255", "0-1=255 (wraps)"),
+    ]
+
+    colors_cycle = [
+        STYLE["accent1"],
+        STYLE["accent2"],
+        STYLE["accent3"],
+        STYLE["accent4"],
+        STYLE["warn"],
+        STYLE["accent1"],
+        STYLE["accent2"],
+        STYLE["accent3"],
+    ]
+
+    # Header
+    ax.text(
+        1.5,
+        9.0,
+        "Operation",
+        color=STYLE["text"],
+        fontsize=11,
+        fontweight="bold",
+        ha="left",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax.text(
+        6.5,
+        9.0,
+        "Before",
+        color=STYLE["text"],
+        fontsize=11,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax.text(
+        8.5,
+        9.0,
+        "",
+        color=STYLE["text_dim"],
+        fontsize=11,
+        ha="center",
+        va="center",
+        zorder=5,
+    )
+    ax.text(
+        10.5,
+        9.0,
+        "After",
+        color=STYLE["text"],
+        fontsize=11,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+    ax.text(
+        13.0,
+        9.0,
+        "Notes",
+        color=STYLE["text_dim"],
+        fontsize=10,
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    # Divider line
+    ax.plot([0.3, 13.7], [8.5, 8.5], color=STYLE["grid"], linewidth=1.5, zorder=2)
+
+    row_height = 1.0
+    for i, (name, before, after, note) in enumerate(operations):
+        y = 8.0 - i * row_height
+        color = colors_cycle[i]
+
+        # Operation name
+        ax.text(
+            1.5,
+            y,
+            name,
+            color=color,
+            fontsize=9,
+            fontweight="bold",
+            fontfamily="monospace",
+            ha="left",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+
+        # Before box
+        before_rect = FancyBboxPatch(
+            (5.7, y - 0.3),
+            1.6,
+            0.6,
+            boxstyle="round,pad=0.05",
+            facecolor=STYLE["surface"],
+            edgecolor=color,
+            linewidth=1.5,
+            zorder=2,
+        )
+        ax.add_patch(before_rect)
+        ax.text(
+            6.5,
+            y,
+            before,
+            color=color,
+            fontsize=10,
+            fontweight="bold",
+            fontfamily="monospace",
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+
+        # Arrow
+        ax.annotate(
+            "",
+            xy=(9.7, y),
+            xytext=(7.5, y),
+            arrowprops={
+                "arrowstyle": "->,head_width=0.25,head_length=0.12",
+                "color": STYLE["text_dim"],
+                "lw": 1.8,
+            },
+            zorder=3,
+        )
+
+        # After box
+        after_rect = FancyBboxPatch(
+            (9.7, y - 0.3),
+            1.6,
+            0.6,
+            boxstyle="round,pad=0.05",
+            facecolor=STYLE["surface"],
+            edgecolor=color,
+            linewidth=1.5,
+            zorder=2,
+        )
+        ax.add_patch(after_rect)
+        ax.text(
+            10.5,
+            y,
+            after,
+            color=color,
+            fontsize=10,
+            fontweight="bold",
+            fontfamily="monospace",
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+
+        # Note
+        ax.text(
+            13.0,
+            y,
+            note,
+            color=STYLE["text_dim"],
+            fontsize=7,
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+            style="italic",
+        )
+
+    # Reference value annotation
+    ax.text(
+        7.0,
+        0.3,
+        "Reference value (ref) = 42 for REPLACE examples",
+        color=STYLE["warn"],
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        path_effects=stroke,
+        zorder=5,
+    )
+
+    fig.suptitle(
+        "Stencil Operations Reference",
+        color=STYLE["text"],
+        fontsize=16,
+        fontweight="bold",
+        y=0.97,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    save(fig, "gpu/34-stencil-testing", "stencil_operations.png")
+
+
+# ---------------------------------------------------------------------------
+# gpu/34-stencil-testing — draw_order_stencil.png
+# ---------------------------------------------------------------------------
+
+
+def diagram_draw_order_stencil():
+    """Timeline showing complete frame draw order with stencil state annotations."""
+    from matplotlib.patches import FancyBboxPatch
+
+    fig, ax = plt.subplots(1, 1, figsize=(16, 5), facecolor=STYLE["bg"])
+    setup_axes(ax, xlim=(0, 18), ylim=(0, 5.5), grid=False, aspect=None)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
+
+    # Timeline axis
+    ax.plot([0.5, 17.5], [2.8, 2.8], color=STYLE["grid"], linewidth=2, zorder=1)
+    ax.annotate(
+        "",
+        xy=(17.8, 2.8),
+        xytext=(17.2, 2.8),
+        arrowprops={
+            "arrowstyle": "->,head_width=0.2,head_length=0.1",
+            "color": STYLE["grid"],
+            "lw": 2,
+        },
+        zorder=1,
+    )
+    ax.text(
+        17.8,
+        2.4,
+        "time",
+        color=STYLE["text_dim"],
+        fontsize=8,
+        ha="right",
+        va="top",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    passes = [
+        ("Shadow\nPass", STYLE["text_dim"], "depth only", 1.2),
+        ("Portal\nMask", STYLE["accent2"], "stencil=1\nno color", 3.3),
+        ("Portal\nWorld", STYLE["accent2"], "stencil==1", 5.4),
+        ("Main\nWorld", STYLE["accent1"], "stencil!=1", 7.5),
+        ("Grid\nFloor", STYLE["accent3"], "always", 9.6),
+        ("Portal\nFrame", STYLE["accent4"], "always", 11.7),
+        ("Outline\nPass", STYLE["warn"], "replace\nthen !=", 13.8),
+        ("Debug\nOverlay", STYLE["text_dim"], "if toggled", 15.9),
+    ]
+
+    box_w = 1.8
+    box_h = 1.6
+    for label, color, annotation, x in passes:
+        rect = FancyBboxPatch(
+            (x - box_w / 2, 2.8 + 0.3),
+            box_w,
+            box_h,
+            boxstyle="round,pad=0.1",
+            facecolor=STYLE["surface"],
+            edgecolor=color,
+            linewidth=2.2,
+            zorder=2,
+        )
+        ax.add_patch(rect)
+        ax.text(
+            x,
+            2.8 + 0.3 + box_h / 2,
+            label,
+            color=color,
+            fontsize=8,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+        # Stencil annotation below timeline
+        ax.text(
+            x,
+            2.3,
+            annotation,
+            color=color,
+            fontsize=6.5,
+            ha="center",
+            va="top",
+            path_effects=stroke_thin,
+            zorder=5,
+            fontstyle="italic",
+        )
+        # Tick mark on timeline
+        ax.plot([x, x], [2.65, 2.95], color=color, linewidth=2, zorder=2)
+
+    # Pass number labels
+    for i, (_, color, _, x) in enumerate(passes):
+        ax.text(
+            x,
+            4.9,
+            str(i + 1),
+            color=color,
+            fontsize=9,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            path_effects=stroke_thin,
+            zorder=5,
+        )
+
+    ax.text(
+        0.5,
+        4.9,
+        "Pass #",
+        color=STYLE["text_dim"],
+        fontsize=9,
+        ha="left",
+        va="center",
+        path_effects=stroke_thin,
+        zorder=5,
+    )
+
+    fig.suptitle(
+        "Frame Draw Order with Stencil State",
+        color=STYLE["text"],
+        fontsize=15,
+        fontweight="bold",
+        y=0.97,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.92])
+    save(fig, "gpu/34-stencil-testing", "draw_order_stencil.png")
