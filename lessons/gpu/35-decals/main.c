@@ -107,11 +107,11 @@
 #define DECAL_DEPTH_RATIO  0.6f     /* projection depth relative to width */
 
 /* Initial camera */
-#define CAM_START_X        2.0f
-#define CAM_START_Y        2.5f
-#define CAM_START_Z        6.0f
-#define CAM_START_YAW     -0.3f     /* initial horizontal rotation (radians) */
-#define CAM_START_PITCH   -0.2f     /* initial vertical rotation (radians) */
+#define CAM_START_X        0.0f
+#define CAM_START_Y        4.0f
+#define CAM_START_Z       10.0f
+#define CAM_START_YAW      0.0f     /* initial horizontal rotation (radians) */
+#define CAM_START_PITCH   -0.3f     /* initial vertical rotation (radians) */
 
 /* Decal system */
 #define MAX_DECALS         120
@@ -373,6 +373,9 @@ static SDL_GPUBuffer *upload_gpu_buffer(
 
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("ERROR: SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUBuffer(device, buffer);
+        return NULL;
     }
     SDL_ReleaseGPUTransferBuffer(device, xfer);
 
@@ -452,6 +455,9 @@ static SDL_GPUTexture *upload_texture_rgba(
 
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         SDL_Log("ERROR: SDL_SubmitGPUCommandBuffer failed: %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(device, xfer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return NULL;
     }
     SDL_ReleaseGPUTransferBuffer(device, xfer);
 
@@ -824,10 +830,24 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
             SDL_GPU_TEXTUREUSAGE_SAMPLER)) {
         state->depth_stencil_fmt = SDL_GPU_TEXTUREFORMAT_D32_FLOAT_S8_UINT;
         SDL_Log("Depth format: D32_FLOAT_S8_UINT (fallback, with SAMPLER)");
-    } else {
+    } else if (SDL_GPUTextureSupportsFormat(device,
+            SDL_GPU_TEXTUREFORMAT_D32_FLOAT,
+            SDL_GPU_TEXTURETYPE_2D,
+            SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET |
+            SDL_GPU_TEXTUREUSAGE_SAMPLER)) {
         /* Last resort: D32_FLOAT without stencil */
         state->depth_stencil_fmt = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
         SDL_Log("Depth format: D32_FLOAT (no stencil, fallback)");
+    } else {
+        SDL_Log("ERROR: No depth format supports DEPTH_STENCIL_TARGET | SAMPLER");
+        SDL_ReleaseGPUBuffer(device, state->suzanne_ib);
+        SDL_ReleaseGPUBuffer(device, state->suzanne_vb);
+        forge_gltf_free(&state->gltf_scene);
+        SDL_ReleaseWindowFromGPUDevice(device, window);
+        SDL_DestroyWindow(window);
+        SDL_DestroyGPUDevice(device);
+        SDL_free(state);
+        return SDL_APP_FAILURE;
     }
 
     /* ── 4. Depth textures ───────────────────────────────────────────── */
@@ -1245,12 +1265,21 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     /* ── 13. Scene objects (Suzanne instances) ───────────────────────── */
 
-    state->suzannes[0] = (SceneObject){ vec3_create( 0.0f, 1.0f,  0.0f), 1.0f, 0.0f };
-    state->suzannes[1] = (SceneObject){ vec3_create( 3.0f, 1.0f, -2.0f), 0.8f, 0.7f };
-    state->suzannes[2] = (SceneObject){ vec3_create(-3.0f, 1.0f, -1.0f), 1.2f, 2.1f };
-    state->suzannes[3] = (SceneObject){ vec3_create( 1.5f, 1.0f,  3.5f), 0.9f, 4.0f };
-    state->suzannes[4] = (SceneObject){ vec3_create(-2.0f, 1.0f,  3.0f), 1.1f, 1.5f };
-    state->suzannes[5] = (SceneObject){ vec3_create( 0.0f, 1.0f, -4.0f), 0.7f, 3.2f };
+    /* Arrange Suzannes in a ring around the origin so the camera can see all */
+    {
+        const float ring_radius = 3.5f;
+        const float base_scales[SUZANNE_COUNT] = { 1.0f, 0.8f, 1.2f, 0.9f, 1.1f, 0.7f };
+        for (int i = 0; i < SUZANNE_COUNT; i++) {
+            float angle = (float)i / (float)SUZANNE_COUNT * 2.0f * 3.14159265f;
+            float x = ring_radius * sinf(angle);
+            float z = ring_radius * cosf(angle);
+            /* Face each Suzanne toward the center */
+            float face_angle = angle + 3.14159265f;
+            state->suzannes[i] = (SceneObject){
+                vec3_create(x, 1.0f, z), base_scales[i], face_angle
+            };
+        }
+    }
 
     /* ── 14. Generate decals ─────────────────────────────────────────── */
 

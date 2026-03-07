@@ -17693,11 +17693,18 @@ def diagram_decal_box_projection():
     # --- Wireframe OBB (oriented bounding box) ---
     box_hw, box_hh = 1.2, 1.4  # half-width, half-height
     box_cy = 0.5
+    # Rotate the box to show it is oriented (not axis-aligned)
+    obb_theta = 0.2  # radians (~11 degrees)
+    cos_t, sin_t = np.cos(obb_theta), np.sin(obb_theta)
+    box_corners_local = [
+        (-box_hw, -box_hh),
+        (box_hw, -box_hh),
+        (box_hw, box_hh),
+        (-box_hw, box_hh),
+    ]
     box_corners = [
-        (-box_hw, box_cy - box_hh),
-        (box_hw, box_cy - box_hh),
-        (box_hw, box_cy + box_hh),
-        (-box_hw, box_cy + box_hh),
+        (cos_t * x - sin_t * y, sin_t * x + cos_t * y + box_cy)
+        for x, y in box_corners_local
     ]
     # Draw wireframe box
     for i in range(4):
@@ -17711,9 +17718,11 @@ def diagram_decal_box_projection():
             linestyle="--",
             zorder=4,
         )
+    # Label at top-right corner
+    label_x, label_y = box_corners[2]
     ax.text(
-        box_hw + 0.15,
-        box_cy + box_hh,
+        label_x + 0.15,
+        label_y,
         "OBB",
         color=STYLE["accent1"],
         fontsize=11,
@@ -17728,17 +17737,19 @@ def diagram_decal_box_projection():
     n_rays = 7
     ray_xs = np.linspace(-box_hw + 0.15, box_hw - 0.15, n_rays)
     for rx in ray_xs:
-        ry_top = box_cy + box_hh
-        ry_hit = -0.12 * rx**2 - 0.8
+        # Rotate ray origin through OBB orientation
+        rx_rot = cos_t * rx - sin_t * box_hh
+        ry_top = sin_t * rx + cos_t * box_hh + box_cy
+        ry_hit = -0.12 * rx_rot**2 - 0.8
         ax.plot(
-            [rx, rx],
+            [rx_rot, rx_rot],
             [ry_top, ry_hit],
             color=STYLE["accent4"],
             linewidth=1,
             alpha=0.5,
             zorder=3,
         )
-        ax.plot(rx, ry_hit, "o", color=STYLE["accent2"], markersize=4, zorder=5)
+        ax.plot(rx_rot, ry_hit, "o", color=STYLE["accent2"], markersize=4, zorder=5)
 
     # Arrow label for projection direction
     ax.annotate(
@@ -18143,7 +18154,7 @@ def diagram_decal_local_space():
     ax.text(
         0.0,
         1.85,
-        "Bounds check:  abs(local.x) < 0.5  &&  abs(local.z) < 0.5",
+        "Bounds check:  abs(local.x) < 0.5  &&  abs(local.y) < 0.5  &&  abs(local.z) < 0.5",
         color=STYLE["text"],
         fontsize=10,
         fontfamily="monospace",
@@ -18462,18 +18473,21 @@ def diagram_back_face_culling_decals():
         )
         ax.add_patch(box_rect)
 
-        # Front face (left wall when camera is on right)
+        # Determine which face to highlight based on the label
         front_face_x = box_x + box_w
         back_face_x = box_x
+        is_back_face = "back face" in face_label
+        highlighted_x = back_face_x if is_back_face else front_face_x
+        other_x = front_face_x if is_back_face else back_face_x
         ax.plot(
-            [front_face_x, front_face_x],
+            [highlighted_x, highlighted_x],
             [box_y, box_y + box_h],
             color=face_color,
             linewidth=3.5,
             zorder=4,
         )
         ax.text(
-            front_face_x + 0.1,
+            highlighted_x + (-0.1 if is_back_face else 0.1),
             box_y + box_h + 0.15,
             face_label,
             color=face_color,
@@ -18485,14 +18499,14 @@ def diagram_back_face_culling_decals():
             zorder=5,
         )
 
-        # Back face (far wall)
-        back_color = (
+        # Other face (dimmed)
+        other_color = (
             STYLE["accent3"] if face_color != STYLE["accent3"] else STYLE["text_dim"]
         )
         ax.plot(
-            [back_face_x, back_face_x],
+            [other_x, other_x],
             [box_y, box_y + box_h],
-            color=back_color,
+            color=other_color,
             linewidth=2,
             linestyle="--",
             zorder=3,
