@@ -85,7 +85,7 @@ before checking depth:
 The comparison evaluates:
 
 $$
-(\text{buffer\_value} \mathbin{\&} \text{compare\_mask}) \;\text{COMPARE\_OP}\; (\text{reference} \mathbin{\&} \text{compare\_mask})
+(\text{buffer}\_\text{value} \mathbin{\&} \text{compare}\_\text{mask}) \enspace \text{COMPARE}\_\text{OP} \enspace (\text{reference} \mathbin{\&} \text{compare}\_\text{mask})
 $$
 
 where `buffer_value` is the current stencil value at this pixel, `reference`
@@ -236,7 +236,7 @@ pixels between the original silhouette and the scaled silhouette, because the
 original object's pixels already have stencil value 2 and fail the NOT_EQUAL
 test. Depth writes are disabled so the outline does not occlude other objects.
 
-The result is a solid colored border exactly where the scaled object extends
+The result is a solid-colored border exactly where the scaled object extends
 beyond the original.
 
 ## Draw order

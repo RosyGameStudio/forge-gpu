@@ -17193,13 +17193,7 @@ def diagram_draw_order_stencil():
 
 
 def diagram_phase_ordering():
-    """Side-by-side comparison of wrong vs correct stencil/depth phase order.
-
-    Shows how drawing the portal mask before opaque cubes allows the portal
-    to bleed through closer geometry (the bug), and how reversing the order
-    fixes it by letting the depth buffer prevent stencil writes behind
-    closer objects.
-    """
+    """Compare wrong vs correct stencil/depth phase ordering for portals."""
     from matplotlib.patches import FancyBboxPatch, Rectangle
 
     fig, (ax_bad, ax_good) = plt.subplots(2, 1, figsize=(14, 9), facecolor=STYLE["bg"])
@@ -17552,10 +17546,9 @@ def diagram_phase_ordering():
                 "cube_z": 2,
             },
             {
-                "label": "Phase B: Cube rejected by stencil!=1",
+                "label": "Phase B: Cube skipped — depth not yet written",
                 "label_color": STYLE["accent2"],
                 "show_mask": True,
-                "show_stencil_cone": True,
                 "show_rejected": True,
                 "cube_style": "dashed",
                 "cube_alpha": 0.3,

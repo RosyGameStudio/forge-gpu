@@ -76,20 +76,21 @@ The reference value is set per-draw call:
 SDL_SetGPUStencilReference(render_pass, reference_value);
 ```
 
-## Portal technique (4 pipelines)
+## Portal technique (4 passes)
 
-1. **Mask pipeline** — Write stencil, no color/depth:
+1. **Main world pass** — Draw regular scene geometry first:
+   - Stencil test disabled, normal depth write
+   - Establishes depth so the mask respects occlusion
+
+2. **Mask pipeline** — Write stencil, no color/depth:
    - `compare_op = ALWAYS`, `pass_op = REPLACE`, ref = 1
    - Color write mask = 0, depth write = false
    - Draw an invisible quad filling the portal opening
+   - Depth test still active — mask only writes where no closer geometry exists
 
-2. **Portal world pipeline** — Draw inside portal only:
+3. **Portal world pipeline** — Draw inside portal only:
    - `compare_op = EQUAL`, ref = 1, `pass_op = KEEP`
    - Draw alternate-world objects (only pass where stencil == 1)
-
-3. **Main world pipeline** — Draw outside portal only:
-   - `compare_op = NOT_EQUAL`, ref = 1, `pass_op = KEEP`
-   - Draw normal scene objects (only pass where stencil != 1)
 
 4. **Frame pipeline** — Draw portal frame geometry:
    - Stencil test disabled or `compare_op = ALWAYS`
@@ -161,9 +162,10 @@ SDL_GPUColorTargetDescription ctd = {
 - **Forgetting to clear stencil** — Set `stencil_load_op = SDL_GPU_LOADOP_CLEAR`
   and `clear_stencil = 0` on the depth-stencil target info. Without this,
   stale stencil values from the previous frame cause artifacts.
-- **Wrong draw order** — The stencil mask must be written before any geometry
-  that tests against it. Outline writes must happen after the main world so
-  the outline reference value does not collide with the portal reference.
+- **Wrong draw order** — Main-world occluders must render before the portal
+  mask so the depth buffer is established. The mask then only writes stencil
+  where no closer geometry exists. Outline writes must happen after the main
+  world so the outline reference value does not collide with the portal reference.
 - **Not disabling depth writes for mask** — The mask quad must not write depth,
   or it will occlude objects drawn behind it in the portal world.
 - **Forgetting to set both front and back stencil** — If back-face culling is

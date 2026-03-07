@@ -27,10 +27,11 @@ with AI when they understand what they're building.
 
 ### GPU Lessons (lessons/gpu/)
 
-The core rendering track. Start with a triangle, end with skeletal animations.
-Every lesson is a standalone C program introducing one SDL GPU concept:
-pipelines, textures, depth buffers, lighting, shadows, compute shaders,
-HDR, post-processing, UI rendering, and animations.
+The core rendering track. Start with a triangle, build up to skeletal animations,
+stencil effects, and beyond. Every lesson is a standalone C program introducing
+one SDL GPU concept: pipelines, textures, depth buffers, lighting, shadows,
+compute shaders, HDR, post-processing, UI rendering, animations, and stencil
+testing.
 
 <table>
 <tr>
@@ -568,7 +569,9 @@ forge-gpu/
 │       ├── 29-screen-space-reflections/
 │       ├── 30-planar-reflections/
 │       ├── 31-transform-animations/
-│       └── 32-skinning-animations/
+│       ├── 32-skinning-animations/
+│       ├── 33-vertex-pulling/
+│       └── 34-stencil-testing/
 ├── common/
 │   ├── math/              Math library (vectors, matrices, quaternions)
 │   │   ├── forge_math.h   All math operations (header-only)

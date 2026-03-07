@@ -59,7 +59,7 @@ Pass 2: Main scene (swapchain color + D24_UNORM_S8_UINT depth-stencil)
 Pass 3: Debug overlay           (if toggled, fullscreen stencil visualization)
 ```
 
-### Pipelines (9 total)
+### Pipelines (9 scene + 1 debug = 10 total)
 
 | # | Name                | Stencil Test | Pass Op  | Color Write | Depth Write |
 |---|---------------------|--------------|----------|-------------|-------------|
