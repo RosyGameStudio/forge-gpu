@@ -308,12 +308,19 @@ $$
 
 Keep worked examples (step-by-step with numbers) in ` ```text ` blocks.
 
-## Large file write limit
+## MANDATORY: Chunked writes for large files
 
-Task agents have a 32K output token limit per Write call. If a README exceeds
-~800 lines, split the write into multiple parts and concatenate. This also
-applies to any large code file being written. See `CLAUDE.md` "Large file
-writes" section for the chunked-write pattern.
+Task agents have a 32K output token limit per Write call. **Any file over ~800
+lines** (README, code, skill file) MUST be written in chunks — split into
+parts, write each to `/tmp/`, then concatenate.
+
+**Recovery rule — if a writing agent fails with a token limit error:**
+
+- **NEVER write a fallback or simplified version.** STOP and report the failure.
+- Re-run the write using the chunked approach.
+
+See [`.claude/large-file-strategy.md`](../../../.claude/large-file-strategy.md)
+for the full strategy.
 
 ## Code style reminders
 

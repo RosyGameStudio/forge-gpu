@@ -309,12 +309,19 @@ If errors are found:
 2. Manually fix remaining errors (especially MD040 - missing language tags)
 3. Verify: `npx markdownlint-cli2 "**/*.md"`
 
-## Large file write limit
+## MANDATORY: Chunked writes for large files
 
-Task agents have a 32K output token limit per Write call. If a `main.c` or
-README exceeds ~800 lines, use the chunked-write pattern: split into 3-4 parts
-(~400-600 lines each), write each to `/tmp/`, then concatenate. See `CLAUDE.md`
-"Large file writes" section for details.
+Task agents have a 32K output token limit per Write call. **Any file over ~800
+lines** MUST be written in chunks — split into 3-4 parts (~400-600 lines each),
+write each to `/tmp/`, then concatenate.
+
+**Recovery rule — if a writing agent fails with a token limit error:**
+
+- **NEVER write a fallback or simplified version.** STOP and report the failure.
+- Re-run the write using the chunked approach.
+
+See [`.claude/large-file-strategy.md`](../../../.claude/large-file-strategy.md)
+for the full strategy.
 
 ## Engine Lesson Conventions
 

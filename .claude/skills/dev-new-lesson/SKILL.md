@@ -265,15 +265,31 @@ $$
 
 Keep worked examples (step-by-step with numbers) in ` ```text ` blocks.
 
-## Large file write limit
+## MANDATORY: Chunked writes for main.c
 
-Task agents have a 32K output token limit per Write call. A `main.c` over
-~800 lines will fail silently — the file is never created and all work is lost.
+**ALL GPU lesson `main.c` files MUST use the chunked-write pattern.** Task
+agents have a 32K output token limit per Write call. A single Write over ~800
+lines fails silently — the file is never created and all work is lost. This is
+a fatal error that wastes hours of work.
 
-**If the lesson's main.c will exceed ~800 lines**, add a "main.c Decomposition"
-section to the plan and use the chunked-write pattern: split into 3-4 parts
-(~400-600 lines each), write each to `/tmp/`, then concatenate. See
-`CLAUDE.md` "Large file writes" section for details.
+**Required workflow:**
+
+1. The lesson plan MUST include a **"main.c Decomposition"** section before
+   any coding agent starts writing. Specify what goes in each chunk.
+2. Split into 3-4 parts (~400-600 lines each). Write each to `/tmp/`, then
+   concatenate with `cat`.
+3. Agent A (header + helpers + structs) runs first. Agents B and C run in
+   parallel after A completes.
+
+**Recovery rule — if a coding agent fails with a token limit error:**
+
+- **NEVER write a fallback or simplified `main.c`.** This destroys all the
+  planning and coding work.
+- **STOP immediately** and report the failure to the user.
+- Re-plan using the chunked approach and re-run with decomposed agents.
+
+See [`.claude/large-file-strategy.md`](../../../.claude/large-file-strategy.md)
+for the full strategy and decomposition template.
 
 ## Code style reminders
 
