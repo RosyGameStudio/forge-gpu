@@ -1447,7 +1447,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     case SDL_EVENT_MOUSE_MOTION:
         if (state->mouse_captured) {
-            state->cam_yaw   += event->motion.xrel * MOUSE_SENSITIVITY;
+            state->cam_yaw   -= event->motion.xrel * MOUSE_SENSITIVITY;
             state->cam_pitch -= event->motion.yrel * MOUSE_SENSITIVITY;
             /* Clamp pitch to avoid gimbal-lock flipping */
             if (state->cam_pitch >  PITCH_CLAMP) state->cam_pitch =  PITCH_CLAMP;
