@@ -182,13 +182,13 @@ class PluginRegistry:
             log.exception("Failed to import plugin %s", py_file)
             return
 
-        # Find all AssetPlugin subclasses defined in the module.
-        for attr_name in dir(module):
-            attr = getattr(module, attr_name)
+        # Find AssetPlugin subclasses defined in this module (not imported ones).
+        for attr_name, attr in vars(module).items():
             if (
                 isinstance(attr, type)
                 and issubclass(attr, AssetPlugin)
                 and attr is not AssetPlugin
+                and attr.__module__ == module.__name__
                 and attr.name  # skip abstract subclasses without a name
             ):
                 try:

@@ -61,9 +61,12 @@ class ScannedFile:
 def fingerprint_file(path: Path) -> str:
     """Return the SHA-256 hex digest of *path*'s contents."""
     h = hashlib.sha256()
-    with open(path, "rb") as f:
-        while chunk := f.read(HASH_CHUNK_SIZE):
-            h.update(chunk)
+    try:
+        with open(path, "rb") as f:
+            while chunk := f.read(HASH_CHUNK_SIZE):
+                h.update(chunk)
+    except OSError as exc:
+        raise OSError(f"Failed to fingerprint {path}: {exc}") from exc
     return h.hexdigest()
 
 

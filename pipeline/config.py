@@ -77,20 +77,29 @@ def load_config(path: Path) -> PipelineConfig:
     Raises ``ConfigError`` if the file does not exist or contains invalid
     TOML.
     """
-    if not path.exists():
+    if not path.is_file():
         raise ConfigError(f"Configuration file not found: {path}")
 
     try:
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             raw = tomllib.load(f)
+    except OSError as exc:
+        raise ConfigError(f"Could not read configuration file {path}: {exc}") from exc
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"Invalid TOML in {path}: {exc}") from exc
 
     pipeline_section = raw.get("pipeline", {})
+    if not isinstance(pipeline_section, dict):
+        raise ConfigError("[pipeline] must be a table")
 
-    source_dir = Path(pipeline_section.get("source_dir", DEFAULT_SOURCE_DIR))
-    output_dir = Path(pipeline_section.get("output_dir", DEFAULT_OUTPUT_DIR))
-    cache_dir = Path(pipeline_section.get("cache_dir", DEFAULT_CACHE_DIR))
+    def _resolve(key: str, default: str) -> Path:
+        value = pipeline_section.get(key, default)
+        candidate = Path(value)
+        return candidate if candidate.is_absolute() else path.parent / candidate
+
+    source_dir = _resolve("source_dir", DEFAULT_SOURCE_DIR)
+    output_dir = _resolve("output_dir", DEFAULT_OUTPUT_DIR)
+    cache_dir = _resolve("cache_dir", DEFAULT_CACHE_DIR)
 
     # Collect per-plugin sections — everything that isn't [pipeline] is
     # treated as a plugin configuration block.

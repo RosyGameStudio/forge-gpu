@@ -43,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-c",
         "--config",
         type=Path,
-        default=Path("pipeline.toml"),
+        default=None,
         help="Path to the TOML configuration file (default: pipeline.toml)",
     )
     parser.add_argument(
@@ -89,16 +89,20 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     # -- Configuration ------------------------------------------------------
-    if args.config.exists():
+    config_path = args.config or Path("pipeline.toml")
+    if config_path.exists():
         try:
-            config = load_config(args.config)
-            log.info("Loaded config from %s", args.config)
+            config = load_config(config_path)
+            log.info("Loaded config from %s", config_path)
         except ConfigError as exc:
             log.error("%s", exc)
             return 1
-    else:
+    elif args.config is None:
         config = default_config()
         log.info("No config file found — using defaults")
+    else:
+        log.error("Configuration file not found: %s", config_path)
+        return 1
 
     # CLI overrides
     if args.source_dir is not None:
@@ -108,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     plugins_dir = args.plugins_dir
     if plugins_dir is None:
         # Default: look for a plugins/ directory next to the config file
-        plugins_dir = args.config.parent / "plugins"
+        plugins_dir = config_path.parent / "plugins"
 
     registry = PluginRegistry()
     if plugins_dir.is_dir():
@@ -162,12 +166,10 @@ def main(argv: list[str] | None = None) -> int:
             plugin_name = plugin.name if plugin else "?"
             print(f"  {label}  {f.relative}  ({plugin_name})")
 
-    # Update cache with current fingerprints so the next run sees them as
-    # unchanged (simulates a successful processing step).
-    for f in files:
-        if f.status is not FileStatus.UNCHANGED:
-            cache.set(f.relative, f.fingerprint)
-    cache.save()
+    # Lesson 01 only scans/reports — don't advance the fingerprint cache.
+    # Persisting fingerprints here would mark files as UNCHANGED on the next
+    # run even though no processing actually happened.  Cache writes belong
+    # in a real processing step (added in later lessons).
 
     if new_count + changed_count > 0:
         print(f"\n{new_count + changed_count} file(s) would be processed.")
