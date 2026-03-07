@@ -12,7 +12,7 @@ learner sees objects moving, colliding, and reacting under physical forces.
 
 - You need to teach particle dynamics, rigid body physics, or collision detection
 - A learner wants to understand integration, forces, impulses, or constraints
-- You want to demonstrate a physics concept with a live 3D visualization
+- The concept benefits from a live 3D visualization showing behavior over time
 - A lesson should build on the `common/physics/` header-only library
 
 **Smart behavior:**
