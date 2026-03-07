@@ -98,9 +98,9 @@ execution order.
 
 The comparison evaluates:
 
-$$
+```math
 (\mathrm{buffer\_value} \mathbin{\&} \mathrm{compare\_mask}) \enspace \mathrm{COMPARE\_OP} \enspace (\mathrm{reference} \mathbin{\&} \mathrm{compare\_mask})
-$$
+```
 
 where `buffer_value` is the current stencil value at this pixel, `reference`
 is set per draw call, and `COMPARE_OP` is one of the eight comparison
