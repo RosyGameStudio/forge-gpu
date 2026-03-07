@@ -7,7 +7,7 @@
  * procedurally generated colorful shape decals.
  *
  * Three-pass rendering architecture:
- *   Pass 1: Shadow map (depth-only, D32_FLOAT 2048x2048)
+ *   Pass 1: Shadow map (depth-only, negotiated format 2048x2048)
  *   Pass 2: Scene (Suzannes + grid floor, writes scene_depth)
  *   Pass 3: Decals (reads scene_depth, draws back faces of unit cubes)
  *
@@ -858,8 +858,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* Upload the first primitive's geometry to the GPU */
     if (!state->gltf_scene.primitives || state->gltf_scene.primitive_count == 0) {
         SDL_Log("ERROR: Suzanne glTF has no primitives");
-        forge_gltf_free(&state->gltf_scene);
-        return SDL_APP_FAILURE;
+        return SDL_APP_FAILURE;  /* SDL_AppQuit handles cleanup */
     }
     {
         ForgeGltfPrimitive *prim = &state->gltf_scene.primitives[0];
