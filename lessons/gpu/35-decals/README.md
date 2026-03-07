@@ -11,19 +11,19 @@
 - Deferred decal projection using oriented bounding boxes (OBBs)
 - Inverse depth reconstruction to obtain world positions from the depth buffer
 - Three-pass rendering: shadow, scene, decals
-- Alpha blending with back-face culling for robust decal visibility
+- Front-face culling (`CULL_FRONT`) for robust decal visibility inside volumes
 - Procedural texture generation for decal shapes (circle, heart, star, and more)
 
 ## Result
 
 ![Lesson 35 screenshot](assets/screenshot.png)
 
-A procedural grid floor and colored cubes sit under directional lighting with
+A procedural grid floor and Suzanne meshes sit under directional lighting with
 shadow mapping. Projected onto the scene surfaces are decals of various shapes
 — circles, hearts, stars, checkerboards, rings, diamonds, crosses, and
 triangles — each generated procedurally as a texture. The decals conform to
-whatever geometry they overlap, bending across cube faces and floor surfaces
-without any UV seams or mesh modifications.
+whatever geometry they overlap, bending across Suzanne's curved surfaces and
+the floor without any UV seams or mesh modifications.
 
 ## Key concepts
 
@@ -180,9 +180,9 @@ shape is defined by a distance function evaluated at every texel:
 | Triangle | Half-plane intersection |
 
 The distance value is passed through a smoothstep to produce antialiased edges.
-The result is a single-channel alpha texture uploaded to the GPU. The decal
-fragment shader samples this texture and multiplies the alpha by the decal's
-color to produce the final blended output.
+The result is stored in the alpha channel of an RGBA texture uploaded to the
+GPU. The decal fragment shader samples the texture's alpha channel and
+multiplies it by the decal's tint color to produce the final blended output.
 
 ## Render pass architecture
 
@@ -203,13 +203,13 @@ the scene pass for shadow testing.
 ### Pass 2: Scene
 
 The main scene renders to the swapchain color texture and a separate
-`D24_UNORM_S8_UINT` depth texture. Both are cleared at the start. Cubes and
-the grid floor are drawn with Blinn-Phong lighting and shadow sampling. The
+`D24_UNORM_S8_UINT` depth texture. Both are cleared at the start. Suzanne meshes
+and the grid floor are drawn with Blinn-Phong lighting and shadow sampling. The
 depth texture is stored (not discarded) because the decal pass needs it.
 
 - Color target: swapchain texture, CLEAR + STORE
 - Depth-stencil: scene depth `D24_UNORM_S8_UINT`, CLEAR + STORE
-- Cull mode: BACK (cubes), NONE (grid)
+- Cull mode: BACK (Suzannes), NONE (grid)
 
 ### Pass 3: Decals
 
@@ -261,7 +261,7 @@ float4 frag_main(VSOutput input) : SV_Target0
 
     /* 6. Map local XZ to decal UV; sample shape texture; apply fade */
     float2 decal_uv = local.xz + 0.5;
-    float shape = shape_texture.Sample(shape_sampler, decal_uv).r;
+    float shape = shape_texture.Sample(shape_sampler, decal_uv).a;
     float fade = smoothstep(0.0, FADE_EDGE, 0.5 - abs(local.x))
                * smoothstep(0.0, FADE_EDGE, 0.5 - abs(local.y))
                * smoothstep(0.0, FADE_EDGE, 0.5 - abs(local.z));
@@ -357,10 +357,10 @@ projection techniques are needed in your project.
 
 ## What's next
 
-[Lesson 36 — Edge Detection & X-Ray](../36-edge-detection/) explores
-post-process techniques that read from depth and normal buffers to detect
-edges and reveal occluded geometry. It builds on the same depth-buffer-as-input
-pattern used here for decal projection.
+Lesson 36 — Edge Detection & X-Ray (coming soon) will explore post-process
+techniques that read from depth and normal buffers to detect edges and reveal
+occluded geometry, building on the same depth-buffer-as-input pattern used here
+for decal projection.
 
 ## Exercises
 

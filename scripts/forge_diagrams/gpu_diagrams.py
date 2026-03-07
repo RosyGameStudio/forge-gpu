@@ -17737,7 +17737,7 @@ def diagram_decal_box_projection():
     n_rays = 7
     ray_xs = np.linspace(-box_hw + 0.15, box_hw - 0.15, n_rays)
     # OBB local Y direction (projection axis) rotated into world space
-    proj_dx = -sin_t  # world X component of local -Y direction
+    proj_dx = sin_t  # world X component of local -Y direction
     proj_dy = -cos_t  # world Y component of local -Y direction
     for rx in ray_xs:
         # Ray origin at top of box in OBB local coords, rotated to world
@@ -17937,11 +17937,12 @@ def diagram_decal_depth_reconstruction():
 
     # Pipeline stages
     stages = [
-        (2.0, "Screen UV", STYLE["text_dim"], "(frag_pos / resolution)"),
-        (5.5, "Depth Sample", STYLE["accent4"], "texture(depth_tex, uv)"),
-        (9.0, "NDC Position", STYLE["accent1"], "xy: uv*2-1, y-flip\nz: depth"),
-        (12.8, "inv(VP) Multiply", STYLE["accent2"], "inv_vp * ndc_pos"),
-        (16.2, "World Position", STYLE["accent3"], "result.xyz / result.w"),
+        (1.5, "Screen UV", STYLE["text_dim"], "(frag_pos / resolution)"),
+        (4.5, "Depth Sample", STYLE["accent4"], "texture(depth_tex, uv)"),
+        (7.5, "NDC Position", STYLE["accent1"], "xy: uv*2-1, y-flip\nz: depth"),
+        (10.5, "Clip Position", STYLE["accent1"], "float4(ndc_xy,\n depth, 1.0)"),
+        (13.5, "inv(VP) Multiply", STYLE["accent2"], "inv_vp * clip_pos"),
+        (16.5, "World Position", STYLE["accent3"], "result.xyz / result.w"),
     ]
 
     y_center = 2.8
@@ -18800,22 +18801,24 @@ def diagram_decal_layering():
         overlap_h = 2.5  # intersection height
 
         if has_stencil:
-            # Clean overlap — stencil prevents double-blending
+            # Clean overlap — stencil rejects B, keeps A's appearance
             overlap = Rectangle(
                 (overlap_x, overlap_y),
                 overlap_w,
                 overlap_h,
-                facecolor=STYLE["accent3"],
+                facecolor="none",
                 edgecolor=STYLE["accent3"],
                 linewidth=2,
-                alpha=0.3,
+                linestyle="--",
+                hatch="//",
+                alpha=0.8,
                 zorder=4,
             )
             ax.add_patch(overlap)
             ax.text(
                 overlap_x + overlap_w / 2,
                 overlap_y + overlap_h / 2,
-                "stencil\nblocks\nre-blend",
+                "B rejected\nstencil keeps A",
                 color=STYLE["accent3"],
                 fontsize=8,
                 fontweight="bold",

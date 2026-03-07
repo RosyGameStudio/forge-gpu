@@ -72,8 +72,8 @@ sampler in the decal pass will fail or produce undefined results.
 
 | Pipeline | Cull mode | Depth test | Depth write | Blend | Purpose |
 |----------|-----------|------------|-------------|-------|---------|
-| Shadow | `BACK` | Yes (`LESS_OR_EQUAL`) | Yes | None | Depth-only shadow map |
-| Scene | `BACK` | Yes (`LESS_OR_EQUAL`) | Yes | None | Color + depth for lit geometry |
+| Shadow | `BACK` | Yes (`LESS`) | Yes | None | Depth-only shadow map |
+| Scene | `BACK` | Yes (`LESS`) | Yes | None | Color + depth for lit geometry |
 | Grid | `NONE` | Yes (`LESS_OR_EQUAL`) | Yes | None | Ground grid contributing to scene depth |
 | Decal | `FRONT` | No | No | Alpha blend | Projected decal volumes |
 
@@ -100,7 +100,7 @@ decal_pi.target_info.color_target_descriptions[0].blend_state = (SDL_GPUColorTar
     .dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
     .color_blend_op        = SDL_GPU_BLENDOP_ADD,
     .src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE,
-    .dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+    .dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ZERO,
     .alpha_blend_op         = SDL_GPU_BLENDOP_ADD,
     .color_write_mask       = 0xF,
 };
