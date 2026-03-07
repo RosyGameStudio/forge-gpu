@@ -17654,9 +17654,9 @@ def diagram_phase_ordering():
 def diagram_decal_box_projection():
     """Oriented bounding box projecting a decal texture onto a curved surface.
 
-    Shows a curved surface (sphere section), a wireframe OBB around it,
-    projection rays from the top of the box down through the surface,
-    and the resulting UV-mapped decal region.
+    Shows a parabolic surface, a wireframe OBB around it, projection rays
+    from the top of the box down through the surface, and the resulting
+    UV-mapped decal region.
     """
     fig, ax = plt.subplots(1, 1, figsize=(10, 6), facecolor=STYLE["bg"])
     setup_axes(ax, xlim=(-3, 3), ylim=(-2.5, 2.8), grid=False)
@@ -17666,7 +17666,7 @@ def diagram_decal_box_projection():
     stroke = [pe.withStroke(linewidth=3, foreground=STYLE["bg"])]
     stroke_thin = [pe.withStroke(linewidth=2, foreground=STYLE["bg"])]
 
-    # --- Curved surface (sphere section) ---
+    # --- Curved surface (parabolic) ---
     t_surf = np.linspace(-2.2, 2.2, 200)
     y_surf = -0.12 * t_surf**2 - 0.8
     ax.fill_between(
@@ -17980,7 +17980,7 @@ def diagram_decal_depth_reconstruction():
     ax.text(
         16.2,
         1.5,
-        "Perspective divide:\nworld = clip.xyz / clip.w",
+        "Perspective divide:\nworld_h = inv_vp * clip\nworld = world_h.xyz / world_h.w",
         color=STYLE["accent3"],
         fontsize=8,
         ha="center",
