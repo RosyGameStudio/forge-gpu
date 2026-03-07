@@ -940,9 +940,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     /* ── Pipeline 4: main_pipeline ───────────────────────────────────
-     * Draws the main world objects.  Only pixels whose stencil value
-     * does NOT equal STENCIL_PORTAL pass — the portal area is excluded.
-     * This prevents main-world objects from overwriting portal content. */
+     * Draws the main world objects.  Stencil testing is DISABLED so that
+     * cubes closer to the camera than the portal correctly occlude it
+     * via the depth test.  The portal world already wrote its depth in
+     * Phase B, so depth alone determines which fragments win. */
     {
         SDL_GPUGraphicsPipelineCreateInfo pi;
         SDL_zero(pi);
@@ -959,15 +960,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         pi.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
         pi.depth_stencil_state.enable_depth_write = true;
 
-        /* Stencil: only draw where stencil != STENCIL_PORTAL */
-        pi.depth_stencil_state.enable_stencil_test = true;
-        pi.depth_stencil_state.front_stencil_state.compare_op = SDL_GPU_COMPAREOP_NOT_EQUAL;
-        pi.depth_stencil_state.front_stencil_state.pass_op = SDL_GPU_STENCILOP_KEEP;
-        pi.depth_stencil_state.front_stencil_state.fail_op = SDL_GPU_STENCILOP_KEEP;
-        pi.depth_stencil_state.front_stencil_state.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
-        pi.depth_stencil_state.back_stencil_state = pi.depth_stencil_state.front_stencil_state;
-        pi.depth_stencil_state.compare_mask = 0xFF;
-        pi.depth_stencil_state.write_mask = 0x00;
+        /* No stencil test — depth handles occlusion with portal world */
+        pi.depth_stencil_state.enable_stencil_test = false;
 
         pi.target_info.color_target_descriptions = &color_target;
         pi.target_info.num_color_targets = 1;
@@ -1728,12 +1722,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     /* ── Phase C: Main world (stencil != PORTAL) ───────────────────
-     * Draw main-world cubes.  The main pipeline passes only where
-     * stencil != STENCIL_PORTAL, so these objects are invisible
-     * through the portal opening — the portal shows a different world. */
+     * Draw main-world cubes.  The main pipeline has NO stencil test —
+     * depth alone determines occlusion.  Cubes closer to the camera
+     * than the portal will correctly draw over portal content. */
 
     SDL_BindGPUGraphicsPipeline(pass, state->main_pipeline);
-    SDL_SetGPUStencilReference(pass, STENCIL_PORTAL);
 
     /* Re-bind shadow map for main-world fragment sampling */
     SDL_BindGPUFragmentSamplers(pass, 0, &shadow_bind, 1);
