@@ -838,6 +838,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     app_state *state = SDL_calloc(1, sizeof(app_state));
     if (!state) {
         SDL_Log("ERROR: Failed to allocate app_state");
+        SDL_ReleaseWindowFromGPUDevice(device, window);
         SDL_DestroyWindow(window);
         SDL_DestroyGPUDevice(device);
         return SDL_APP_FAILURE;
